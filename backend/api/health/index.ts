@@ -15,7 +15,7 @@
 // Vercel explicit runtime config — ensures Node.js 22.x even if project
 // defaults change. Also keeps Hobby plan compatible.
 export const config = {
-  runtime: 'nodejs24.x',
+  runtime: 'nodejs22.x',
   maxDuration: 10,
   memory: 512,
 };

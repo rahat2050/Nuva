@@ -12,7 +12,7 @@
  */
 
 export const config = {
-  runtime: 'nodejs24.x',
+  runtime: 'nodejs22.x',
   maxDuration: 10,
   memory: 512,
 };

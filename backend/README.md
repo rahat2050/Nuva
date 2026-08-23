@@ -71,7 +71,7 @@ under our control with no extra supply-chain surface.
 
 ## Deployment
 
-Vercel project with **Root Directory = `backend`**. Node 24.x (`engines`). `vercel.json` pins
+Vercel project with **Root Directory = `backend`**. Node 22.x (`engines`). `vercel.json` pins
 **Build Command = `npm run build`** and **Output Directory = `public`**; the committed
 `public/index.html` is a small landing page so API-only deployments do not fail Vercel's output
 folder check. Functions are detected from `api/**/*.ts`; `dev/` and `tests/` are excluded by
