@@ -17,7 +17,6 @@
 export const config = {
   runtime: 'nodejs22.x',
   maxDuration: 10,
-  memory: 512,
 };
 
 import { defineHandler, ok } from '../../lib/http';

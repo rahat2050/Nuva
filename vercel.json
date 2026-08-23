@@ -7,8 +7,7 @@
   "functions": {
     "backend/api/**/*.ts": {
       "runtime": "nodejs22.x",
-      "maxDuration": 10,
-      "memory": 512
+      "maxDuration": 10
     }
   },
   "rewrites": [
