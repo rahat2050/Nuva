@@ -93,7 +93,9 @@ curl -s -X POST localhost:3000/api/ai/command \
 ## Deploying the backend
 
 1. **Supabase** — create a project, run `supabase/migrations/0001…0003` in order.
-2. **Vercel** — new project from this repo with **Root Directory = `backend`**.
+2. **Vercel** — new project from this repo with **Root Directory = `backend`**. The repo includes
+   `backend/vercel.json`, which pins **Build Command = `npm run build`** and
+   **Output Directory = `public`** so API-only deployments do not fail with a missing `public` folder.
 3. Add environment variables (see [`backend/.env.example`](backend/.env.example)):
    `GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 4. Deploy, then verify:
