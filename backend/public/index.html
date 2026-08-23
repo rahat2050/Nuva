@@ -3,20 +3,240 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NUVA Backend</title>
+    <meta name="description" content="NUVA v1.0 Backend — Personal AI assistant for Android that understands Bangla, Banglish and English" />
+    <title>NUVA Backend — v1.0</title>
     <style>
-      :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0f172a; color: #e2e8f0; }
-      main { max-width: 42rem; padding: 2rem; }
-      a { color: #7dd3fc; }
-      code { background: rgba(148, 163, 184, 0.18); border-radius: 0.35rem; padding: 0.1rem 0.35rem; }
+      :root {
+        color-scheme: dark;
+        --bg: #0a0b0f;
+        --panel: #14161d;
+        --line: #252833;
+        --text: #e8eaf0;
+        --muted: #8b90a0;
+        --accent: #7c5cff;
+        --ok: #3ddc97;
+        --warn: #ffb454;
+        --err: #ff5c72;
+        --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(1200px 600px at 20% -10%, rgba(124,92,255,0.15), transparent),
+                    radial-gradient(1000px 500px at 90% 0%, rgba(61,220,151,0.10), transparent),
+                    var(--bg);
+        color: var(--text);
+        font: 15px/1.6 var(--font);
+        display: flex;
+        flex-direction: column;
+      }
+      .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 48px; width: 100%; }
+      header { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
+      .logo {
+        width: 44px; height: 44px; border-radius: 12px;
+        background: linear-gradient(135deg, var(--accent), var(--ok));
+        display: grid; place-items: center;
+        font-weight: 800; font-size: 20px; color: #0a0b0f;
+        box-shadow: 0 8px 24px rgba(124,92,255,0.3);
+      }
+      h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; }
+      .sub { color: var(--muted); font-size: 13px; margin: 0 0 28px 60px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px;
+        position: relative;
+        overflow: hidden;
+      }
+      .panel h2 {
+        font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--muted); margin: 0 0 14px; font-weight: 600;
+        display: flex; align-items: center; gap: 8px;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+      .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+      .dot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+      .dot.err { background: var(--err); box-shadow: 0 0 8px var(--err); }
+      .dot.loading { background: var(--muted); animation: pulse 1.2s infinite; }
+      @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+      .kv { display: grid; gap: 8px; font-size: 13px; }
+      .kv div { display: flex; justify-content: space-between; gap: 12px; }
+      .kv span:first-child { color: var(--muted); }
+      .kv span:last-child { font-family: var(--mono); color: var(--text); }
+      .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+      .badge {
+        font-size: 11px; padding: 4px 9px; border-radius: 999px;
+        border: 1px solid var(--line); color: var(--muted);
+        font-family: var(--mono);
+      }
+      .badge.ok { color: var(--ok); border-color: #1e5c46; background: rgba(61,220,151,0.08); }
+      .badge.warn { color: var(--warn); border-color: #5c4620; background: rgba(255,180,84,0.08); }
+      .badge.err { color: var(--err); border-color: #5c2430; background: rgba(255,92,114,0.08); }
+      pre {
+        background: #0e1016; border: 1px solid var(--line); border-radius: 10px;
+        padding: 14px; overflow: auto; max-height: 360px;
+        font: 12px/1.5 var(--mono); margin: 12px 0 0; white-space: pre-wrap; word-break: break-word;
+      }
+      a { color: #7dd3fc; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      code { background: rgba(148,163,184,0.18); border-radius: 0.35rem; padding: 0.1rem 0.35rem; font-family: var(--mono); font-size: 13px; }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+      button {
+        padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line);
+        background: #1c1f29; color: var(--text); cursor: pointer; font-size: 13px; font-family: inherit;
+        transition: border-color 0.15s, transform 0.05s;
+      }
+      button:hover { border-color: var(--accent); }
+      button:active { transform: scale(0.98); }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #0a0b0f; font-weight: 600; }
+      .footer { margin-top: auto; padding: 20px; text-align: center; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
+      .note { color: var(--muted); font-size: 12px; margin-top: 10px; line-height: 1.5; }
     </style>
   </head>
   <body>
-    <main>
-      <h1>NUVA Backend</h1>
-      <p>The serverless API is deployed. Use <code>/api/health</code> to verify the service.</p>
-      <p><a href="/api/health">Open health check</a></p>
-    </main>
+    <div class="wrap">
+      <header>
+        <div class="logo">N</div>
+        <h1>NUVA Backend</h1>
+      </header>
+      <p class="sub">v1.0 — Vercel Backend Foundation · Secure API gateway for Android personal assistant</p>
+
+      <div class="grid">
+        <div class="panel">
+          <h2><span id="statusDot" class="dot loading"></span> Service Status</h2>
+          <div class="kv" id="kv">
+            <div><span>Service</span><span>nuva-backend</span></div>
+            <div><span>Version</span><span>1.0.0</span></div>
+            <div><span>Phase</span><span>1</span></div>
+            <div><span>Time</span><span id="time">—</span></div>
+            <div><span>Request ID</span><span id="reqId">—</span></div>
+          </div>
+          <div class="badges" id="badges"></div>
+          <div class="row">
+            <button onclick="check(false)">GET /api/health</button>
+            <button onclick="check(true)">GET /api/health?deep=1</button>
+            <button class="primary" onclick="document.getElementById('healthOut').scrollIntoView({behavior:'smooth'})">View JSON</button>
+          </div>
+          <p class="note">Cheap health is free (no upstream calls). <code>?deep=1</code> pings Groq & Supabase to prove deployment.</p>
+        </div>
+
+        <div class="panel">
+          <h2>Quick Links</h2>
+          <div class="kv">
+            <div><span>Health</span><span><a href="/api/health">/api/health</a></span></div>
+            <div><span>Deep Health</span><span><a href="/api/health?deep=1">/api/health?deep=1</a></span></div>
+            <div><span>AI Command</span><span><code>POST /api/ai/command</code></span></div>
+            <div><span>Commands</span><span><code>GET /api/commands</code></span></div>
+            <div><span>Memory</span><span><code>GET /api/memory</code></span></div>
+          </div>
+          <div class="row">
+            <button onclick="testCommand()">Test Command: YouTube</button>
+          </div>
+          <p class="note">
+            Android app flow: <code>Voice → /api/ai/command → validated action → risk check → confirmation → execution</code><br/>
+            Docs: <a href="https://github.com/rahat2050/Nuva" target="_blank" rel="noopener">GitHub</a>
+          </p>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <h2>Live Response</h2>
+        <pre id="healthOut">Loading health check…</pre>
+        <pre id="cmdOut" style="display:none"></pre>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <h2>How to Deploy</h2>
+        <div style="font-size:13px; line-height:1.7; color:var(--muted)">
+          <p style="margin:0 0 8px; color:var(--text)">1. <b>Supabase</b> — create project, run <code>supabase/migrations/0001…0003</code> in order.</p>
+          <p style="margin:0 0 8px; color:var(--text)">2. <b>Vercel</b> — import repo, set <b>Root Directory = <code>backend</code></b>. Build command <code>npm run build</code>, output <code>public</code> is auto-configured.</p>
+          <p style="margin:0 0 8px; color:var(--text)">3. Add env vars: <code>GROQ_API_KEY</code>, <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code></p>
+          <p style="margin:0">4. Verify: <code>curl https://your-domain/api/health?deep=1 | jq .checks</code> — both must be <code>ok</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      NUVA v1.0 · MIT License · Built for Bangla, Banglish & English · <a href="/api/health">Health</a>
+    </div>
+
+    <script>
+      const dot = document.getElementById('statusDot');
+      const badges = document.getElementById('badges');
+      const out = document.getElementById('healthOut');
+      const cmdOut = document.getElementById('cmdOut');
+      const timeEl = document.getElementById('time');
+      const reqIdEl = document.getElementById('reqId');
+
+      function setDot(state) {
+        dot.className = 'dot ' + state;
+      }
+
+      function renderBadges(cfg) {
+        if (!cfg) {
+          badges.innerHTML = '<span class="badge err">health failed</span>';
+          return;
+        }
+        const b = [];
+        b.push('<span class="badge ' + (cfg.groq.configured ? 'ok' : 'warn') + '">Groq: ' + (cfg.groq.configured ? cfg.groq.model : 'not configured') + '</span>');
+        b.push('<span class="badge ' + (cfg.supabase.configured ? 'ok' : 'warn') + '">Supabase: ' + (cfg.supabase.configured ? 'configured' : 'not configured') + '</span>');
+        b.push('<span class="badge ' + (cfg.persistence ? 'ok' : 'warn') + '">Persistence: ' + (cfg.persistence ? 'on' : 'off') + '</span>');
+        b.push('<span class="badge">Auth: ' + cfg.auth_required + '</span>');
+        b.push('<span class="badge">Fallback: ' + cfg.fallback_parser + '</span>');
+        badges.innerHTML = b.join('');
+      }
+
+      async function check(deep) {
+        out.style.display = 'block';
+        cmdOut.style.display = 'none';
+        out.textContent = 'Loading ' + (deep ? '/api/health?deep=1' : '/api/health') + '…';
+        setDot('loading');
+        try {
+          const res = await fetch('/api/health' + (deep ? '?deep=1' : ''), { cache: 'no-store' });
+          const json = await res.json();
+          out.textContent = res.status + ' ' + JSON.stringify(json, null, 2);
+          timeEl.textContent = json.time ? new Date(json.time).toLocaleString() : '—';
+          reqIdEl.textContent = json.request_id ? json.request_id.slice(0, 8) + '…' : '—';
+          renderBadges(json.config);
+          if (json.ok) setDot('ok');
+          else if (res.status >= 500) setDot('err');
+          else setDot('warn');
+          if (json.checks) {
+            const groqOk = json.checks.groq.status !== 'error';
+            const supaOk = json.checks.supabase.status !== 'error';
+            if (!groqOk || !supaOk) setDot('warn');
+          }
+        } catch (err) {
+          out.textContent = 'Failed to fetch health: ' + err;
+          setDot('err');
+          renderBadges(null);
+        }
+      }
+
+      async function testCommand() {
+        cmdOut.style.display = 'block';
+        cmdOut.textContent = 'Sending POST /api/ai/command { text: "Nuva YouTube open koro." } …';
+        try {
+          const res = await fetch('/api/ai/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Nuva-Device-Id': 'web-dashboard' },
+            body: JSON.stringify({ text: 'Nuva YouTube open koro.', language: 'auto' }),
+          });
+          const json = await res.json();
+          cmdOut.textContent = res.status + ' ' + JSON.stringify(json, null, 2);
+          cmdOut.scrollIntoView({ behavior: 'smooth' });
+        } catch (err) {
+          cmdOut.textContent = 'Failed: ' + err;
+        }
+      }
+
+      // Auto-check on load
+      check(false);
+    </script>
   </body>
 </html>

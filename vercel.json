@@ -1,15 +1,22 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "npm run build",
-  "outputDirectory": "public",
+  "buildCommand": "cd backend && npm run build",
+  "outputDirectory": "backend/public",
+  "installCommand": "cd backend && npm install",
   "functions": {
-    "api/**/*.ts": {
+    "backend/api/**/*.ts": {
       "runtime": "nodejs22.x",
       "maxDuration": 10,
       "memory": 512
     }
   },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/backend/api/:path*"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
@@ -21,12 +28,6 @@
         { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=()" },
         { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/index.html"
     }
   ]
 }
