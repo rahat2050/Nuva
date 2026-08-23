@@ -1,0 +1,7 @@
+# Local-only harnesses — never deployed to Vercel.
+dev/
+tests/
+vitest.config.ts
+.env
+.env.*
+!.env.example

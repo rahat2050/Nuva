@@ -1,0 +1,51 @@
+# ---------------------------------------------------------------------------
+# NUVA — repository ignore rules
+# Security rule (master prompt §12): never commit secrets or credentials.
+# ---------------------------------------------------------------------------
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+service-account*.json
+
+# Node / backend
+node_modules/
+dist/
+build/
+coverage/
+.vercel/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Android (used from Phase 2 onwards)
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/
+android/local.properties
+android/.idea/
+android/.cxx/
+*.apk
+*.aab
+*.aar
+*.keystore
+!android/app/debug.keystore
+keystore.properties
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
