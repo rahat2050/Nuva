@@ -10,7 +10,6 @@
  * command interpretation still works, but nothing is persisted and per-user
  * endpoints return 401.
  */
-import { getAnonClient } from './supabase';
 import { getEnv, supabaseConfigured, type NuvaEnv } from './env';
 import { NuvaError } from './errors';
 import type { Logger } from './logger';
@@ -77,6 +76,11 @@ export async function resolveIdentity(
     if (!supabaseConfigured(env)) {
       throw new NuvaError('NOT_CONFIGURED', 'A bearer token was sent but Supabase auth is not configured');
     }
+    // Only load the Supabase SDK when authentication is actually requested.
+    // This keeps anonymous routes (especially /api/health) bootable even when
+    // Supabase is intentionally not configured or its optional SDK bundle is
+    // unavailable in a deployment.
+    const { getAnonClient } = await import('./supabase');
     const { data, error } = await getAnonClient(env).auth.getUser(token);
     if (error || !data.user) {
       logger.warn('rejected bearer token', { reason: error?.message ?? 'no user' });

@@ -8,12 +8,32 @@
  * Never returns secret values, only booleans describing their presence (§12).
  */
 import { defineHandler, ok } from '../../lib/http';
-import { envSummary } from '../../lib/env';
+import { envSummary, type NuvaEnv } from '../../lib/env';
 import { pingGroq } from '../../lib/groq';
-import { pingSupabase } from '../../lib/supabase';
+import type { DependencyCheck } from '../../types/api';
 import type { HealthResponse } from '../../types/api';
 
 const VERSION = '1.0.0';
+
+/**
+ * Supabase is not needed for the normal liveness endpoint. Loading it lazily
+ * means an optional database SDK/configuration issue cannot turn a cheap health
+ * check into a function-invocation failure. Deep health still reports such an
+ * issue as a structured dependency error.
+ */
+async function checkSupabase(env: NuvaEnv): Promise<DependencyCheck> {
+  try {
+    const { pingSupabase } = await import('../../lib/supabase');
+    return await pingSupabase(env);
+  } catch {
+    return {
+      ok: false,
+      status: 'error',
+      latency_ms: null,
+      detail: 'Supabase health check could not be initialized',
+    };
+  }
+}
 
 export default defineHandler({
   name: 'health',
@@ -33,7 +53,7 @@ export default defineHandler({
     };
 
     if (deep) {
-      const [groq, supabase] = await Promise.all([pingGroq(env), pingSupabase(env)]);
+      const [groq, supabase] = await Promise.all([pingGroq(env), checkSupabase(env)]);
       response.checks = { groq, supabase };
       // A dependency that is deliberately not configured is not a failure;
       // a configured dependency that cannot be reached is.
