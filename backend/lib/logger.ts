@@ -4,6 +4,10 @@
  * §22 asks for useful logging; §12 forbids leaking secrets. Every value logged
  * passes through `redact()`, which blanks secret-looking keys and truncates long
  * strings so a transcript never floods the log.
+ *
+ * HARDENED: getEnv() is called defensively — if it throws, we fall back to
+ * info level instead of crashing the function (which would become
+ * FUNCTION_INVOCATION_FAILED on Vercel).
  */
 import { getEnv, type LogLevel } from './env';
 
@@ -49,22 +53,42 @@ export interface Logger {
   child(fields: LogFields): Logger;
 }
 
+function getLogLevelSafe(): LogLevel {
+  try {
+    return getEnv().logLevel;
+  } catch {
+    return 'info';
+  }
+}
+
 function emit(level: LogLevel, message: string, base: LogFields, fields?: LogFields): void {
-  const min = LEVEL_WEIGHT[getEnv().logLevel];
-  if (LEVEL_WEIGHT[level] < min) return;
+  try {
+    const currentLevel = getLogLevelSafe();
+    const min = LEVEL_WEIGHT[currentLevel] ?? LEVEL_WEIGHT['info'] ?? 20;
+    const lvlWeight = LEVEL_WEIGHT[level] ?? 20;
+    if (lvlWeight < min) return;
 
-  const payload = {
-    level,
-    time: new Date().toISOString(),
-    service: 'nuva-backend',
-    message,
-    ...redact({ ...base, ...(fields ?? {}) }),
-  };
+    const payload = {
+      level,
+      time: new Date().toISOString(),
+      service: 'nuva-backend',
+      message,
+      ...redact({ ...base, ...(fields ?? {}) }),
+    };
 
-  const line = JSON.stringify(payload);
-  if (level === 'error') console.error(line);
-  else if (level === 'warn') console.warn(line);
-  else console.log(line);
+    const line = JSON.stringify(payload);
+    if (level === 'error') console.error(line);
+    else if (level === 'warn') console.warn(line);
+    else console.log(line);
+  } catch {
+    // Logger must never throw — if JSON.stringify fails or anything else,
+    // fall back to a plain console.log so we don't crash the function.
+    try {
+      console.log(`[${level}] ${message}`);
+    } catch {
+      // ultimate fallback: do nothing
+    }
+  }
 }
 
 export function createLogger(base: LogFields = {}): Logger {

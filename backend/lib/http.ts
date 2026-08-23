@@ -2,8 +2,13 @@
  * Shared HTTP plumbing for every NUVA endpoint: request ids, CORS, security
  * headers, method guards, body limits, rate limiting, timing and a single
  * error funnel so nothing ever fails silently (§24).
+ *
+ * HARDENED FOR VERCEL:
+ * - All env/logger creation is inside the try/catch so a mis-configured env
+ *   never becomes FUNCTION_INVOCATION_FAILED.
+ * - randomUUID has multiple fallbacks (node:crypto → globalThis.crypto → Math.random)
+ * - Security headers and CORS are applied defensively.
  */
-import { randomUUID } from 'node:crypto';
 import { getEnv, type NuvaEnv } from './env';
 import { NuvaError, toNuvaError } from './errors';
 import { createLogger, type Logger } from './logger';
@@ -36,25 +41,55 @@ export interface ApiResult {
   body: unknown;
 }
 
+function safeRandomUUID(): string {
+  try {
+    // Node 14.17+ provides randomUUID in node:crypto, but dynamic import
+    // avoids a hard top-level import that could crash in edge-like envs.
+    // We try globalThis.crypto first (available in Node 19+ and browsers),
+    // then node:crypto, then a Math.random fallback.
+    const g = globalThis as unknown as { crypto?: { randomUUID?: () => string } };
+    if (g.crypto?.randomUUID) return g.crypto.randomUUID();
+  } catch {
+    // ignore
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { randomUUID } = require('node:crypto') as { randomUUID: () => string };
+    if (typeof randomUUID === 'function') return randomUUID();
+  } catch {
+    // ignore
+  }
+  // Last resort: not cryptographically strong, but better than crashing.
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function applySecurityHeaders(res: VercelResponse): void {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  try {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  } catch {
+    // If headers already sent or res is mocked, ignore.
+  }
 }
 
 function applyCors(req: VercelRequest, res: VercelResponse, env: NuvaEnv, methods: HttpMethod[]): void {
-  const origin = headerValue(req, 'origin');
-  if (env.allowedOrigins.includes('*')) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  } else if (origin && env.allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
+  try {
+    const origin = headerValue(req, 'origin');
+    if (env.allowedOrigins.includes('*')) {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    } else if (origin && env.allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
+    res.setHeader('Access-Control-Allow-Methods', [...methods, 'OPTIONS'].join(', '));
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Nuva-Device-Id');
+    res.setHeader('Access-Control-Max-Age', '600');
+  } catch {
+    // Non-fatal
   }
-  res.setHeader('Access-Control-Allow-Methods', [...methods, 'OPTIONS'].join(', '));
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Nuva-Device-Id');
-  res.setHeader('Access-Control-Max-Age', '600');
 }
 
 /** Vercel pre-parses JSON bodies; the local dev harness may hand us a string. */
@@ -91,9 +126,13 @@ function parseBody(req: VercelRequest): Record<string, unknown> {
 
 function flattenQuery(req: VercelRequest): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(req.query ?? {})) {
-    if (typeof value === 'string') out[key] = value;
-    else if (Array.isArray(value) && typeof value[0] === 'string') out[key] = value[0];
+  try {
+    for (const [key, value] of Object.entries(req.query ?? {})) {
+      if (typeof value === 'string') out[key] = value;
+      else if (Array.isArray(value) && typeof value[0] === 'string') out[key] = value[0];
+    }
+  } catch {
+    // ignore malformed query
   }
   return out;
 }
@@ -116,21 +155,76 @@ export interface HandlerOptions {
 
 export function defineHandler(options: HandlerOptions) {
   return async function nuvaHandler(req: VercelRequest, res: VercelResponse): Promise<void> {
-    const env = getEnv();
-    const requestId = headerValue(req, 'x-vercel-id') ?? randomUUID();
-    const startedAt = Date.now();
-    const logger = createLogger({ request_id: requestId, endpoint: options.name });
+    // These are initialized with safe fallbacks BEFORE the try, so the catch
+    // block can always report a request_id even if getEnv() itself throws.
+    let env: NuvaEnv;
+    let requestId: string;
+    let logger: Logger;
+    let startedAt = Date.now();
+    let language: Language = 'en';
 
-    applySecurityHeaders(res);
-    applyCors(req, res, env, options.methods);
-    res.setHeader('X-Request-Id', requestId);
-
-    if (req.method === 'OPTIONS') {
-      res.status(204).end();
-      return;
+    try {
+      env = getEnv();
+    } catch {
+      // If env parsing itself crashes, use minimal safe defaults so we can
+      // still return a structured JSON error instead of FUNCTION_INVOCATION_FAILED.
+      env = {
+        groqApiKey: null,
+        groqModel: 'openai/gpt-oss-20b',
+        groqFallbackModel: 'openai/gpt-oss-120b',
+        groqBaseUrl: 'https://api.groq.com/openai/v1',
+        groqTimeoutMs: 12000,
+        groqReasoningEffort: 'low',
+        supabaseUrl: null,
+        supabaseAnonKey: null,
+        supabaseServiceRoleKey: null,
+        requireAuth: false,
+        persistEnabled: false,
+        allowFallbackParser: true,
+        allowedOrigins: ['*'],
+        rateLimitPerMin: 60,
+        logLevel: 'info',
+        isProduction: false,
+      };
     }
 
-    let language: Language = 'en';
+    try {
+      requestId = headerValue(req, 'x-vercel-id') ?? safeRandomUUID();
+    } catch {
+      requestId = safeRandomUUID();
+    }
+
+    try {
+      startedAt = Date.now();
+      logger = createLogger({ request_id: requestId, endpoint: options.name });
+    } catch {
+      // Fallback logger that never throws
+      logger = {
+        debug: () => {},
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        child: () => logger,
+      } as unknown as Logger;
+    }
+
+    // Always apply security headers, even if env was fallback.
+    applySecurityHeaders(res);
+    try {
+      applyCors(req, res, env, options.methods);
+      res.setHeader('X-Request-Id', requestId);
+    } catch {
+      // ignore
+    }
+
+    if (req.method === 'OPTIONS') {
+      try {
+        res.status(204).end();
+      } catch {
+        // ignore
+      }
+      return;
+    }
 
     try {
       const method = (req.method ?? 'GET').toUpperCase() as HttpMethod;
@@ -147,10 +241,16 @@ export function defineHandler(options: HandlerOptions) {
       if (options.rateLimit) {
         const key = `${options.name}:${headerValue(req, 'x-nuva-device-id') ?? clientIp(req) ?? 'anonymous'}`;
         const decision = checkRateLimit(key, env.rateLimitPerMin);
-        res.setHeader('X-RateLimit-Limit', String(decision.limit));
-        res.setHeader('X-RateLimit-Remaining', String(decision.remaining));
+        try {
+          res.setHeader('X-RateLimit-Limit', String(decision.limit));
+          res.setHeader('X-RateLimit-Remaining', String(decision.remaining));
+          if (!decision.allowed) {
+            res.setHeader('Retry-After', String(decision.retryAfterSeconds));
+          }
+        } catch {
+          // ignore header errors
+        }
         if (!decision.allowed) {
-          res.setHeader('Retry-After', String(decision.retryAfterSeconds));
           throw new NuvaError('RATE_LIMITED', `Rate limit of ${decision.limit}/min exceeded`, { expected: true });
         }
       }
@@ -167,7 +267,11 @@ export function defineHandler(options: HandlerOptions) {
         language,
       });
 
-      logger.info('request completed', { status: result.status, duration_ms: Date.now() - startedAt });
+      try {
+        logger.info('request completed', { status: result.status, duration_ms: Date.now() - startedAt });
+      } catch {
+        // ignore logger failure
+      }
       res.status(result.status).json(result.body);
     } catch (err) {
       const error = toNuvaError(err);
@@ -189,10 +293,23 @@ export function defineHandler(options: HandlerOptions) {
         duration_ms: Date.now() - startedAt,
         error: error.message,
       };
-      if (error.expected) logger.warn('request rejected', fields);
-      else logger.error('request failed', fields);
+      try {
+        if (error.expected) logger.warn('request rejected', fields);
+        else logger.error('request failed', fields);
+      } catch {
+        // logger failed, ignore
+      }
 
-      res.status(error.status).json(body);
+      try {
+        res.status(error.status).json(body);
+      } catch {
+        // If res.json fails (headers already sent), try end()
+        try {
+          res.status(error.status).end(JSON.stringify(body));
+        } catch {
+          // Last resort: do nothing, Vercel will return 500 but we tried
+        }
+      }
     }
   };
 }

@@ -10,6 +10,12 @@
  * not be processed (auth, rate limit, AI unreachable), which is what the Android
  * error handling in §24 keys off.
  */
+
+export const config = {
+  runtime: 'nodejs22.x',
+  maxDuration: 10,
+};
+
 import { defineHandler, ok } from '../../lib/http';
 import { resolveIdentity } from '../../lib/auth';
 import { interpretCommand } from '../../lib/pipeline';

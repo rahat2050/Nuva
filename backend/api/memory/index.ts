@@ -9,6 +9,12 @@
  * not for secrets. Keys that look like credentials are rejected outright so a
  * misbehaving client cannot turn NUVA's memory into a password store.
  */
+
+export const config = {
+  runtime: 'nodejs22.x',
+  maxDuration: 10,
+};
+
 import { defineHandler, ok } from '../../lib/http';
 import { requireUser, resolveIdentity } from '../../lib/auth';
 import { deleteMemory, listMemories, upsertMemory } from '../../lib/repository';

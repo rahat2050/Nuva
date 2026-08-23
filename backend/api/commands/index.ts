@@ -10,6 +10,12 @@
  *
  * Both require a verified Supabase user: history is inherently per-user.
  */
+
+export const config = {
+  runtime: 'nodejs22.x',
+  maxDuration: 10,
+};
+
 import { defineHandler, ok } from '../../lib/http';
 import { requireUser, resolveIdentity } from '../../lib/auth';
 import { listCommands, recordCommand, updateCommandStatus } from '../../lib/repository';
