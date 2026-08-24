@@ -74,6 +74,8 @@ export default defineHandler({
         auth_required: false,
         persistence: false,
         fallback_parser: true,
+        rate_limiting: 'memory' as const,
+        cloudinary: { configured: false },
       };
     }
 

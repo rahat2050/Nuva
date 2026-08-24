@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  NUVA AccessibilityService capabilities — deliberately scoped:
+  * canRetrieveWindowContent — read the screen for READ_SCREEN and NodeFinder
+  * canPerformGestures        — tap/swipe/scroll via gesture dispatch
+  * flagReportViewIds         — match selectors by resource-id
+  No package restriction: automation targets any user-chosen app (WhatsApp,
+  YouTube, browser, …). The service is ALWAYS disabled until the user enables
+  it manually in Android Settings → Accessibility.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault|flagReportViewIds|flagIncludeNotImportantViews"
+    android:canRetrieveWindowContent="true"
+    android:canPerformGestures="true"
+    android:notificationTimeout="100"
+    android:description="@string/accessibility_service_description" />

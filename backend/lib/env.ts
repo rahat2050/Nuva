@@ -50,6 +50,20 @@ export interface NuvaEnv {
   rateLimitPerMin: number;
   logLevel: LogLevel;
   isProduction: boolean;
+
+  /**
+   * Optional distributed rate limiting via Upstash Redis REST (roadmap
+   * follow-up). When both URL and token are set, rate limit decisions become
+   * global across serverless instances instead of per-instance.
+   * Optional so hard-coded fallback env literals elsewhere stay valid.
+   */
+  upstash?: { url: string; token: string } | null;
+  /**
+   * Optional Cloudinary direct-upload signing (roadmap follow-up, §18).
+   * The API secret is only ever used to SIGN parameters server-side; it is
+   * never returned to any client.
+   */
+  cloudinary?: { cloudName: string; apiKey: string; apiSecret: string } | null;
 }
 
 function safeEnv(): Record<string, string | undefined> {
@@ -113,6 +127,21 @@ export function getEnv(): NuvaEnv {
     // An explicitly empty value disables the parameter; an absent value uses the default.
     const effort = reasoningRaw === undefined ? DEFAULTS.GROQ_REASONING_EFFORT : (reasoningRaw ?? '').trim();
 
+    const upstashUrl = str('UPSTASH_REDIS_REST_URL');
+    const upstashToken = str('UPSTASH_REDIS_REST_TOKEN');
+    const upstash =
+      upstashUrl !== null && upstashToken !== null
+        ? { url: upstashUrl.replace(/\/+$/, ''), token: upstashToken }
+        : null;
+
+    const cloudName = str('CLOUDINARY_CLOUD_NAME');
+    const cloudKey = str('CLOUDINARY_API_KEY');
+    const cloudSecret = str('CLOUDINARY_API_SECRET');
+    const cloudinary =
+      cloudName !== null && cloudKey !== null && cloudSecret !== null
+        ? { cloudName, apiKey: cloudKey, apiSecret: cloudSecret }
+        : null;
+
     return {
       groqApiKey: str('GROQ_API_KEY'),
       groqModel: str('GROQ_MODEL') ?? DEFAULTS.GROQ_MODEL,
@@ -135,6 +164,8 @@ export function getEnv(): NuvaEnv {
       rateLimitPerMin: int('NUVA_RATE_LIMIT_PER_MIN', DEFAULTS.RATE_LIMIT_PER_MIN, 1, 10_000),
       logLevel: logLevel(),
       isProduction: (str('VERCEL_ENV') ?? str('NODE_ENV')) === 'production',
+      upstash,
+      cloudinary,
     };
   } catch {
     // Ultimate fallback: return safe defaults that allow the health check to
@@ -186,6 +217,24 @@ export function supabaseWritable(env: NuvaEnv = getEnv()): boolean {
   }
 }
 
+/** Distributed rate limiting is active only when both Upstash vars are set. */
+export function upstashConfigured(env: NuvaEnv = getEnv()): boolean {
+  try {
+    return env.upstash !== null && env.upstash !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/** Cloudinary direct-upload signing is active only when all three vars are set. */
+export function cloudinaryConfigured(env: NuvaEnv = getEnv()): boolean {
+  try {
+    return env.cloudinary !== null && env.cloudinary !== undefined;
+  } catch {
+    return false;
+  }
+}
+
 /** Client-safe summary. Contains no secret material by construction. */
 export function envSummary(env: NuvaEnv = getEnv()) {
   try {
@@ -202,6 +251,8 @@ export function envSummary(env: NuvaEnv = getEnv()) {
       auth_required: env.requireAuth,
       persistence: env.persistEnabled,
       fallback_parser: env.allowFallbackParser,
+      rate_limiting: (upstashConfigured(env) ? 'upstash' : 'memory') as 'upstash' | 'memory',
+      cloudinary: { configured: cloudinaryConfigured(env) },
     };
   } catch {
     return {
@@ -210,6 +261,8 @@ export function envSummary(env: NuvaEnv = getEnv()) {
       auth_required: false,
       persistence: false,
       fallback_parser: true,
+      rate_limiting: 'memory' as const,
+      cloudinary: { configured: false },
     };
   }
 }

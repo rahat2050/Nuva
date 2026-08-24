@@ -15,10 +15,11 @@ you say into a validated action, asks before doing anything risky, and carries i
 | Phase                                    | Status                                             |
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHRASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
-| **PHRASE 2** — Android application      | ⛔ Not started (gated on PHRASE 1 deployment)      |
+| **PHRASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
 
-`backend/` builds clean under strict TypeScript with **156 passing tests**. `android/` is an
-intentional placeholder. See [`docs/roadmap.md`](docs/roadmap.md) for the exit criteria.
+`backend/` builds clean under strict TypeScript with **188 passing tests**. `android/` contains the
+full PHRASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
+[`docs/roadmap.md`](docs/roadmap.md) for the exit criteria.
 
 ## Architecture
 
@@ -48,7 +49,7 @@ and classifies risk; the user confirms anything sensitive; only then does Androi
 
 ```
 NUVA/
-├── android/      PHRASE 2 — Kotlin + Compose app (placeholder)
+├── android/      PHRASE 2 — Kotlin + Compose app
 ├── backend/      PHRASE 1 — Vercel serverless API (TypeScript)
 ├── supabase/     migrations (schema + RLS) and seed
 ├── docs/         architecture, commands, security, testing, roadmap
@@ -63,7 +64,7 @@ NUVA/
 cd backend
 npm install
 cp .env.example .env.local     # add GROQ_API_KEY / SUPABASE_* as you get them
-npm run verify                 # tsc --noEmit + 156 tests
+npm run verify                 # tsc --noEmit + 188 tests
 npm run dev                    # http://localhost:3000  (test console at /)
 ```
 

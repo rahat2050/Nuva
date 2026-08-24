@@ -1,0 +1,27 @@
+# Built application files
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Local configuration (SDK path, signing keys — never commit)
+local.properties
+keystore.properties
+*.jks
+*.keystore
+
+# Logs / OS
+*.log
+.DS_Store

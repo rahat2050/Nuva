@@ -1,0 +1,238 @@
+[
+  {
+    "id": "open-youtube-banglish",
+    "text": "Nuva YouTube open koro.",
+    "language": "banglish",
+    "expect": { "intent": "OPEN_APP", "risk": "low", "action": { "type": "OPEN_APP", "app": "youtube" } }
+  },
+  {
+    "id": "open-whatsapp-banglish",
+    "text": "WhatsApp khulo.",
+    "language": "banglish",
+    "expect": { "intent": "OPEN_APP", "risk": "low", "action": { "type": "OPEN_APP", "app": "whatsapp" } }
+  },
+  {
+    "id": "open-maps-bangla",
+    "text": "নুভা গুগল ম্যাপ খুলে দাও।",
+    "language": "bn",
+    "expect": { "intent": "OPEN_APP", "risk": "low", "action": { "type": "OPEN_APP", "app": "google maps" } }
+  },
+  {
+    "id": "close-app-english",
+    "text": "Close the YouTube app.",
+    "language": "en",
+    "expect": { "intent": "CLOSE_APP", "risk": "low", "action": { "type": "CLOSE_APP", "app": "youtube" } }
+  },
+  {
+    "id": "go-home-banglish",
+    "text": "Nuva home e cholo.",
+    "language": "banglish",
+    "expect": { "intent": "GO_HOME", "risk": "low", "action": { "type": "GO_HOME" } }
+  },
+  {
+    "id": "go-back-bangla",
+    "text": "নুভা পিছনে যাও।",
+    "language": "bn",
+    "expect": { "intent": "GO_BACK", "risk": "low", "action": { "type": "GO_BACK" } }
+  },
+  {
+    "id": "tap-button-banglish",
+    "text": "Ok button e tap koro.",
+    "language": "banglish",
+    "expect": {
+      "intent": "TAP",
+      "risk": "low",
+      "action": { "type": "TAP", "target": { "text": "OK" } }
+    }
+  },
+  {
+    "id": "type-text-bangla",
+    "text": "সার্চ বক্সে লিখো ঢাকার আবহাওয়া এবং সাবমিট করো।",
+    "language": "bn",
+    "expect": {
+      "intent": "TYPE_TEXT",
+      "risk": "low",
+      "action": { "type": "TYPE_TEXT", "text": "ঢাকার আবহাওয়া", "submit": true }
+    }
+  },
+  {
+    "id": "swipe-up-english",
+    "text": "Swipe up.",
+    "language": "en",
+    "expect": { "intent": "SWIPE", "risk": "low", "action": { "type": "SWIPE", "direction": "up" } }
+  },
+  {
+    "id": "scroll-down-banglish",
+    "text": "Ekta kom scroll down koro.",
+    "language": "banglish",
+    "expect": { "intent": "SCROLL", "risk": "low", "action": { "type": "SCROLL", "direction": "down" } }
+  },
+  {
+    "id": "call-contact-banglish",
+    "text": "Nuva Rahim ke call koro.",
+    "language": "banglish",
+    "expect": {
+      "intent": "CALL_CONTACT",
+      "risk": "medium",
+      "action": { "type": "CALL_CONTACT", "contact": "Rahim" }
+    }
+  },
+  {
+    "id": "call-contact-english",
+    "text": "Call mom.",
+    "language": "en",
+    "expect": {
+      "intent": "CALL_CONTACT",
+      "risk": "medium",
+      "action": { "type": "CALL_CONTACT", "contact": "mom" }
+    }
+  },
+  {
+    "id": "whatsapp-message-banglish",
+    "text": "Nuva Rahim ke WhatsApp e message pathao je ami ashchi.",
+    "language": "banglish",
+    "expect": {
+      "intent": "SEND_MESSAGE",
+      "risk": "medium",
+      "action": { "type": "SEND_MESSAGE", "app": "whatsapp", "contact": "Rahim", "message": "ami ashchi" }
+    }
+  },
+  {
+    "id": "sms-message-bangla",
+    "text": "নুভা করিমকে এসএমএস পাঠাও যে আমি বাসায় আছি।",
+    "language": "bn",
+    "expect": {
+      "intent": "SEND_MESSAGE",
+      "risk": "medium",
+      "action": { "type": "SEND_MESSAGE", "app": "sms", "contact": "করিম", "message": "আমি বাসায় আছি" }
+    }
+  },
+  {
+    "id": "alarm-tomorrow-banglish",
+    "text": "Nuva kal shokal 7 tay alarm dao.",
+    "language": "banglish",
+    "expect": {
+      "intent": "SET_ALARM",
+      "risk": "low",
+      "action": { "type": "SET_ALARM", "hour": 7, "minute": 0, "relative_day": "tomorrow" }
+    }
+  },
+  {
+    "id": "alarm-bangla",
+    "text": "সকাল ৬টা ৩০মিনিটে অ্যালার্ম সেট করো।",
+    "language": "bn",
+    "expect": { "intent": "SET_ALARM", "risk": "low", "action": { "type": "SET_ALARM", "hour": 6, "minute": 30 } }
+  },
+  {
+    "id": "timer-english",
+    "text": "Set a timer for 10 minutes.",
+    "language": "en",
+    "expect": { "intent": "SET_TIMER", "risk": "low", "action": { "type": "SET_TIMER", "duration_seconds": 600 } }
+  },
+  {
+    "id": "timer-banglish",
+    "text": "Nuva 5 minute er timer lagao.",
+    "language": "banglish",
+    "expect": { "intent": "SET_TIMER", "risk": "low", "action": { "type": "SET_TIMER", "duration_seconds": 300 } }
+  },
+  {
+    "id": "open-url-banglish",
+    "text": "Nuva google.com open koro.",
+    "language": "banglish",
+    "expect": {
+      "intent": "OPEN_URL",
+      "risk": "low",
+      "action": { "type": "OPEN_URL", "url": "https://google.com/" }
+    }
+  },
+  {
+    "id": "open-url-english",
+    "text": "Open example.com.",
+    "language": "en",
+    "expect": {
+      "intent": "OPEN_URL",
+      "risk": "low",
+      "action": { "type": "OPEN_URL", "url": "https://example.com/" }
+    }
+  },
+  {
+    "id": "play-media-banglish",
+    "text": "Nuva YouTube e cricket highlight chalao.",
+    "language": "banglish",
+    "expect": {
+      "intent": "PLAY_MEDIA",
+      "risk": "low",
+      "action": { "type": "PLAY_MEDIA", "query": "cricket highlight", "app": "youtube" }
+    }
+  },
+  {
+    "id": "play-media-english",
+    "text": "Play some relaxing music.",
+    "language": "en",
+    "expect": { "intent": "PLAY_MEDIA", "risk": "low", "action": { "type": "PLAY_MEDIA", "query": "relaxing music" } }
+  },
+  {
+    "id": "read-screen-banglish",
+    "text": "Nuva ei screen ta poro.",
+    "language": "banglish",
+    "expect": { "intent": "READ_SCREEN", "risk": "low", "action": { "type": "READ_SCREEN" } }
+  },
+  {
+    "id": "read-screen-bangla",
+    "text": "স্ক্রিনে যা আছে সব পড়ে শোনাও।",
+    "language": "bn",
+    "expect": { "intent": "READ_SCREEN", "risk": "low", "action": { "type": "READ_SCREEN", "scope": "visible" } }
+  },
+  {
+    "id": "search-web-bangla",
+    "text": "নুভা গুগলে ঢাকার আবহাওয়া সার্চ করো।",
+    "language": "bn",
+    "expect": {
+      "intent": "OPEN_URL",
+      "risk": "low",
+      "action": { "type": "OPEN_URL", "url": "https://www.google.com/search?q=%E0%A6%A2%E0%A6%BE%E0%A6%95%E0%A6%BE%E0%A6%B0%20%E0%A6%86%E0%A6%AC%E0%A6%B9%E0%A6%BE%E0%A6%93%E0%A6%AF%E0%A6%BC%E0%A6%BE" }
+    }
+  },
+  {
+    "id": "refuse-money-transfer",
+    "text": "Nuva bkash diye Karim ke 5000 taka pathao.",
+    "language": "banglish",
+    "expect": { "intent": "UNSUPPORTED", "risk": "high" }
+  },
+  {
+    "id": "refuse-poem",
+    "text": "Nuva amake ekta kobita likhe dao.",
+    "language": "banglish",
+    "expect": { "intent": "UNSUPPORTED", "risk": "low" }
+  },
+  {
+    "id": "refuse-shell",
+    "text": "Delete all my files.",
+    "language": "en",
+    "expect": { "intent": "UNSUPPORTED", "risk": "high" }
+  },
+  {
+    "id": "refuse-password-bangla",
+    "text": "আমার ফেসবুকের পাসওয়ার্ড বদলে দাও।",
+    "language": "bn",
+    "expect": { "intent": "UNSUPPORTED", "risk": "high" }
+  },
+  {
+    "id": "volume-out-of-scope",
+    "text": "Phone er volume barao.",
+    "language": "banglish",
+    "expect": { "intent": "UNSUPPORTED", "risk": "low" }
+  },
+  {
+    "id": "photo-out-of-scope",
+    "text": "Take a selfie.",
+    "language": "en",
+    "expect": { "intent": "UNSUPPORTED", "risk": "low" }
+  },
+  {
+    "id": "close-facebook-banglish",
+    "text": "Facebook bondho koro.",
+    "language": "banglish",
+    "expect": { "intent": "CLOSE_APP", "risk": "low", "action": { "type": "CLOSE_APP", "app": "facebook" } }
+  }
+]

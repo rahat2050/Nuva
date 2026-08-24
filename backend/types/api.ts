@@ -67,6 +67,9 @@ export interface HealthResponse {
     auth_required: boolean;
     persistence: boolean;
     fallback_parser: boolean;
+    /** "upstash" when distributed rate limiting is configured, else "memory". */
+    rate_limiting: 'upstash' | 'memory';
+    cloudinary: { configured: boolean };
   };
   /** Only present for ?deep=1 — performs real upstream round-trips. */
   checks?: {
@@ -98,3 +101,40 @@ export interface MemoryUpsertRequest {
   key: string;
   value: string;
 }
+
+export interface DeviceRegisterRequest {
+  /** 1–120 chars, e.g. "Pixel 7". */
+  device_name: string;
+  /** e.g. "14". */
+  android_version?: string;
+}
+
+export interface DeviceRow {
+  id: string;
+  device_name: string;
+  android_version: string | null;
+  created_at: string;
+}
+
+/** Response of POST /api/screenshots — a signed Cloudinary direct-upload grant. */
+export interface ScreenshotUploadGrantDto {
+  cloud_name: string;
+  api_key: string;
+  timestamp: number;
+  signature: string;
+  folder: string;
+  upload_url: string;
+  expires_at: number;
+  max_bytes: number;
+  allowed_formats: readonly string[];
+  usage: string;
+}
+
+/**
+ * SSE events emitted by POST /api/ai/command/stream.
+ * `result` carries the exact CommandResponse; `error` the exact ApiErrorBody.
+ */
+export type CommandStreamEvent =
+  | { event: 'stage'; data: { stage: 'accepted' | 'interpreting'; request_id?: string; source?: 'groq' | 'fallback' } }
+  | { event: 'result'; data: CommandResponse }
+  | { event: 'error'; data: ApiErrorBody };

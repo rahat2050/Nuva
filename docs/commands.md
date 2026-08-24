@@ -211,4 +211,44 @@ GET /api/health?deep=1   → additionally round-trips Groq and Supabase
 
 `config` reports **booleans** about secret presence, never values. `?deep=1` also warns when the
 configured `GROQ_MODEL` is missing from Groq's live model list — an early signal of a model
-deprecation.
+deprecation. `config.rate_limiting` is `"upstash"` (distributed) or `"memory"` (per instance) and
+`config.cloudinary.configured` says whether screenshot-upload signing is available.
+
+## 9. `POST /api/ai/command/stream` — SSE progress events
+
+Same body and same final result as `POST /api/ai/command`, delivered over Server-Sent Events:
+
+```
+event: stage   data: {"stage":"accepted","request_id":"…"}
+event: stage   data: {"stage":"interpreting","source":"groq"}
+event: result  data: { …the exact CommandResponse… }
+```
+
+On failure after the stream has opened, the error arrives as `event: error` carrying the same
+envelope as the JSON endpoints (`ok:false`, `request_id`, `error.code/message/speech`). Bad request
+bodies are rejected with normal JSON `400` **before** the stream starts. Clients that ignore SSE can
+keep using `POST /api/ai/command`; both endpoints share one parser (`lib/commandRequest.ts`) and one
+pipeline, so their results are identical by construction.
+
+## 10. `POST /api/devices` — device registration
+
+```
+POST /api/devices  { "device_name": "Pixel 7", "android_version": "14" }   → 201 { ok, device }
+GET  /api/devices                                                        → { ok, count, devices }
+```
+
+Requires a user JWT. Registration is idempotent per `(user, device_name)`: re-registering refreshes
+`android_version` instead of duplicating rows. `device_name` ≤ 120 chars, `android_version` ≤ 40.
+
+## 11. `POST /api/screenshots` — signed direct upload
+
+```
+POST /api/screenshots   (user JWT, empty body)
+→ { ok, upload: { cloud_name, api_key, timestamp, signature, folder,
+                  upload_url, expires_at, max_bytes, allowed_formats } }
+```
+
+The app then uploads the image **directly** to `upload_url` as multipart form fields
+`file, api_key, timestamp, folder, signature`. `CLOUDINARY_API_SECRET` never leaves the server;
+the grant is scoped to `nuva/<user_id>/screenshots` and expires with its 5-minute timestamp.
+`503 NOT_CONFIGURED` when Cloudinary env vars are absent.
