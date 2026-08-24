@@ -59,8 +59,8 @@ com.nuva.assistant/
 
 ## First-run setup on a device
 
-1. **Backend URL** — Settings → Backend base URL. For the local backend on an emulator use
-   `http://10.0.2.2:3000/`; for production use your Vercel URL. Tap Save — it checks `/api/health`.
+1. **Backend URL** — defaults to `https://nuvaa.vercel.app/` (verified with `/api/health?deep=1`).
+   For local backend testing on an emulator use `http://10.0.2.2:3000/`. Tap Save — it checks `/api/health`.
 2. **Microphone + notification** — grant when prompted. A visible foreground notification is shown
    whenever NUVA is listening or waiting for the wake phrase.
 3. **Floating popup** — Settings → System assistant mode → enable **Display over other apps** when

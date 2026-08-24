@@ -12,7 +12,7 @@ object AppConstants {
     const val WAKE_WORD_BANGLISH = "nuva"
 
     /** Default production backend; overridable in Settings (emulator: 10.0.2.2). */
-    const val DEFAULT_BASE_URL = "https://nuva-backend.vercel.app/"
+    const val DEFAULT_BASE_URL = "https://nuvaa.vercel.app/"
 
     /** Supabase — URL + anon key are the only Supabase values the app may hold. */
     const val DEFAULT_SUPABASE_URL = "https://YOUR-PROJECT.supabase.co"
