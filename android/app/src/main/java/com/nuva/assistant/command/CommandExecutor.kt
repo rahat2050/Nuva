@@ -9,9 +9,9 @@ import com.nuva.assistant.automation.BrowserAutomation
 import com.nuva.assistant.automation.GenericAutomation
 import com.nuva.assistant.automation.WhatsAppAutomation
 import com.nuva.assistant.automation.YouTubeAutomation
-import com.nuva.assistant.database.CommandHistoryDao
-import com.nuva.assistant.database.PendingActionDao
-import com.nuva.assistant.database.PendingActionEntity
+import com.nuva.assistant.database.dao.CommandHistoryDao
+import com.nuva.assistant.database.dao.PendingActionDao
+import com.nuva.assistant.database.entities.PendingActionEntity
 import com.nuva.assistant.database.dao.insert
 import com.nuva.assistant.memory.UserPreferences
 import com.nuva.assistant.supabase.SupabaseRepository
