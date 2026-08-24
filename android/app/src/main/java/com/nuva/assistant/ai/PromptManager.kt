@@ -16,12 +16,14 @@ object PromptManager {
         val foregroundApp: String? = null,
         val screenSummary: String? = null,
         val deviceId: String? = null,
+        val clientRequestId: String? = null,
     )
 
     fun buildRequest(input: CommandInput): CommandRequestDto = CommandRequestDto(
         text = input.text.trim().take(MAX_TRANSCRIPT_CHARS),
         language = input.languageHint,
         deviceId = input.deviceId,
+        clientRequestId = input.clientRequestId,
         context = buildContext(input),
     )
 
