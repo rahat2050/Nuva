@@ -14,9 +14,9 @@
  * req.headers is undefined or malformed (which would otherwise become
  * FUNCTION_INVOCATION_FAILED on Vercel).
  */
-import { getEnv, supabaseConfigured, type NuvaEnv } from './env';
-import { NuvaError } from './errors';
-import type { Logger } from './logger';
+import { getEnv, supabaseConfigured, type NuvaEnv } from './env.js';
+import { NuvaError } from './errors.js';
+import type { Logger } from './logger.js';
 import type { VercelRequest } from '@vercel/node';
 
 export interface Identity {
@@ -130,7 +130,7 @@ export async function resolveIdentity(
     // Supabase is intentionally not configured or its optional SDK bundle is
     // unavailable in a deployment.
     try {
-      const { getAnonClient } = await import('./supabase');
+      const { getAnonClient } = await import('./supabase.js');
       const { data, error } = await getAnonClient(env).auth.getUser(token);
       if (error || !data.user) {
         try {

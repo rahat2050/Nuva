@@ -9,8 +9,8 @@
  *
  * It never translates and never guesses intent — that is the AI's job (§10).
  */
-import { NuvaError } from './errors';
-import type { Language } from '../types/action';
+import { NuvaError } from './errors.js';
+import type { Language } from '../types/action.js';
 
 export const MAX_COMMAND_CHARS = 1000;
 

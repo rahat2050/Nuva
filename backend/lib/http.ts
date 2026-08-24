@@ -10,14 +10,14 @@
  * - Security headers and CORS are applied defensively.
  */
 import { randomUUID } from 'node:crypto';
-import { getEnv, type NuvaEnv } from './env';
-import { NuvaError, toNuvaError } from './errors';
-import { createLogger, type Logger } from './logger';
-import { checkRateLimitDistributed } from './ratelimit';
-import { clientIp, headerValue } from './auth';
-import { detectLanguage } from './normalize';
-import { LANGUAGES, type Language } from '../types/action';
-import type { ApiErrorBody } from '../types/api';
+import { getEnv, type NuvaEnv } from './env.js';
+import { NuvaError, toNuvaError } from './errors.js';
+import { createLogger, type Logger } from './logger.js';
+import { checkRateLimitDistributed } from './ratelimit.js';
+import { clientIp, headerValue } from './auth.js';
+import { detectLanguage } from './normalize.js';
+import { LANGUAGES, type Language } from '../types/action.js';
+import type { ApiErrorBody } from '../types/api.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';

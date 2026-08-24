@@ -20,10 +20,10 @@ export const config = {
   maxDuration: 10,
 };
 
-import { defineHandler, ok } from '../../lib/http';
-import { envSummary, type NuvaEnv } from '../../lib/env';
-import type { DependencyCheck } from '../../types/api';
-import type { HealthResponse } from '../../types/api';
+import { defineHandler, ok } from '../../lib/http.js';
+import { envSummary, type NuvaEnv } from '../../lib/env.js';
+import type { DependencyCheck } from '../../types/api.js';
+import type { HealthResponse } from '../../types/api.js';
 
 const VERSION = '1.0.0';
 
@@ -35,7 +35,7 @@ const VERSION = '1.0.0';
  */
 async function checkSupabase(env: NuvaEnv): Promise<DependencyCheck> {
   try {
-    const { pingSupabase } = await import('../../lib/supabase');
+    const { pingSupabase } = await import('../../lib/supabase.js');
     return await pingSupabase(env);
   } catch (err) {
     return {
@@ -49,7 +49,7 @@ async function checkSupabase(env: NuvaEnv): Promise<DependencyCheck> {
 
 async function checkGroq(env: NuvaEnv): Promise<DependencyCheck> {
   try {
-    const { pingGroq } = await import('../../lib/groq');
+    const { pingGroq } = await import('../../lib/groq.js');
     return await pingGroq(env);
   } catch (err) {
     return {

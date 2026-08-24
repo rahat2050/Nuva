@@ -12,9 +12,9 @@
  * avoid FUNCTION_INVOCATION_FAILED when Supabase SDK or fetch is unavailable.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { getEnv, supabaseConfigured, supabaseWritable, type NuvaEnv } from './env';
-import { NuvaError } from './errors';
-import type { DependencyCheck } from '../types/api';
+import { getEnv, supabaseConfigured, supabaseWritable, type NuvaEnv } from './env.js';
+import { NuvaError } from './errors.js';
+import type { DependencyCheck } from '../types/api.js';
 
 const CLIENT_OPTIONS = {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },

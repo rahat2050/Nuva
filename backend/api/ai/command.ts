@@ -15,10 +15,10 @@ export const config = {
   maxDuration: 10,
 };
 
-import { defineHandler, ok } from '../../lib/http';
-import { resolveIdentity } from '../../lib/auth';
-import { interpretCommand } from '../../lib/pipeline';
-import { readCommandRequest } from '../../lib/commandRequest';
+import { defineHandler, ok } from '../../lib/http.js';
+import { resolveIdentity } from '../../lib/auth.js';
+import { interpretCommand } from '../../lib/pipeline.js';
+import { readCommandRequest } from '../../lib/commandRequest.js';
 
 export default defineHandler({
   name: 'ai/command',

@@ -14,8 +14,8 @@
  *     "I couldn't understand that command" path.
  *   * Its output still goes through validateAction() and assessRisk().
  */
-import { findAppInText } from './apps';
-import type { ParsedAction } from './actions';
+import { findAppInText } from './apps.js';
+import type { ParsedAction } from './actions.js';
 
 /** Regexes are matched against lowercased, wake-word-stripped text. */
 interface Rule {

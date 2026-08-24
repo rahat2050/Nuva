@@ -17,10 +17,10 @@
  * AbortController in edge-like environments, returning structured errors instead
  * of crashing.
  */
-import { getEnv, groqConfigured, type NuvaEnv } from './env';
-import { NuvaError } from './errors';
-import type { Logger } from './logger';
-import type { DependencyCheck } from '../types/api';
+import { getEnv, groqConfigured, type NuvaEnv } from './env.js';
+import { NuvaError } from './errors.js';
+import type { Logger } from './logger.js';
+import type { DependencyCheck } from '../types/api.js';
 
 export interface GroqResult {
   content: string;

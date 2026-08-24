@@ -3,9 +3,9 @@
  * POST /api/ai/command/stream. One parser → the two endpoints can never drift
  * apart on what they accept.
  */
-import { NuvaError } from './errors';
-import { MAX_COMMAND_CHARS } from './normalize';
-import type { CommandRequest } from '../types/api';
+import { NuvaError } from './errors.js';
+import { MAX_COMMAND_CHARS } from './normalize.js';
+import type { CommandRequest } from '../types/api.js';
 
 export function readCommandRequest(body: Record<string, unknown>): CommandRequest {
   const text = body['text'];

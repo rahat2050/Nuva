@@ -9,7 +9,7 @@
  * info level instead of crashing the function (which would become
  * FUNCTION_INVOCATION_FAILED on Vercel).
  */
-import { getEnv, type LogLevel } from './env';
+import { getEnv, type LogLevel } from './env.js';
 
 const LEVEL_WEIGHT: Record<LogLevel, number> = { debug: 10, info: 20, warn: 30, error: 40 };
 

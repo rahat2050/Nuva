@@ -9,9 +9,9 @@
  *   * unknown extra keys               → rejected by the strict schemas
  */
 import { z } from 'zod';
-import { actionSchema, isRegisteredActionType, safeText, type ParsedAction } from './actions';
-import { packageHintFor } from './apps';
-import { RISK_LEVELS, type RiskLevel } from '../types/action';
+import { actionSchema, isRegisteredActionType, safeText, type ParsedAction } from './actions.js';
+import { packageHintFor } from './apps.js';
+import { RISK_LEVELS, type RiskLevel } from '../types/action.js';
 
 export type ValidationOutcome =
   | {

@@ -23,12 +23,12 @@ export const config = {
   maxDuration: 10,
 };
 
-import { defineHandler, type ApiContext } from '../../../lib/http';
-import { resolveIdentity } from '../../../lib/auth';
-import { interpretCommand } from '../../../lib/pipeline';
-import { readCommandRequest } from '../../../lib/commandRequest';
-import { toNuvaError } from '../../../lib/errors';
-import { groqConfigured } from '../../../lib/env';
+import { defineHandler, type ApiContext } from '../../../lib/http.js';
+import { resolveIdentity } from '../../../lib/auth.js';
+import { interpretCommand } from '../../../lib/pipeline.js';
+import { readCommandRequest } from '../../../lib/commandRequest.js';
+import { toNuvaError } from '../../../lib/errors.js';
+import { groqConfigured } from '../../../lib/env.js';
 
 function writeSse(ctx: ApiContext, event: string, data: unknown): void {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;

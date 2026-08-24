@@ -2,7 +2,7 @@
  * HTTP contract for the NUVA backend. Frozen in PHRASE 1 so the PHRASE 2
  * Android client can be written against it without churn.
  */
-import type { ActionDecision, CommandStatus, Language, RiskLevel } from './action';
+import type { ActionDecision, CommandStatus, Language, RiskLevel } from './action.js';
 
 export interface ApiErrorBody {
   ok: false;

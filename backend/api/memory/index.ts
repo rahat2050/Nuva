@@ -14,10 +14,10 @@ export const config = {
   maxDuration: 10,
 };
 
-import { defineHandler, ok } from '../../lib/http';
-import { requireUser, resolveIdentity } from '../../lib/auth';
-import { deleteMemory, listMemories, upsertMemory } from '../../lib/repository';
-import { NuvaError } from '../../lib/errors';
+import { defineHandler, ok } from '../../lib/http.js';
+import { requireUser, resolveIdentity } from '../../lib/auth.js';
+import { deleteMemory, listMemories, upsertMemory } from '../../lib/repository.js';
+import { NuvaError } from '../../lib/errors.js';
 
 const KEY_PATTERN = /^[a-z0-9][a-z0-9_.-]{0,119}$/;
 const MAX_VALUE_CHARS = 4000;
