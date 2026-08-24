@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "description": "NUVA v1.0 secure API gateway — Vercel serverless functions bridging the Android app to Groq and Supabase",
-  "type": "module",
   "engines": {
     "node": "22.x"
   },

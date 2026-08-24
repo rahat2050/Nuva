@@ -6,9 +6,10 @@
  * HARDENED FOR VERCEL:
  * - All env/logger creation is inside the try/catch so a mis-configured env
  *   never becomes FUNCTION_INVOCATION_FAILED.
- * - randomUUID has multiple fallbacks (node:crypto → globalThis.crypto → Math.random)
+ * - randomUUID has multiple fallbacks (node:crypto → Math.random)
  * - Security headers and CORS are applied defensively.
  */
+import { randomUUID } from 'node:crypto';
 import { getEnv, type NuvaEnv } from './env';
 import { NuvaError, toNuvaError } from './errors';
 import { createLogger, type Logger } from './logger';
@@ -43,24 +44,13 @@ export interface ApiResult {
 
 function safeRandomUUID(): string {
   try {
-    // Node 14.17+ provides randomUUID in node:crypto, but dynamic import
-    // avoids a hard top-level import that could crash in edge-like envs.
-    // We try globalThis.crypto first (available in Node 19+ and browsers),
-    // then node:crypto, then a Math.random fallback.
-    const g = globalThis as unknown as { crypto?: { randomUUID?: () => string } };
-    if (g.crypto?.randomUUID) return g.crypto.randomUUID();
+    // Node 14.17+ provides randomUUID in node:crypto; the functions run on
+    // Node 22 (see engines), so a static import is safe and CJS/ESM agnostic.
+    return randomUUID();
   } catch {
-    // ignore
+    // Last resort: not cryptographically strong, but better than crashing.
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}-${Math.random().toString(36).slice(2, 10)}`;
   }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { randomUUID } = require('node:crypto') as { randomUUID: () => string };
-    if (typeof randomUUID === 'function') return randomUUID();
-  } catch {
-    // ignore
-  }
-  // Last resort: not cryptographically strong, but better than crashing.
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function applySecurityHeaders(res: VercelResponse): void {
