@@ -87,7 +87,7 @@ under our control with no extra supply-chain surface.
 ## Deployment
 
 Vercel project with **Root Directory = `backend`** (or repo root — the root `vercel.json`
-handles that too). Node 22.x (`engines`, `nodejs22.x` function runtime). `vercel.json` pins
+handles that too). Node 22.x is pinned via `engines` in `package.json` (the `functions.runtime` field must stay unset — Vercel resolves @vercel/node automatically and rejects version strings like `nodejs22.x`). `vercel.json` pins
 **Build Command = `npm run build`**, **Install Command = `npm install --include=dev`** and
 **Output Directory = `public`**; the committed `public/index.html` is a small landing page so
 API-only deployments do not fail Vercel's output folder check. Functions are detected from
