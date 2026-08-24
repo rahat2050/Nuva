@@ -1,6 +1,6 @@
 # NUVA Command & Action Reference
 
-The frozen contract between the Android app and the backend. PHRASE 2 code should be written
+The frozen contract between the Android app and the backend. PHASE 2 code should be written
 against this document.
 
 ## 1. `POST /api/ai/command`
@@ -126,7 +126,7 @@ Selectors must be preferred over coordinates (§9).
 ```
 
 At least one of `resource_id`, `content_description`, `text`, `class_name` is required. Search
-priority for the PHRASE 2 `NodeFinder`: resource-id → contentDescription → text → class name →
+priority for the PHASE 2 `NodeFinder`: resource-id → contentDescription → text → class name →
 coordinate fallback.
 
 ### Things that are deliberately NOT actions

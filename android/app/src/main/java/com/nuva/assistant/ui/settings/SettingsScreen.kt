@@ -1,5 +1,7 @@
 package com.nuva.assistant.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,31 +13,40 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nuva.assistant.R
 import com.nuva.assistant.core.NuvaContainer
+import com.nuva.assistant.core.permissions.NuvaPermissions
+import com.nuva.assistant.service.WakeWordService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
  * Settings: backend URL, Supabase connection, language, voice, confirmation
- * mode. NOTE: risky-action confirmation cannot be turned off — only switched
- * between "always" and "risky_only" (§11).
+ * mode and system-assistant activation. NOTE: risky-action confirmation cannot
+ * be turned off — only switched between "always" and "risky_only" (§11).
  */
 class SettingsViewModel : ViewModel() {
 
@@ -44,6 +55,10 @@ class SettingsViewModel : ViewModel() {
 
     var message = mutableStateOf<String?>(null)
         private set
+
+    fun setMessage(text: String?) {
+        message.value = text
+    }
 
     fun saveBaseUrl(url: String) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -80,16 +95,43 @@ class SettingsViewModel : ViewModel() {
             message.value = "Signed out"
         }
     }
+
+    fun setWakeWord(enabled: Boolean) {
+        CoroutineScope(Dispatchers.IO).launch {
+            preferences.setWakeWordEnabled(enabled)
+            if (enabled) {
+                WakeWordService.start(NuvaContainer.appContext)
+                message.value = "NUVA active — leave the app and say “Hey Nuva”."
+            } else {
+                WakeWordService.stop(NuvaContainer.appContext)
+                message.value = "Wake word stopped."
+            }
+        }
+    }
 }
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var permissionRefresh by remember { mutableIntStateOf(0) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) permissionRefresh++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val preferences = viewModel.preferences
     val baseUrl by preferences.baseUrl.collectAsState(initial = com.nuva.assistant.core.constants.AppConstants.DEFAULT_BASE_URL)
     val supabaseUrl by preferences.supabaseUrl.collectAsState(initial = "")
     val language by preferences.language.collectAsState(initial = "auto")
     val voiceEnabled by preferences.voiceEnabled.collectAsState(initial = true)
     val confirmationAlways by preferences.confirmationAlways.collectAsState(initial = false)
+    val wakeWordEnabled by preferences.wakeWordEnabled.collectAsState(initial = false)
+    val directCall by preferences.directCall.collectAsState(initial = false)
     val signedIn by viewModel.signedIn.collectAsState(initial = false)
     val message by viewModel.message
 
@@ -100,6 +142,38 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
     var password by remember { mutableStateOf("") }
 
     val scope = remember { CoroutineScope(Dispatchers.Main) }
+    val overlayGranted = remember(permissionRefresh) { NuvaPermissions.canDrawOverlays(context) }
+    val runtimeMissing = remember(permissionRefresh) { NuvaPermissions.missingWakeWordRuntimePermissions(context) }
+    val notificationGranted = remember(permissionRefresh) { NuvaPermissions.hasNotifications(context) }
+    val micGranted = remember(permissionRefresh) { NuvaPermissions.hasRecordAudio(context) }
+
+    val wakePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        permissionRefresh++
+        if (!NuvaPermissions.hasWakeWordRuntimePermissions(context)) {
+            viewModel.setMessage("Microphone and notification permission are required for Hey Nuva.")
+        } else if (!NuvaPermissions.canDrawOverlays(context)) {
+            viewModel.setMessage("Enable “Display over other apps”, then return and switch Hey Nuva on.")
+            NuvaPermissions.openOverlaySettings(context)
+        } else {
+            viewModel.setWakeWord(true)
+        }
+    }
+
+    fun enableWakeWord() {
+        val missing = NuvaPermissions.missingWakeWordRuntimePermissions(context)
+        if (missing.isNotEmpty()) {
+            wakePermissionLauncher.launch(missing.toTypedArray())
+            return
+        }
+        if (!NuvaPermissions.canDrawOverlays(context)) {
+            viewModel.setMessage("Enable “Display over other apps”, then return and switch Hey Nuva on.")
+            NuvaPermissions.openOverlaySettings(context)
+            return
+        }
+        viewModel.setWakeWord(true)
+    }
 
     Column(
         modifier = Modifier
@@ -170,7 +244,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("auto", "bn", "en", "banglish").forEach { option ->
                 val selected = language == option
-                androidx.compose.material3.OutlinedButton(
+                OutlinedButton(
                     onClick = { scope.launch { preferences.setLanguage(option) } },
                     colors = if (selected) {
                         androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
@@ -195,6 +269,45 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             checked = confirmationAlways,
             onChange = { scope.launch { preferences.setConfirmationAlways(it) } },
         )
+        ToggleRow(
+            label = stringResource(R.string.settings_direct_call),
+            checked = directCall,
+            onChange = { scope.launch { preferences.setDirectCall(it) } },
+        )
+
+        HorizontalDivider()
+
+        Text("System assistant mode", style = MaterialTheme.typography.titleMedium)
+        ToggleRow(
+            label = stringResource(R.string.settings_wake_word),
+            checked = wakeWordEnabled,
+            onChange = { enabled ->
+                if (enabled) enableWakeWord() else viewModel.setWakeWord(false)
+            },
+        )
+        Text(
+            "After this is on, leave NUVA open no longer: use any app, say “Hey Nuva”, then give the command in the floating popup.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "Permissions: mic ${if (micGranted) "✓" else "missing"} · notification ${if (notificationGranted) "✓" else "missing"} · overlay ${if (overlayGranted) "✓" else "missing"}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (runtimeMissing.isEmpty() && overlayGranted) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!overlayGranted) {
+                OutlinedButton(onClick = { NuvaPermissions.openOverlaySettings(context) }) {
+                    Text("Overlay permission")
+                }
+            }
+            OutlinedButton(onClick = { NuvaPermissions.openAccessibilitySettings(context) }) {
+                Text("Accessibility")
+            }
+            OutlinedButton(onClick = { NuvaPermissions.openBatteryOptimizationSettings(context) }) {
+                Text("Battery")
+            }
+        }
 
         message?.let {
             Text(it, color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodyMedium)

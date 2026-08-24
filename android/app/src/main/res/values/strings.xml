@@ -29,5 +29,5 @@
     <string name="settings_confirmation">Confirmation mode</string>
     <string name="settings_voice">Speak replies out loud</string>
     <string name="settings_direct_call">Direct call (skip dialer)</string>
-    <string name="settings_wake_word">Wake word “Hey Nuva” (coming soon)</string>
+    <string name="settings_wake_word">Wake word “Hey Nuva”</string>
 </resources>

@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- User-granted floating assistant popup shown only after activation. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- CALL_CONTACT: ACTION_DIAL needs no permission; ACTION_CALL is used only
@@ -52,7 +54,7 @@
             </intent-filter>
         </activity>
 
-        <!-- PHRASE 2 UI automation: enabled manually by the user in system
+        <!-- PHASE 2 UI automation: enabled manually by the user in system
              settings; NUVA can never enable it programmatically. -->
         <service
             android:name=".accessibility.NuvaAccessibilityService"
@@ -73,5 +75,13 @@
             android:name=".service.NuvaForegroundService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!-- Opt-in wake-word fallback. Runs as a visible foreground microphone
+             service; the user can stop it from Settings or the notification. -->
+        <service
+            android:name=".service.WakeWordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone"
+            android:stopWithTask="false" />
     </application>
 </manifest>

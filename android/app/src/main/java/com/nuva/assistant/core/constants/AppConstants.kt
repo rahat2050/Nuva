@@ -2,7 +2,7 @@ package com.nuva.assistant.core.constants
 
 /**
  * Central constants — mirrors of the frozen backend contract, kept in ONE
- * place so PHRASE 2 code never hard-codes magic values.
+ * place so PHASE 2 code never hard-codes magic values.
  */
 object AppConstants {
 

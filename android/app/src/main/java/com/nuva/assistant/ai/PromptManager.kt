@@ -2,7 +2,7 @@ package com.nuva.assistant.ai
 
 /**
  * Builds the client half of the command request: language hint, device
- * identity and — in PHRASE 2 — the fenced, untrusted screen context the
+ * identity and — in PHASE 2 — the fenced, untrusted screen context the
  * AccessibilityService can attach to a command.
  *
  * Screen context is DATA, never instructions: the backend labels it untrusted

@@ -11,7 +11,7 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
- * Retrofit surface of the NUVA backend — the frozen PHRASE 1 contract in
+ * Retrofit surface of the NUVA backend — the frozen PHASE 1 contract in
  * docs/commands.md. SSE streaming lives in [AIRepository] (raw OkHttp), not here.
  */
 interface NuvaApi {

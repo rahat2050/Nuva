@@ -14,17 +14,17 @@ you say into a validated action, asks before doing anything risky, and carries i
 
 | Phase                                    | Status                                             |
 | ---------------------------------------- | -------------------------------------------------- |
-| **PHRASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
-| **PHRASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
+| **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
+| **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
 
 `backend/` builds clean under strict TypeScript with **188 passing tests**. `android/` contains the
-full PHRASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
+full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
 [`docs/roadmap.md`](docs/roadmap.md) for the exit criteria.
 
 ## Architecture
 
 ```
-USER ─▶ ANDROID APP ─▶ VOICE ENGINE ─▶ COMMAND ENGINE ─▶ VERCEL API ─▶ GROQ AI
+USER ─▶ HEY NUVA ─▶ FLOATING POPUP ─▶ VOICE ENGINE ─▶ COMMAND ENGINE ─▶ VERCEL API ─▶ GROQ AI
                                                                           │
                                                               STRUCTURED ACTION JSON
                                                                           │
@@ -49,8 +49,8 @@ and classifies risk; the user confirms anything sensitive; only then does Androi
 
 ```
 NUVA/
-├── android/      PHRASE 2 — Kotlin + Compose app
-├── backend/      PHRASE 1 — Vercel serverless API (TypeScript)
+├── android/      PHASE 2 — Kotlin + Compose app
+├── backend/      PHASE 1 — Vercel serverless API (TypeScript)
 ├── supabase/     migrations (schema + RLS) and seed
 ├── docs/         architecture, commands, security, testing, roadmap
 ├── README.md
@@ -133,10 +133,10 @@ Full detail: [`docs/security.md`](docs/security.md).
 | Document                                   | Contents                                          |
 | ------------------------------------------ | ------------------------------------------------- |
 | [architecture.md](docs/architecture.md)    | Pipeline, modules, data model, AI boundary        |
-| [commands.md](docs/commands.md)            | API contract + all 15 actions (frozen for PHRASE 2) |
+| [commands.md](docs/commands.md)            | API contract + all 15 actions (frozen for PHASE 2) |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
-| [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHRASE 2 build order  |
+| [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |
 
 ## License
 
