@@ -19,9 +19,9 @@ export const config = {
   maxDuration: 10,
 };
 
-import { defineHandler, ok } from '../../lib/http';
-import { requireUser, resolveIdentity } from '../../lib/auth';
-import { cloudinaryConfiguredOrThrow, signScreenshotUpload } from '../../lib/cloudinary';
+import { defineHandler, ok } from '../../lib/http.js';
+import { requireUser, resolveIdentity } from '../../lib/auth.js';
+import { cloudinaryConfiguredOrThrow, signScreenshotUpload } from '../../lib/cloudinary.js';
 
 export default defineHandler({
   name: 'screenshots',

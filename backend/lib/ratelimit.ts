@@ -15,8 +15,8 @@
  * Contract: if Upstash cannot be reached, we degrade to the in-memory limiter
  * and log a warning. Rate limiting must never take the API down.
  */
-import { getEnv, upstashConfigured, type NuvaEnv } from './env';
-import type { Logger } from './logger';
+import { getEnv, upstashConfigured, type NuvaEnv } from './env.js';
+import type { Logger } from './logger.js';
 
 const WINDOW_MS = 60_000;
 const MAX_TRACKED_KEYS = 5_000;

@@ -7,10 +7,10 @@
  * model, never lowered — a prompt-injected `"risk":"low"` cannot disarm a
  * confirmation (§26: never bypass confirmation).
  */
-import { isSensitiveApp } from './apps';
-import type { ParsedAction } from './actions';
-import { ACTION_META } from './actions';
-import type { RiskLevel } from '../types/action';
+import { isSensitiveApp } from './apps.js';
+import type { ParsedAction } from './actions.js';
+import { ACTION_META } from './actions.js';
+import type { RiskLevel } from '../types/action.js';
 
 const RISK_ORDER: Record<RiskLevel, number> = { low: 0, medium: 1, high: 2 };
 

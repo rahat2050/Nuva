@@ -6,9 +6,9 @@
  * here is re-checked server-side — the prompt is a guide, not a security
  * boundary (§10, §26).
  */
-import { actionCatalogue } from './actions';
-import type { Language } from '../types/action';
-import type { CommandRequest } from '../types/api';
+import { actionCatalogue } from './actions.js';
+import type { Language } from '../types/action.js';
+import type { CommandRequest } from '../types/api.js';
 
 export const SYSTEM_PROMPT = `You are NUVA's command interpreter for an Android personal assistant.
 Your only job: turn one user utterance into ONE structured JSON action.

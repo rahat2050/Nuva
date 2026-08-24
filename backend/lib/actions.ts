@@ -20,7 +20,7 @@ import {
   WEEKDAYS,
   type ActionType,
   type RiskLevel,
-} from '../types/action';
+} from '../types/action.js';
 
 /** Control characters are never legitimate in a voice transcript field. */
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;

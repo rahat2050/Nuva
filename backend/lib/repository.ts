@@ -9,11 +9,11 @@
  *
  * Every write carries a user_id that came from a verified JWT (see auth.ts).
  */
-import { getServiceClient } from './supabase';
-import { getEnv, type NuvaEnv } from './env';
-import { NuvaError } from './errors';
-import type { Logger } from './logger';
-import type { CommandStatus, RiskLevel } from '../types/action';
+import { getServiceClient } from './supabase.js';
+import { getEnv, type NuvaEnv } from './env.js';
+import { NuvaError } from './errors.js';
+import type { Logger } from './logger.js';
+import type { CommandStatus, RiskLevel } from '../types/action.js';
 
 export interface CommandRow {
   id: string;

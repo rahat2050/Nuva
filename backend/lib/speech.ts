@@ -5,9 +5,9 @@
  * the model omits it or when the offline fallback parser runs. Every action has
  * a template in all three supported languages (§15, §25).
  */
-import { appLabel } from './apps';
-import type { ParsedAction } from './actions';
-import type { Language } from '../types/action';
+import { appLabel } from './apps.js';
+import type { ParsedAction } from './actions.js';
+import type { Language } from '../types/action.js';
 
 type Templates = Record<Language, string>;
 

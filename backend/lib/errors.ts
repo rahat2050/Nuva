@@ -4,7 +4,7 @@
  * §24: never fail silently, and every failure must be safe and recoverable.
  * The `speech` string is what NUVA says out loud; `message` is for developers.
  */
-import type { Language } from '../types/action';
+import type { Language } from '../types/action.js';
 
 export const ERROR_CODES = [
   'BAD_REQUEST',

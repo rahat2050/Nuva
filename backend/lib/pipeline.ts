@@ -7,22 +7,22 @@
  * The remaining steps (CONFIRMATION, EXECUTION, RESULT VERIFICATION) belong to
  * the Android app in PHRASE 2. This module never executes anything.
  */
-import { assessRisk } from './risk';
-import { buildUserMessage, SYSTEM_PROMPT } from './prompt';
-import { groqChatJson } from './groq';
-import { parseFallback } from './fallbackParser';
-import { normalizeCommand } from './normalize';
-import { validateAction, validateModelOutput, type ValidationOutcome } from './validate';
-import { confirmationPrompt, notUnderstoodSpeech, speechForAction, unsupportedSpeech } from './speech';
-import { recordCommand, recordConversation } from './repository';
-import { groqConfigured, type NuvaEnv } from './env';
-import { NuvaError } from './errors';
-import type { Logger } from './logger';
-import type { Identity } from './auth';
-import type { ParsedAction } from './actions';
-import type { ActionDecision, CommandStatus, Language, RiskLevel } from '../types/action';
-import { LANGUAGES } from '../types/action';
-import type { CommandRequest, CommandResponse } from '../types/api';
+import { assessRisk } from './risk.js';
+import { buildUserMessage, SYSTEM_PROMPT } from './prompt.js';
+import { groqChatJson } from './groq.js';
+import { parseFallback } from './fallbackParser.js';
+import { normalizeCommand } from './normalize.js';
+import { validateAction, validateModelOutput, type ValidationOutcome } from './validate.js';
+import { confirmationPrompt, notUnderstoodSpeech, speechForAction, unsupportedSpeech } from './speech.js';
+import { recordCommand, recordConversation } from './repository.js';
+import { groqConfigured, type NuvaEnv } from './env.js';
+import { NuvaError } from './errors.js';
+import type { Logger } from './logger.js';
+import type { Identity } from './auth.js';
+import type { ParsedAction } from './actions.js';
+import type { ActionDecision, CommandStatus, Language, RiskLevel } from '../types/action.js';
+import { LANGUAGES } from '../types/action.js';
+import type { CommandRequest, CommandResponse } from '../types/api.js';
 
 export interface InterpretOptions {
   request: CommandRequest;

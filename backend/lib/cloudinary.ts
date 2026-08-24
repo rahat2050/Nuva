@@ -13,8 +13,8 @@
  * signing user's own folder for a few minutes.
  */
 import { createHash } from 'node:crypto';
-import { cloudinaryConfigured, getEnv, type NuvaEnv } from './env';
-import { NuvaError } from './errors';
+import { cloudinaryConfigured, getEnv, type NuvaEnv } from './env.js';
+import { NuvaError } from './errors.js';
 
 /** Grants are short-lived; Cloudinary rejects stale timestamps. */
 export const SIGNATURE_TTL_SECONDS = 300;

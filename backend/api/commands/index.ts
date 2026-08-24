@@ -15,12 +15,12 @@ export const config = {
   maxDuration: 10,
 };
 
-import { defineHandler, ok } from '../../lib/http';
-import { requireUser, resolveIdentity } from '../../lib/auth';
-import { listCommands, recordCommand, updateCommandStatus } from '../../lib/repository';
-import { NuvaError } from '../../lib/errors';
-import { COMMAND_STATUSES, RISK_LEVELS, type CommandStatus, type RiskLevel } from '../../types/action';
-import { isRegisteredActionType } from '../../lib/actions';
+import { defineHandler, ok } from '../../lib/http.js';
+import { requireUser, resolveIdentity } from '../../lib/auth.js';
+import { listCommands, recordCommand, updateCommandStatus } from '../../lib/repository.js';
+import { NuvaError } from '../../lib/errors.js';
+import { COMMAND_STATUSES, RISK_LEVELS, type CommandStatus, type RiskLevel } from '../../types/action.js';
+import { isRegisteredActionType } from '../../lib/actions.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
