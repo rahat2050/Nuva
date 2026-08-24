@@ -32,43 +32,47 @@ Two major phases (§19). PHRASE 2 must not begin until PHRASE 1 is deployed to V
 
 ## PHRASE 2 — Full NUVA Android project
 
-Internal build order (§20). Do not jump ahead.
+Internal build order (§20). Status after the 2026-08-24 implementation pass (`android/`):
 
-| #  | Step                     | Notes                                                            |
-| -- | ------------------------ | ---------------------------------------------------------------- |
-| 1  | Android project foundation | Kotlin, Compose, `com.nuva.assistant`, min SDK 26              |
-| 2  | Compose UI               | Voice-first single screen; states: idle/listening/processing/executing/done/failed/confirm |
-| 3  | Voice input/output       | `SpeechRecognizer` (bn-BD + en-US), `TextToSpeech`                |
-| 4  | Vercel API integration   | Retrofit/OkHttp against the frozen contract in `docs/commands.md` |
-| 5  | Groq action parsing      | Mirror `types/action.ts` into Kotlin data classes                 |
-| 6  | Command engine           | `CommandParser`, `CommandExecutor`                                |
-| 7  | Action validation        | **Re-validate locally** — server check is not the only gate       |
-| 8  | AccessibilityService     | `NuvaAccessibilityService`, `NodeFinder`                          |
-| 9  | Basic Android actions    | home, back, open/close app, alarm, timer, URL                     |
-| 10 | Generic UI automation    | tap, type, swipe, scroll, read screen; timeouts + retries         |
-| 11 | WhatsApp automation      | First confirmed medium-risk flow                                   |
-| 12 | YouTube automation       | Search + play                                                      |
-| 13 | Browser automation       | Search, navigate                                                   |
-| 14 | Room database            | `CommandHistory`, `LocalMemory`, `UserPreferences`, `PendingAction` |
-| 15 | Supabase integration     | Auth + `SyncManager`                                               |
-| 16 | Memory                   | Local first, then sync                                             |
-| 17 | Authentication           | Supabase sign-in; then flip `NUVA_REQUIRE_AUTH=true`               |
-| 18 | Security                 | No secrets in APK, permission audit                                |
-| 19 | Confirmation system      | Blocking UI for medium/high risk                                   |
-| 20 | Wake word                | "Hey Nuva", opt-in, battery-aware, never silent recording           |
-| 21 | Testing                  | Unit + instrumented; the §23 manual matrix                         |
-| 22 | Performance optimization | Latency budget: speech → action → execution                        |
-| 23 | Release APK              | Signed release build                                               |
+| #  | Step                     | Status | Where                                                            |
+| -- | ------------------------ | ------ | ---------------------------------------------------------------- |
+| 1  | Android project foundation | ✅ | Gradle 8.9 + AGP 8.7.3, Kotlin 2.0.20, `com.nuva.assistant`, minSdk 26 |
+| 2  | Compose UI               | ✅ | `ui/home` (idle/listening/processing/done/failed/confirm), History, Memory, Settings |
+| 3  | Voice input/output       | ✅ | `voice/SpeechRecognizerController` (bn-BD + en-US, partials), `voice/TTSManager` |
+| 4  | Vercel API integration   | ✅ | `ai/NuvaApi` + `ai/AIRepository` (incl. SSE `/api/ai/command/stream`) |
+| 5  | Groq action parsing      | ✅ | `command/Intent.kt`, `command/Action.kt` (registry mirror), `ai/ActionParser` |
+| 6  | Command engine           | ✅ | `command/CommandParser` (offline), `command/CommandExecutor` |
+| 7  | Action validation        | ✅ | `command/CommandValidator` — full local re-validation + risk floor |
+| 8  | AccessibilityService     | ✅ | `accessibility/NuvaAccessibilityService`, `NodeFinder` (§9 priority) |
+| 9  | Basic Android actions    | ✅ | `automation/AppLauncher` (home/back/app/alarm/timer/dial/URL) |
+| 10 | Generic UI automation    | ✅ | Tap/Text/Swipe controllers + ScreenReader, retries + timeouts |
+| 11 | WhatsApp automation      | ✅ | `automation/WhatsAppAutomation` (wa.me deep link + node flow) |
+| 12 | YouTube automation       | ✅ | `automation/YouTubeAutomation` (search + play) |
+| 13 | Browser automation       | ✅ | `automation/BrowserAutomation` (search, navigate) |
+| 14 | Room database            | ✅ | `database/` (CommandHistory, PendingAction, LocalMemory) |
+| 15 | Supabase integration     | ✅ | `supabase/SupabaseRepository` (GoTrue REST) + `SyncManager` |
+| 16 | Memory                   | ✅ | `memory/MemoryManager` — local first, push/pull sync |
+| 17 | Authentication           | ✅ | Settings sign-in; flip `NUVA_REQUIRE_AUTH=true` server-side when ready |
+| 18 | Security                 | ✅ | `core/security/SecurityPolicy`; no secrets in APK |
+| 19 | Confirmation system      | ✅ | Blocking AlertDialog for medium/high; no off switch |
+| 20 | Wake word                | ⏳ | `service/WakeWordService` scaffold — deliberately last |
+| 21 | Testing                  | ⏳ | JVM unit tests in `app/src/test`; instrumented + §23 matrix pending |
+| 22 | Performance optimization | ⏳ | SSE streaming already wired; profiling pending |
+| 23 | Release APK              | ⏳ | Release build configured (minify+shrink); signing pending |
 
-## Backend follow-ups (deferred, not blocking)
+⏳ items need a real Android SDK/machine (Gradle build, instrumented tests, profiling, signed APK)
+and the production backend URL — they are listed for the human developer's machine pass.
 
-- Distributed rate limiting (Upstash) — see `docs/security.md` §8.
-- Cloudinary upload endpoint for screenshots (§18) — env documented, no code yet.
-- `POST /api/devices` registration (table exists, endpoint not needed yet).
-- Streaming/partial transcripts to cut perceived latency.
-- Model evaluation harness comparing `gpt-oss-20b` vs `gpt-oss-120b` on a Bangla/Banglish command set.
-- Pin `GROQ_MODEL` deliberately and watch Groq's deprecation page; `?deep=1` warns when the
-  configured model disappears from the live list.
+## Backend follow-ups (completed 2026-08-24)
+
+| Follow-up                                            | Status | Where                                                                 |
+| ---------------------------------------------------- | ------ | --------------------------------------------------------------------- |
+| Distributed rate limiting (Upstash)                  | ✅     | `lib/ratelimit.ts` → `checkRateLimitDistributed` (REST pipeline, automatic in-memory fallback); `UPSTASH_REDIS_REST_*` env |
+| Cloudinary upload endpoint for screenshots (§18)     | ✅     | `POST /api/screenshots` + `lib/cloudinary.ts` — signed direct upload, secret never leaves the server |
+| `POST /api/devices` registration                     | ✅     | `api/devices/index.ts` + `registerDevice`/`listDevices` in `lib/repository.ts` |
+| Streaming to cut perceived latency                   | ✅     | `POST /api/ai/command/stream` — SSE `stage` events + the identical `result` payload |
+| Model evaluation harness (`gpt-oss-20b` vs `gpt-oss-120b`) | ✅ | `npm run eval` (`scripts/eval-models.ts` + 32-case Bangla/Banglish/English dataset in `scripts/eval-dataset.json`, kept honest by `tests/eval.test.ts`) |
+| Pin `GROQ_MODEL` + deprecation watch                 | ✅     | Pinned in `lib/env.ts` defaults; automatic fallback model in `lib/groq.ts`; `?deep=1` warns when the model vanishes from Groq's live list |
 
 ## Definition of done (§28)
 

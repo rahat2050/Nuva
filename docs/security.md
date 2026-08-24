@@ -13,7 +13,8 @@ model has to assume the AI will occasionally be wrong or manipulated.
 | `SUPABASE_SERVICE_ROLE_KEY` | Vercel env                 | **never**                |
 | `SUPABASE_URL`              | Vercel env + app           | yes (not secret)         |
 | `SUPABASE_ANON_KEY`         | Vercel env + app           | yes (public by design)   |
-| `CLOUDINARY_API_SECRET`     | Vercel env (unused so far) | **never**                |
+| `CLOUDINARY_API_SECRET`     | Vercel env                 | **never** — used only to sign direct-upload grants server-side |
+| `UPSTASH_REDIS_REST_TOKEN`  | Vercel env                 | **never** — used only by the rate limiter |
 
 Enforcement in code:
 
@@ -95,14 +96,18 @@ NUVA's memory into a password store.
 
 ## 8. Known limitations (honest list)
 
-1. **Rate limiting is per serverless instance** (in-memory). It is an abuse brake, not a security
-   control. Move to Upstash/Postgres if NUVA becomes multi-tenant.
+1. **Rate limiting degrades gracefully, it is not a hard cap.** With `UPSTASH_REDIS_REST_*`
+   configured, counters are global across serverless instances (fixed 60s windows in Redis).
+   Without Upstash — or during an Upstash outage — the limiter silently falls back to per-instance
+   memory and logs a warning. It remains an abuse brake, not a security control.
 2. **Keyword-based risk escalation is heuristic.** It errs toward extra confirmations; it will not
    catch every phrasing. Registry baselines are the real guarantee.
 3. **No request signing / replay protection** beyond the JWT's own expiry.
 4. **Prompt injection cannot be fully solved** — it is mitigated by the whitelist, strict schemas and
    mandatory confirmations, which bound the damage rather than preventing manipulation.
-5. **Cloudinary is unimplemented.** Env vars are documented but no code reads them yet.
+5. **Cloudinary is signature-only.** `POST /api/screenshots` signs direct uploads; screenshot bytes
+   never pass through the API. Upload-policy enforcement (size/format caps) lives in the Cloudinary
+   account settings, not in this codebase.
 
 ## 9. Reporting
 

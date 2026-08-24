@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">নুভা</string>
+    <string name="accessibility_service_label">নুভা অটোমেশন</string>
+    <string name="accessibility_service_description">আপনার বলা কাজ নুভাকে করতে দিলে সে স্ক্রিনের বাটন খুঁজে চাপা, লেখা ও স্ক্রল করতে পারে। নুভা শুধু অনুমোদিত ১৫টি কাজ করে এবং ঝুঁকিপূর্ণ কাজের আগে অবশ্যই জিজ্ঞেস করে।</string>
+
+    <string name="home_title">নুভা</string>
+    <string name="home_subtitle">আপনার ব্যক্তিগত এআই সহকারী</string>
+    <string name="speak">🎙️ বলুন</string>
+    <string name="how_can_i_help">কী করব বলুন?</string>
+    <string name="listening">শুনছি…</string>
+    <string name="thinking">ভাবছি…</string>
+    <string name="executing">কাজ করছি…</string>
+    <string name="confirm_title">কাজটি নিশ্চিত করুন</string>
+    <string name="confirm_yes">হ্যাঁ, করো</string>
+    <string name="confirm_no">বাতিল</string>
+
+    <string name="nav_home">হোম</string>
+    <string name="nav_history">ইতিহাস</string>
+    <string name="nav_memory">স্মৃতি</string>
+    <string name="nav_settings">সেটিংস</string>
+
+    <string name="accessibility_disabled">স্ক্রিনের কাজের জন্য অ্যাক্সেসিবিলিটি অনুমতি লাগবে। সেটিংস → অ্যাক্সেসিবিলিটিতে নুভা চালু করুন।</string>
+    <string name="mic_permission_needed">আপনার কথা শুনতে মাইক্রোফোন অনুমতি দরকার।</string>
+    <string name="recent_commands">সাম্প্রতিক কমান্ড</string>
+    <string name="no_commands_yet">এখনো কিছু নেই — বলুন “নুভা ইউটিউব খোলো।”</string>
+    <string name="settings_base_url">ব্যাকএন্ড ঠিকানা</string>
+    <string name="settings_language">পছন্দের ভাষা</string>
+    <string name="settings_confirmation">নিশ্চিতকরণ মোড</string>
+    <string name="settings_voice">উত্তর পড়ে শোনাও</string>
+    <string name="settings_direct_call">সরাসরি কল (ডায়ালার ছাড়া)</string>
+    <string name="settings_wake_word">ওয়েক ওয়ার্ড “Hey Nuva” (শীঘ্রই আসছে)</string>
+</resources>

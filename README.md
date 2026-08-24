@@ -15,10 +15,11 @@ you say into a validated action, asks before doing anything risky, and carries i
 | Phase                                    | Status                                             |
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHRASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
-| **PHRASE 2** — Android application      | ⛔ Not started (gated on PHRASE 1 deployment)      |
+| **PHRASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
 
-`backend/` builds clean under strict TypeScript with **156 passing tests**. `android/` is an
-intentional placeholder. See [`docs/roadmap.md`](docs/roadmap.md) for the exit criteria.
+`backend/` builds clean under strict TypeScript with **188 passing tests**. `android/` contains the
+full PHRASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
+[`docs/roadmap.md`](docs/roadmap.md) for the exit criteria.
 
 ## Architecture
 
@@ -48,7 +49,7 @@ and classifies risk; the user confirms anything sensitive; only then does Androi
 
 ```
 NUVA/
-├── android/      PHRASE 2 — Kotlin + Compose app (placeholder)
+├── android/      PHRASE 2 — Kotlin + Compose app
 ├── backend/      PHRASE 1 — Vercel serverless API (TypeScript)
 ├── supabase/     migrations (schema + RLS) and seed
 ├── docs/         architecture, commands, security, testing, roadmap
@@ -63,7 +64,7 @@ NUVA/
 cd backend
 npm install
 cp .env.example .env.local     # add GROQ_API_KEY / SUPABASE_* as you get them
-npm run verify                 # tsc --noEmit + 156 tests
+npm run verify                 # tsc --noEmit + 188 tests
 npm run dev                    # http://localhost:3000  (test console at /)
 ```
 
@@ -93,11 +94,18 @@ curl -s -X POST localhost:3000/api/ai/command \
 ## Deploying the backend
 
 1. **Supabase** — create a project, run `supabase/migrations/0001…0003` in order.
-2. **Vercel** — new project from this repo with **Root Directory = `backend`**. The repo includes
-   `backend/vercel.json`, which pins **Build Command = `npm run build`** and
-   **Output Directory = `public`** so API-only deployments do not fail with a missing `public` folder.
+2. **Vercel** — new project from this repo. Either setting works:
+   - **Root Directory = `backend`** (recommended) — uses `backend/vercel.json`, which pins
+     **Build Command = `npm run build`** and **Output Directory = `public`** so API-only
+     deployments do not fail with a missing `public` folder.
+   - **Root Directory = repo root** — the root `vercel.json` builds `backend/`, serves the
+     functions under `backend/api/**` and rewrites `/api/*` to them.
 3. Add environment variables (see [`backend/.env.example`](backend/.env.example)):
    `GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+   ⚠️ **Do NOT set `NODE_ENV=production`** in the project env vars — it makes npm skip
+   devDependencies, so `tsc` disappears and the build fails with `tsc: not found`. Vercel
+   already sets production for deployments; the repo's `installCommand` now passes
+   `--include=dev` as a belt-and-braces guard.
 4. Deploy, then verify:
 
 ```bash

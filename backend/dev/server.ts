@@ -43,8 +43,11 @@ loadEnvFile('.env');
 const ROUTES: Record<string, () => Promise<{ default: VercelHandler }>> = {
   '/api/health': () => import('../api/health/index'),
   '/api/ai/command': () => import('../api/ai/command'),
+  '/api/ai/command/stream': () => import('../api/ai/command/stream'),
   '/api/commands': () => import('../api/commands/index'),
   '/api/memory': () => import('../api/memory/index'),
+  '/api/devices': () => import('../api/devices/index'),
+  '/api/screenshots': () => import('../api/screenshots/index'),
 };
 
 const CONSOLE_HTML = `<!doctype html>

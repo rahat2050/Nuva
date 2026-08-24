@@ -150,6 +150,15 @@ export async function invokeForTest(
   const res = {
     statusCode: 200,
     headersSent: false,
+    writableEnded: false,
+    // SSE/streaming handlers write chunks instead of one JSON body.
+    write(chunk: unknown) {
+      const text = typeof chunk === 'string' ? chunk : Buffer.from(String(chunk)).toString('utf8');
+      captured.raw += text;
+      captured.body = captured.raw;
+      (res as unknown as { headersSent: boolean }).headersSent = true;
+      return res;
+    },
     setHeader(name: string, value: string | number | readonly string[]) {
       captured.headers[name.toLowerCase()] = Array.isArray(value) ? value.join(', ') : String(value);
       return res;
@@ -175,6 +184,7 @@ export async function invokeForTest(
     },
     end(body?: unknown) {
       if (typeof body === 'string') captured.raw = body;
+      (res as unknown as { writableEnded: boolean }).writableEnded = true;
       resolveDone(sentinel);
       return res;
     },

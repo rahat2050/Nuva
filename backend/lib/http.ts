@@ -12,7 +12,7 @@
 import { getEnv, type NuvaEnv } from './env';
 import { NuvaError, toNuvaError } from './errors';
 import { createLogger, type Logger } from './logger';
-import { checkRateLimit } from './ratelimit';
+import { checkRateLimitDistributed } from './ratelimit';
 import { clientIp, headerValue } from './auth';
 import { detectLanguage } from './normalize';
 import { LANGUAGES, type Language } from '../types/action';
@@ -240,10 +240,11 @@ export function defineHandler(options: HandlerOptions) {
 
       if (options.rateLimit) {
         const key = `${options.name}:${headerValue(req, 'x-nuva-device-id') ?? clientIp(req) ?? 'anonymous'}`;
-        const decision = checkRateLimit(key, env.rateLimitPerMin);
+        const decision = await checkRateLimitDistributed(key, env.rateLimitPerMin, env, logger);
         try {
           res.setHeader('X-RateLimit-Limit', String(decision.limit));
           res.setHeader('X-RateLimit-Remaining', String(decision.remaining));
+          res.setHeader('X-RateLimit-Mode', decision.mode);
           if (!decision.allowed) {
             res.setHeader('Retry-After', String(decision.retryAfterSeconds));
           }
@@ -272,7 +273,11 @@ export function defineHandler(options: HandlerOptions) {
       } catch {
         // ignore logger failure
       }
-      res.status(result.status).json(result.body);
+      // Streaming handlers (SSE) write and end the response themselves; trying
+      // to res.json() afterwards would throw after headers were sent.
+      if (!responseAlreadySent(res)) {
+        res.status(result.status).json(result.body);
+      }
     } catch (err) {
       const error = toNuvaError(err);
 
@@ -316,4 +321,23 @@ export function defineHandler(options: HandlerOptions) {
 
 export function ok(body: unknown): ApiResult {
   return { status: 200, body };
+}
+
+/**
+ * True when a handler already wrote the response itself (streaming endpoints).
+ * Checked defensively: mocked responses in tests may lack these properties.
+ */
+export function responseAlreadySent(res: VercelResponse): boolean {
+  try {
+    if ((res as { writableEnded?: boolean }).writableEnded === true) return true;
+    if ((res as { headersSent?: boolean }).headersSent === true) return true;
+  } catch {
+    // ignore
+  }
+  try {
+    if ((res as unknown as { __nuvaStreamComplete?: boolean }).__nuvaStreamComplete === true) return true;
+  } catch {
+    // ignore
+  }
+  return false;
 }

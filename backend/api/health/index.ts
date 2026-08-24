@@ -12,10 +12,11 @@
  * structured error instead of FUNCTION_INVOCATION_FAILED.
  */
 
-// Vercel explicit runtime config — ensures Node.js 22.x even if project
-// defaults change. Also keeps Hobby plan compatible.
+// Per-function limit. NOTE: no `runtime` key — Vercel resolves @vercel/node
+// automatically for .ts, and a version string like `nodejs22.x` here makes the
+// deployment fail with "Function Runtimes must have a valid version". The
+// Node major is pinned by `engines.node` in package.json (22.x).
 export const config = {
-  runtime: 'nodejs22.x',
   maxDuration: 10,
 };
 
@@ -74,6 +75,8 @@ export default defineHandler({
         auth_required: false,
         persistence: false,
         fallback_parser: true,
+        rate_limiting: 'memory' as const,
+        cloudinary: { configured: false },
       };
     }
 

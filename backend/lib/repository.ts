@@ -219,3 +219,96 @@ export async function deleteMemory(
   }
   return (data ?? []).length > 0;
 }
+
+export interface DeviceRow {
+  id: string;
+  device_name: string;
+  android_version: string | null;
+  created_at: string;
+}
+
+const DEVICE_COLUMNS = 'id, device_name, android_version, created_at';
+
+/**
+ * Registers (or refreshes) a device for a user — roadmap follow-up
+ * "POST /api/devices". Idempotent per (user, device_name): re-registering the
+ * same device updates android_version instead of growing duplicate rows.
+ */
+export async function registerDevice(
+  params: { userId: string; deviceName: string; androidVersion?: string },
+  env: NuvaEnv = getEnv(),
+): Promise<DeviceRow> {
+  if (!persistenceEnabled(env)) {
+    throw new NuvaError('NOT_CONFIGURED', 'Persistence is disabled (SUPABASE_SERVICE_ROLE_KEY missing)');
+  }
+
+  const service = getServiceClient(env);
+
+  const { data: existing, error: selectError } = await service
+    .from('devices')
+    .select(DEVICE_COLUMNS)
+    .eq('user_id', params.userId)
+    .eq('device_name', params.deviceName)
+    .maybeSingle();
+
+  if (selectError) {
+    throw new NuvaError('PERSISTENCE_FAILED', `Could not look up devices: ${selectError.message}`, {
+      details: { code: selectError.code },
+    });
+  }
+
+  if (existing) {
+    if (params.androidVersion !== undefined && params.androidVersion !== existing.android_version) {
+      const { data: updated, error: updateError } = await service
+        .from('devices')
+        .update({ android_version: params.androidVersion })
+        .eq('id', (existing as DeviceRow).id)
+        .select(DEVICE_COLUMNS)
+        .single();
+      if (updateError) {
+        throw new NuvaError('PERSISTENCE_FAILED', `Could not update device: ${updateError.message}`, {
+          details: { code: updateError.code },
+        });
+      }
+      return updated as DeviceRow;
+    }
+    return existing as DeviceRow;
+  }
+
+  const { data: inserted, error: insertError } = await service
+    .from('devices')
+    .insert({
+      user_id: params.userId,
+      device_name: params.deviceName,
+      android_version: params.androidVersion ?? null,
+    })
+    .select(DEVICE_COLUMNS)
+    .single();
+
+  if (insertError) {
+    throw new NuvaError('PERSISTENCE_FAILED', `Could not register device: ${insertError.message}`, {
+      details: { code: insertError.code },
+    });
+  }
+  return inserted as DeviceRow;
+}
+
+export async function listDevices(params: { userId: string }, env: NuvaEnv = getEnv()): Promise<DeviceRow[]> {
+  if (!persistenceEnabled(env)) {
+    throw new NuvaError('NOT_CONFIGURED', 'Persistence is disabled (SUPABASE_SERVICE_ROLE_KEY missing)');
+  }
+
+  const { data, error } = await getServiceClient(env)
+    .from('devices')
+    .select(DEVICE_COLUMNS)
+    .eq('user_id', params.userId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    throw new NuvaError('PERSISTENCE_FAILED', `Could not read devices: ${error.message}`, {
+      details: { code: error.code },
+    });
+  }
+  return (data ?? []) as DeviceRow[];
+}

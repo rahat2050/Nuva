@@ -1,50 +1,97 @@
-# NUVA Android — reserved for PHRASE 2
+# NUVA Android — PHRASE 2
 
-This directory is intentionally **empty of implementation code**.
+The NUVA voice assistant app: **Kotlin + Jetpack Compose + AccessibilityService**. It listens
+(Bangla / Banglish / English), sends the transcript to the Vercel backend, re-validates the
+returned action **locally**, asks before anything risky, executes on the device, and speaks the
+result back.
 
-Per the master prompt (§19), the Android application belongs to **PHRASE 2** and must not be
-started until **PHRASE 1 (Vercel Backend Foundation)** is complete *and deployed to Vercel
-production*.
+> Phase gate: the app is written against the frozen contract in [`../docs/commands.md`](../docs/commands.md).
+> Point it at a deployed backend (Settings → Backend base URL) before using it for real.
 
-## Phase gate
+## Stack
 
-PHRASE 2 may begin only when all of the following are true:
+| Layer            | Choice                                            |
+| ---------------- | ------------------------------------------------- |
+| Language         | Kotlin 2.0.20, JDK 17 target                      |
+| UI               | Jetpack Compose (BOM 2024.09), Material 3         |
+| Navigation       | androidx.navigation-compose                       |
+| Local DB         | Room 2.6 (history, memory, pending actions)       |
+| Preferences      | DataStore                                         |
+| Network          | Retrofit + OkHttp + kotlinx-serialization         |
+| Voice in         | `android.speech.SpeechRecognizer` (bn-BD / en-US) |
+| Voice out        | `android.speech.tts.TextToSpeech`                 |
+| Automation       | `AccessibilityService` + platform intents         |
+| Sync             | Supabase REST (GoTrue JWT) → Vercel API           |
 
-- [x] GitHub repository exists
-- [x] Backend exists
-- [x] TypeScript builds
-- [x] Health endpoint works
-- [x] Groq integration works
-- [x] Structured JSON works
-- [x] Supabase connection works
-- [x] Secrets are configured securely
-- [ ] **Vercel production deployment succeeds** ← requires the human developer's Vercel account
-
-See [`../docs/roadmap.md`](../docs/roadmap.md) for the PHRASE 2 internal build order (23 steps)
-and [`../docs/architecture.md`](../docs/architecture.md) for the package layout that will be
-created here (`com.nuva.assistant`).
-
-## Planned layout (do not create yet)
-
-```
-android/
-└── app/src/main/
-    ├── AndroidManifest.xml
-    ├── java/com/nuva/assistant/
-    │   ├── core/  ai/  voice/  command/  accessibility/
-    │   ├── automation/  database/  memory/  supabase/
-    │   ├── service/  ui/
-    └── res/
-```
-
-## What the Android app will talk to
-
-The Android client only ever calls the NUVA backend — never Groq directly, and it never holds a
-server-side secret:
+## Module map
 
 ```
-Android  ──HTTPS──▶  Vercel (/api/ai/command)  ──▶  Groq
+com.nuva.assistant/
+├── MainActivity / NuvaApplication
+├── core/          NuvaContainer (DI), DeviceId, constants, SecurityPolicy
+├── ai/            NuvaApi (Retrofit), AIRepository (+SSE), ActionParser, PromptManager
+├── command/       Intent/Action registry mirror, CommandValidator (LOCAL re-validation),
+│                  CommandParser (offline fallback), CommandExecutor, ActionJson
+├── voice/         SpeechRecognizerController, TTSManager, VoiceController
+├── accessibility/ NuvaAccessibilityService, NodeFinder, Tap/Text/Swipe controllers, ScreenReader
+├── automation/    AppLauncher, GenericAutomation, WhatsApp/YouTube/Browser flows
+├── database/      Room: CommandHistory, PendingAction, LocalMemory
+├── memory/        MemoryManager (local-first), UserPreferences (DataStore)
+├── supabase/      SupabaseRepository (REST + auth), SyncManager
+├── service/       NuvaForegroundService (visible mic session), WakeWordService (scaffold)
+└── ui/            Home (voice + confirm dialog), History, Memory, Settings
 ```
 
-The request/response contract the app must implement is frozen and documented in
-[`../docs/commands.md`](../docs/commands.md).
+## Build & run
+
+1. Open the **`android/`** folder in Android Studio (Koala or newer, AGP 8.7.3 / Gradle 8.9).
+   The wrapper JAR is not committed — Android Studio regenerates it on first sync, or run
+   `gradle wrapper --gradle-version 8.9` once if you prefer the CLI.
+2. `./gradlew :app:assembleDebug` (or the Run ▶ button).
+3. Unit tests (pure JVM, no emulator): `./gradlew :app:testDebugUnitTest`
+
+```bash
+./gradlew lint           # Android lint
+./gradlew test           # unit tests
+./gradlew assembleDebug  # debug APK
+```
+
+## First-run setup on a device
+
+1. **Backend URL** — Settings → Backend base URL. For the local backend on an emulator use
+   `http://10.0.2.2:3000/`; for production use your Vercel URL. Tap Save — it checks `/api/health`.
+2. **Microphone** — grant when prompted (only while actively listening).
+3. **Accessibility** — Settings → Accessibility → NUVA Automation → On. This is required for
+   tap/type/swipe/scroll/read-screen; app open, alarms, timers, dialer and browser work without it.
+4. Optional: Supabase URL + anon key + sign-in to enable cloud memory/history sync.
+
+## The safety model (client half)
+
+- Only the **15 registered actions** exist as executable types; `UNSUPPORTED` is spoken, never run.
+- Every server response is **re-validated locally** (`CommandValidator`) — the server is not the
+  only gate.
+- Risk is recomputed on-device; the model can raise it, never lower it; medium/high ⇒ a **blocking
+  confirmation dialog** (there is no setting that disables it).
+- Offline, a small deterministic parser handles `GO_HOME`, `GO_BACK`, simple `OPEN_APP`, and
+  minute-based `SET_TIMER` — everything else honestly says it needs the server.
+- No secret ever ships in the APK: the app holds only the backend URL and the public Supabase
+  anon key.
+- Pending actions are persisted and re-validated on decode, so nothing stale can execute.
+
+## Wake word status
+
+`WakeWordService` is a documented scaffold — intentionally not started. "Hey Nuva" arrives as the
+final phase: opt-in, battery-aware, never silent recording.
+
+## Test matrix (§2.19 essentials)
+
+| Area         | Check                                                                |
+| ------------ | -------------------------------------------------------------------- |
+| Voice        | bn / banglish / en utterances; empty; noisy; permission denied       |
+| Network      | airplane mode → offline parser or clear error; timeout               |
+| AI           | UNSUPPORTED reply is spoken, not executed                            |
+| Confirmation | SEND_MESSAGE blocks until Yes/No; rejected ⇒ nothing sent            |
+| Accessibility| disabled ⇒ actionable error message with Settings shortcut           |
+| Automation   | open YouTube; WhatsApp send with number; scroll; read screen         |
+| Persistence  | history rows for executed/failed/rejected; pending expiry           |
+| Security     | credential-like memory keys refused; javascript: URL refused        |
