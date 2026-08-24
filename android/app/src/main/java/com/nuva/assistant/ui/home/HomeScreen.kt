@@ -1,5 +1,6 @@
 package com.nuva.assistant.ui.home
 
+import android.Manifest
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,12 +20,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -34,6 +37,7 @@ import com.nuva.assistant.R
 import com.nuva.assistant.accessibility.NuvaAccessibilityService
 import com.nuva.assistant.command.CommandDecision
 import com.nuva.assistant.core.NuvaContainer
+import com.nuva.assistant.core.permissions.NuvaPermissions
 import com.nuva.assistant.voice.VoiceController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.CoroutineScope
@@ -85,6 +89,13 @@ class HomeViewModel : ViewModel() {
 
 @Composable
 fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
+    val context = LocalContext.current
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) viewModel.startListening()
+    }
+
     val state by viewModel.state.collectAsState()
     val pending by viewModel.pending.collectAsState()
     val recent by viewModel.recent.collectAsState()
@@ -108,7 +119,13 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
 
         // Big mic button
         Surface(
-            onClick = { viewModel.startListening() },
+            onClick = {
+                if (NuvaPermissions.hasRecordAudio(context)) {
+                    viewModel.startListening()
+                } else {
+                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            },
             shape = CircleShape,
             color = if (state is VoiceController.State.Listening) {
                 MaterialTheme.colorScheme.error

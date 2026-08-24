@@ -58,6 +58,7 @@ class UserPreferences(private val context: Context) {
     fun confirmationAlwaysBlocking(): Boolean = runBlocking { confirmationAlways.first() }
     fun directCallBlocking(): Boolean = runBlocking { directCall.first() }
     fun voiceEnabledBlocking(): Boolean = runBlocking { voiceEnabled.first() }
+    fun wakeWordEnabledBlocking(): Boolean = runBlocking { wakeWordEnabled.first() }
 
     // --- Writes ----------------------------------------------------------------
 

@@ -29,5 +29,5 @@
     <string name="settings_confirmation">নিশ্চিতকরণ মোড</string>
     <string name="settings_voice">উত্তর পড়ে শোনাও</string>
     <string name="settings_direct_call">সরাসরি কল (ডায়ালার ছাড়া)</string>
-    <string name="settings_wake_word">ওয়েক ওয়ার্ড “Hey Nuva” (শীঘ্রই আসছে)</string>
+    <string name="settings_wake_word">ওয়েক ওয়ার্ড “Hey Nuva”</string>
 </resources>

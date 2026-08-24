@@ -3,8 +3,11 @@ package com.nuva.assistant.voice
 import com.nuva.assistant.command.CommandDecision
 import com.nuva.assistant.command.CommandExecutor
 import com.nuva.assistant.core.NuvaContainer
+import com.nuva.assistant.core.permissions.NuvaPermissions
+import com.nuva.assistant.service.NuvaForegroundService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,38 +38,57 @@ class VoiceController(
     val state: Flow<State> = _state.asStateFlow()
 
     private var recognizer: SpeechRecognizerController? = null
+    private var recognitionJob: Job? = null
     private val tts = TTSManager(NuvaContainer.appContext)
     private val mainScope = CoroutineScope(Dispatchers.Main)
 
     fun startListening() {
         if (_state.value is State.Listening) return
+        val context = NuvaContainer.appContext
+        if (!NuvaPermissions.hasRecordAudio(context)) {
+            val speech = "Microphone permission lagbe."
+            _state.value = State.Failed(speech)
+            speakIfEnabled(speech)
+            return
+        }
+
+        recognitionJob?.cancel()
         _state.value = State.Listening
-        recognizer = SpeechRecognizerController(NuvaContainer.appContext)
+        NuvaForegroundService.start(context)
+        recognizer = SpeechRecognizerController(context)
         val language = NuvaContainer.preferences.languageBlocking()
 
-        mainScope.launch {
-            recognizer?.listen(language)?.collect { event ->
-                when (event) {
-                    is SpeechRecognizerController.VoiceEvent.ListeningStarted -> Unit
-                    is SpeechRecognizerController.VoiceEvent.Partial ->
-                        _state.value = State.Transcribed(event.text)
+        recognitionJob = mainScope.launch {
+            try {
+                recognizer?.listen(language)?.collect { event ->
+                    when (event) {
+                        is SpeechRecognizerController.VoiceEvent.ListeningStarted -> Unit
+                        is SpeechRecognizerController.VoiceEvent.Partial ->
+                            _state.value = State.Transcribed(event.text)
 
-                    is SpeechRecognizerController.VoiceEvent.Final -> {
-                        _state.value = State.Transcribed(event.text)
-                        submit(event.text)
-                    }
+                        is SpeechRecognizerController.VoiceEvent.Final -> {
+                            _state.value = State.Transcribed(event.text)
+                            submit(event.text)
+                        }
 
-                    is SpeechRecognizerController.VoiceEvent.Error -> {
-                        _state.value = State.Failed(event.speech)
-                        speakIfEnabled(event.speech)
+                        is SpeechRecognizerController.VoiceEvent.Error -> {
+                            _state.value = State.Failed(event.speech)
+                            speakIfEnabled(event.speech)
+                        }
                     }
                 }
+            } finally {
+                recognizer = null
+                NuvaForegroundService.stop(context)
             }
         }
     }
 
     fun stopListening() {
+        recognitionJob?.cancel()
+        recognitionJob = null
         recognizer = null // flow's awaitClose destroys the recognizer
+        NuvaForegroundService.stop(NuvaContainer.appContext)
         if (_state.value is State.Listening) _state.value = State.Idle
     }
 
@@ -139,8 +161,8 @@ class VoiceController(
     }
 
     fun destroy() {
+        recognitionJob?.cancel()
+        NuvaForegroundService.stop(NuvaContainer.appContext)
         tts.shutdown()
     }
-
 }
-

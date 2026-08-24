@@ -88,7 +88,7 @@ to `/api/*`).
 ## 7. Privacy (§26)
 
 Stored: command text, the derived action, risk, status, and preferences the user asks NUVA to
-remember. Not stored: audio (never uploaded in PHRASE 1), contact lists, location, screen contents.
+remember. Not stored: audio (never uploaded in PHASE 1), contact lists, location, screen contents.
 Screen context sent with a command is used for that request only and is never persisted.
 
 `/api/memory` actively refuses credential-like keys, so a buggy or malicious client cannot turn

@@ -59,11 +59,11 @@ class NuvaForegroundService : Service() {
 
         fun start(context: Context) {
             val intent = Intent(context, NuvaForegroundService::class.java)
-            context.startForegroundService(intent)
+            runCatching { context.startForegroundService(intent) }
         }
 
         fun stop(context: Context) {
-            context.stopService(Intent(context, NuvaForegroundService::class.java))
+            runCatching { context.stopService(Intent(context, NuvaForegroundService::class.java)) }
         }
     }
 }

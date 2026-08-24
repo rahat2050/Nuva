@@ -28,7 +28,7 @@ android {
             isMinifyEnabled = false
         }
         release {
-            // PHRASE 2 milestone 23 adds signingConfig; release APK stays unsigned until then.
+            // PHASE 2 milestone 23 adds signingConfig; release APK stays unsigned until then.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

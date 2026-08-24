@@ -1,8 +1,8 @@
 # NUVA Roadmap
 
-Two major phases (§19). PHRASE 2 must not begin until PHRASE 1 is deployed to Vercel production.
+Two major phases (§19). The PHASE 2 Android implementation is present in this branch, but a production release still requires PHASE 1 to be deployed to Vercel first.
 
-## PHRASE 1 — Vercel Backend Foundation
+## PHASE 1 — Vercel Backend Foundation
 
 | Exit criterion (§19)              | Status | Evidence                                                      |
 | --------------------------------- | ------ | ------------------------------------------------------------- |
@@ -20,7 +20,7 @@ Two major phases (§19). PHRASE 2 must not begin until PHRASE 1 is deployed to V
 `docs/testing.md` §6 and should be run once deployed.
 ² Schema/credential verification needs a real Supabase project; `?deep=1` reports it precisely.
 
-### Remaining PHRASE 1 work (human developer)
+### Remaining PHASE 1 work (human developer)
 
 1. Create the Supabase project; run `supabase/migrations/0001…0003` in order.
 2. Create the Vercel project with **Root Directory = `backend`**.
@@ -30,7 +30,7 @@ Two major phases (§19). PHRASE 2 must not begin until PHRASE 1 is deployed to V
    `checks.groq.status == "ok"`, `checks.supabase.status == "ok"`, `meta.source == "groq"`.
 5. Consider `NUVA_REQUIRE_AUTH=true` once the Android app can sign in.
 
-## PHRASE 2 — Full NUVA Android project
+## PHASE 2 — Full NUVA Android project
 
 Internal build order (§20). Status after the 2026-08-24 implementation pass (`android/`):
 
@@ -55,7 +55,7 @@ Internal build order (§20). Status after the 2026-08-24 implementation pass (`a
 | 17 | Authentication           | ✅ | Settings sign-in; flip `NUVA_REQUIRE_AUTH=true` server-side when ready |
 | 18 | Security                 | ✅ | `core/security/SecurityPolicy`; no secrets in APK |
 | 19 | Confirmation system      | ✅ | Blocking AlertDialog for medium/high; no off switch |
-| 20 | Wake word                | ⏳ | `service/WakeWordService` scaffold — deliberately last |
+| 20 | Wake word                | ✅ | `service/WakeWordService` opt-in foreground fallback + `ui/floating` overlay |
 | 21 | Testing                  | ⏳ | JVM unit tests in `app/src/test`; instrumented + §23 matrix pending |
 | 22 | Performance optimization | ⏳ | SSE streaming already wired; profiling pending |
 | 23 | Release APK              | ⏳ | Release build configured (minify+shrink); signing pending |
@@ -78,5 +78,5 @@ and the production backend URL — they are listed for the human developer's mac
 
 NUVA v1.0 ships when the user can speak in Bangla/Banglish/English, have the command understood,
 validated, confirmed when risky, executed via AccessibilityService, verified, remembered, and spoken
-back — on a stable release build. PHRASE 1 delivers the understanding + validation + risk half of
-that sentence.
+back — on a stable release build. The repo now contains both backend and Android app halves; remaining
+release work is production deployment, real-device validation, profiling and signed APK generation.

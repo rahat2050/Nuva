@@ -5,8 +5,8 @@
 ```bash
 cd backend
 npm install
-npm run build     # tsc --noEmit  (the PHRASE 1 "TypeScript builds" gate)
-npm test          # vitest run    (156 tests)
+npm run build     # tsc --noEmit  (the PHASE 1 "TypeScript builds" gate)
+npm test          # vitest run    (188 tests)
 npm run verify    # build + test
 npm run dev       # local server on :3000 with a manual test console at /
 ```
@@ -105,10 +105,11 @@ curl -s -X POST $BASE/api/ai/command -H 'Content-Type: application/json' \
 
 `meta.source` must be `"groq"` in production. If it says `"fallback"`, `GROQ_API_KEY` is missing.
 
-## 7. PHRASE 2 manual test plan (not yet executable)
+## 7. PHASE 2 manual test plan (real-device validation)
 
-Reserved from §23; nothing here can be run until the Android app exists:
+Run these on a real Android device/emulator once the Android SDK and production backend URL are available:
 
-microphone permission · speech recognition · AI response · invalid commands · network failure ·
+microphone permission · notification permission · overlay permission · wake-word service on/off ·
+floating popup states · speech recognition · AI response · invalid commands · network failure ·
 Accessibility disabled · UI element not found · action timeout · confirmation · app launch · typing ·
 swipe · scrolling · back · home.

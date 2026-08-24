@@ -1,6 +1,6 @@
 # NUVA Architecture
 
-> Status: **PHRASE 1 (Vercel Backend Foundation) implemented.** PHRASE 2 (Android) not started.
+> Status: **PHASE 1 (Vercel Backend Foundation) implemented.** PHASE 2 Android app is implemented, including the opt-in foreground wake-word fallback and floating popup; real-device build/release verification is still pending.
 
 ## 1. The engineering model (§29)
 
@@ -17,10 +17,14 @@
 
 ## 2. The golden pipeline (§30)
 
-Every command follows exactly this path. Steps marked **[BE]** are implemented in this repo today;
-**[APP]** steps arrive in PHRASE 2.
+Every command follows exactly this path. Steps marked **[BE]** live in `backend/`; steps marked
+**[APP]** live in the Kotlin Android app under `android/`.
 
 ```
+WAKE WORD                 [APP]  opt-in WakeWordService fallback detects "Hey Nuva"
+   ↓
+FLOATING UI               [APP]  overlay shows listening/processing/confirmation/result
+   ↓
 USER COMMAND              [APP]  microphone / text input
    ↓
 VOICE INPUT               [APP]  Android SpeechRecognizer
@@ -73,12 +77,17 @@ Vercel serverless function (api/ai/command.ts)
 
 ```
 NUVA/
-├── android/        PHRASE 2 — placeholder only
-├── backend/        PHRASE 1 — Vercel serverless API  (implemented)
+├── android/        PHASE 2 — Kotlin + Compose assistant app
+│   └── app/src/main/java/com/nuva/assistant/
+│       ├── voice/          SpeechRecognizer, TTS, wake phrase detector
+│       ├── service/        foreground listening + wake-word service
+│       ├── ui/floating/    small overlay assistant popup
+│       └── accessibility/  Android AccessibilityService automation
+├── backend/        PHASE 1 — Vercel serverless API  (implemented)
 │   ├── api/        HTTP endpoints, one file per route
 │   ├── lib/        all logic; endpoints stay thin
-│   ├── types/      dependency-free contracts (mirrored into Kotlin later)
-│   ├── tests/      vitest suites (156 tests)
+│   ├── types/      dependency-free contracts mirrored into Kotlin
+│   ├── tests/      vitest suites
 │   └── dev/        local harness, excluded from deploys
 ├── supabase/       migrations + seed
 └── docs/           this documentation set
@@ -164,7 +173,7 @@ The model is untrusted input, not a trusted component.
 An outage is never disguised as a comprehension failure — that distinction is what makes §24's error
 messages honest.
 
-## 10. Android integration contract (PHRASE 2)
+## 10. Android integration contract (PHASE 2)
 
 `types/action.ts` and `types/api.ts` are intentionally dependency-free so they can be mirrored 1:1
 into Kotlin data classes. The Android side must **re-validate** every action before executing it —
