@@ -3,7 +3,7 @@
   "framework": null,
   "buildCommand": "cd backend && npm run build",
   "outputDirectory": "backend/public",
-  "installCommand": "cd backend && npm install",
+  "installCommand": "cd backend && npm install --include=dev",
   "functions": {
     "backend/api/**/*.ts": {
       "runtime": "nodejs22.x",

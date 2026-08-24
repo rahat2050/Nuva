@@ -3,6 +3,7 @@
   "framework": null,
   "buildCommand": "npm run build",
   "outputDirectory": "public",
+  "installCommand": "npm install --include=dev",
   "functions": {
     "api/**/*.ts": {
       "runtime": "nodejs22.x",

@@ -86,14 +86,19 @@ under our control with no extra supply-chain surface.
 
 ## Deployment
 
-Vercel project with **Root Directory = `backend`**. Node 22.x (`engines`). `vercel.json` pins
-**Build Command = `npm run build`** and **Output Directory = `public`**; the committed
-`public/index.html` is a small landing page so API-only deployments do not fail Vercel's output
-folder check. Functions are detected from `api/**/*.ts`; `dev/` and `tests/` are excluded by
-`.vercelignore`.
+Vercel project with **Root Directory = `backend`** (or repo root — the root `vercel.json`
+handles that too). Node 22.x (`engines`, `nodejs22.x` function runtime). `vercel.json` pins
+**Build Command = `npm run build`**, **Install Command = `npm install --include=dev`** and
+**Output Directory = `public`**; the committed `public/index.html` is a small landing page so
+API-only deployments do not fail Vercel's output folder check. Functions are detected from
+`api/**/*.ts`; `dev/` and `tests/` are excluded by `.vercelignore`.
+
+> If the build ever fails with `sh: tsc: not found`, a `NODE_ENV=production` env var made npm
+> skip devDependencies — remove that variable (the pinned `--include=dev` install command
+> already guards against it).
 
 Required env vars: `GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-Optional `NUVA_*` and `GROQ_*` overrides are documented in `.env.example`.
+Optional `NUVA_*`, `UPSTASH_*`, `CLOUDINARY_*` overrides are documented in `.env.example`.
 
 ## Model choice
 

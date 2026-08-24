@@ -1,0 +1,11 @@
+# Root-level Vercel ignores — only applies when the project uses the REPO ROOT
+# as Root Directory (Root Directory = `backend` uses backend/.vercelignore).
+#
+# The deployable API is backend/api/** + backend/lib/** + backend/types/** +
+# backend/public/. Everything else is dead weight in the upload.
+android/
+docs/
+supabase/
+.github/
+*.md
+LICENSE
