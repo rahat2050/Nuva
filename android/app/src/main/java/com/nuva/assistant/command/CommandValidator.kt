@@ -136,7 +136,8 @@ object CommandValidator {
     private fun validateScroll(json: JsonObject): ValidatedAction {
         val direction = SwipeDirection.fromWire(json.str("direction"))
             ?: return ValidatedAction.Invalid(listOf("SCROLL requires direction (up|down|left|right)"))
-        val amount = json.int("amount")?.takeIf { it in 1..20 }
+        // amount is optional on the wire (1..20); one "page" when absent.
+        val amount = json.int("amount")?.takeIf { it in 1..20 } ?: 1
         return ValidatedAction.Valid(NuvaAction.Scroll(direction, amount, selector(json["target"] as? JsonObject)))
     }
 

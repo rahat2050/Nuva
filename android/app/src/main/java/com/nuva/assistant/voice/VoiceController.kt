@@ -8,8 +8,8 @@ import com.nuva.assistant.service.NuvaForegroundService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
@@ -35,7 +35,7 @@ class VoiceController(
     }
 
     private val _state = MutableStateFlow<State>(State.Idle)
-    val state: Flow<State> = _state.asStateFlow()
+    val state: StateFlow<State> = _state.asStateFlow()
 
     private var recognizer: SpeechRecognizerController? = null
     private var recognitionJob: Job? = null
