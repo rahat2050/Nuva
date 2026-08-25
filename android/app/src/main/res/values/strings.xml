@@ -42,7 +42,7 @@
     <string name="accessibility_guide_step1">1. Open Settings → Accessibility → Installed apps</string>
     <string name="accessibility_guide_step2">2. Tap “NUVA Automation” and switch it on</string>
     <string name="accessibility_guide_step3">3. Come back to NUVA — screen reading, taps and typing will work</string>
-    <string name="accessibility_guide_privacy">NUVA only acts on your commands. It never records screens, and banking/payment apps are always blocked from automation.</string>
+    <string name="accessibility_guide_privacy">NUVA only acts on your commands and never records your screen. Inside wallet/bank apps you can still open them and scroll, but transactions and screen reading/tapping stay blocked.</string>
     <string name="open_settings">Open Settings</string>
     <string name="later">Later</string>
     <string name="confirm_generic">Shall I do this?</string>
@@ -83,7 +83,7 @@
     <string name="perm_required">required</string>
     <string name="perm_open_settings">Open system settings</string>
     <string name="perm_allow">Allow</string>
-    <string name="onboarding_security_note">Security promise: NUVA never automates banking, bKash/Nagad/Rocket or any money transfer, never reads OTP/PIN/password, and always asks before calls, messages or reminders.</string>
+    <string name="onboarding_security_note">Security promise: NUVA never performs financial transactions (send money, payments, cash out) — it can open the app for you, but the transaction is always yours to do manually. It never reads or types OTP/PIN/password, and always asks before calls, messages or reminders.</string>
     <string name="onboarding_done">Done — start using NUVA</string>
     <string name="onboarding_features">What can NUVA do?</string>
 

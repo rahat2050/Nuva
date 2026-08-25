@@ -42,7 +42,7 @@
     <string name="accessibility_guide_step1">১. সেটিংস → অ্যাক্সেসিবিলিটি → ইনস্টল করা অ্যাপ</string>
     <string name="accessibility_guide_step2">২. “নুভা অটোমেশন”-এ চাপ দিয়ে চালু করুন</string>
     <string name="accessibility_guide_step3">৩. নুভায় ফিরে আসুন — স্ক্রিন পড়া, ট্যাপ, টাইপ কাজ করবে</string>
-    <string name="accessibility_guide_privacy">নুভা শুধু আপনার বলা কাজ করে। স্ক্রিন রেকর্ড করে না, আর ব্যাংকিং/পেমেন্ট অ্যাপে অটোমেশন সবসময় বন্ধ থাকে।</string>
+    <string name="accessibility_guide_privacy">নুভা শুধু আপনার বলা কাজ করে, স্ক্রিন রেকর্ড করে না। ওয়ালেট/ব্যাংক অ্যাপে অ্যাপ খোলা ও স্ক্রল চলে, কিন্তু টাকার ট্রানজেকশন ও স্ক্রিন-রিড/ট্যাপ সেখানে বন্ধ থাকে।</string>
     <string name="open_settings">সেটিংস খুলুন</string>
     <string name="later">পরে</string>
     <string name="confirm_generic">কাজটি করব?</string>
@@ -83,7 +83,7 @@
     <string name="perm_required">দরকার</string>
     <string name="perm_open_settings">সিস্টেম সেটিংস খুলুন</string>
     <string name="perm_allow">অনুমতি দিন</string>
-    <string name="onboarding_security_note">নিরাপত্তার প্রতিশ্রুতি: ব্যাংকিং, বিকাশ/নগদ/রকেট বা টাকার লেনদেনের কোনো অটোমেশন নুভা করে না; OTP/PIN/পাসওয়ার্ড কখনো পড়ে না; কল, মেসেজ বা রিমাইন্ডারের আগে অবশ্যই জিজ্ঞেস করে।</string>
+    <string name="onboarding_security_note">নিরাপত্তার প্রতিশ্রুতি: টাকা পাঠানো/পেমেন্ট/ক্যাশ আউটের মতো ফাইন্যান্সিয়াল ট্রানজেকশন নুভা কখনো অটোমেট করে না (অ্যাপ খুলে দিতে পারে, কাজটা আপনি নিজে করবেন); OTP/PIN/পাসওয়ার্ড কখনো পড়ে বা টাইপ করে না; কল, মেসেজ বা রিমাইন্ডারের আগে অবশ্যই জিজ্ঞেস করে।</string>
     <string name="onboarding_done">শেষ — নুভা ব্যবহার শুরু করুন</string>
     <string name="onboarding_features">নুভা কী কী পারে?</string>
 

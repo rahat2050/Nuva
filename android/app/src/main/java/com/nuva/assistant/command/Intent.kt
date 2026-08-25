@@ -36,6 +36,9 @@ enum class NuvaIntent(val wireName: String, val localOnly: Boolean = false) {
     SET_REMINDER("SET_REMINDER", localOnly = true),
     CREATE_NOTE("CREATE_NOTE", localOnly = true),
     CREATE_TODO("CREATE_TODO", localOnly = true),
+    MEDIA_CONTROL("MEDIA_CONTROL", localOnly = true),
+    VOLUME_CONTROL("VOLUME_CONTROL", localOnly = true),
+    CAMERA("CAMERA", localOnly = true),
     ;
 
     companion object {

@@ -1,7 +1,6 @@
 package com.nuva.assistant.core.security
 
 import com.nuva.assistant.command.MessagingApp
-import com.nuva.assistant.command.NuvaAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -46,12 +45,37 @@ class SensitiveAppPolicyTest {
     }
 
     @Test
-    fun `money transfer requests are refused regardless of wording`() {
-        assertTrue(SensitiveAppPolicy.isMoneyTransferRequest("bkash diye 500 taka pathao"))
-        assertTrue(SensitiveAppPolicy.isMoneyTransferRequest("৫০০০ টাকা পাঠাও"))
-        assertTrue(SensitiveAppPolicy.isMoneyTransferRequest("send money to rahim"))
-        assertTrue(SensitiveAppPolicy.isMoneyTransferRequest("cash out 1000"))
-        assertFalse(SensitiveAppPolicy.isMoneyTransferRequest("rahim ke call koro"))
+    fun `transaction requests are refused regardless of wording`() {
+        assertTrue(SensitiveAppPolicy.isTransactionRequest("bkash diye 500 taka pathao"))
+        assertTrue(SensitiveAppPolicy.isTransactionRequest("৫০০০ টাকা পাঠাও"))
+        assertTrue(SensitiveAppPolicy.isTransactionRequest("send money to rahim"))
+        assertTrue(SensitiveAppPolicy.isTransactionRequest("cash out 1000"))
+        assertTrue(SensitiveAppPolicy.isTransactionRequest("card diye payment koro"))
+        assertTrue(SensitiveAppPolicy.isTransactionRequest("bank transfer koro"))
+        assertTrue(SensitiveAppPolicy.isTransactionRequest("100 taka recharge koro"))
+        assertTrue(SensitiveAppPolicy.isTransactionRequest("confirm payment koro"))
+        // LEVEL 1 stays allowed: merely opening the app is not a transaction.
+        assertFalse(SensitiveAppPolicy.isTransactionRequest("bkash kholo"))
+        assertFalse(SensitiveAppPolicy.isTransactionRequest("rahim ke call koro"))
+    }
+
+    @Test
+    fun `level 3 refusal uses the exact product wording and never asks confirmation`() {
+        assertNotNull(SensitiveAppPolicy.refusalForText("bkash e 1000 taka pathao"))
+        assertTrue(
+            SensitiveAppPolicy.TRANSACTION_REFUSAL.contains(
+                "এই financial transaction NUVA নিজে করতে পারবে না। আপনি চাইলে নিজে manually করতে পারবেন।",
+            ),
+        )
+        assertNull(SensitiveAppPolicy.refusalForText("youtube khulo"))
+    }
+
+    @Test
+    fun `messaging tiers are honest`() {
+        assertEquals(SensitiveAppPolicy.MessagingTier.FULL, SensitiveAppPolicy.tierOf(MessagingApp.WHATSAPP))
+        assertEquals(SensitiveAppPolicy.MessagingTier.FULL, SensitiveAppPolicy.tierOf(MessagingApp.SMS))
+        assertEquals(SensitiveAppPolicy.MessagingTier.COMPOSE, SensitiveAppPolicy.tierOf(MessagingApp.TELEGRAM))
+        assertEquals(SensitiveAppPolicy.MessagingTier.COMPOSE, SensitiveAppPolicy.tierOf(MessagingApp.MESSENGER))
     }
 
     @Test
@@ -75,26 +99,10 @@ class SensitiveAppPolicyTest {
     }
 
     @Test
-    fun `opening a banking app by voice is refused before execution`() {
-        val refusal = SensitiveAppPolicy.refusalFor(NuvaAction.OpenApp("bkash", null))
-        assertNotNull(refusal)
-
-        val byBanglaName = SensitiveAppPolicy.refusalFor(NuvaAction.OpenApp("নগদ", null))
-        assertNotNull(byBanglaName)
-
-        assertNull(SensitiveAppPolicy.refusalFor(NuvaAction.OpenApp("youtube", null)))
-    }
-
-    @Test
-    fun `money transfer text is refused before parsing`() {
-        assertNotNull(SensitiveAppPolicy.refusalForText("bkash e 1000 taka pathao"))
-        assertNull(SensitiveAppPolicy.refusalForText("youtube khulo"))
-    }
-
-    @Test
-    fun `messaging support is honest`() {
-        assertNull(SensitiveAppPolicy.unsupportedMessaging(MessagingApp.WHATSAPP))
-        assertNull(SensitiveAppPolicy.unsupportedMessaging(MessagingApp.SMS))
-        assertTrue(SensitiveAppPolicy.unsupportedMessaging(MessagingApp.TELEGRAM)!!.contains("support kori na"))
+    fun `opening a financial app is level 1 allowed and never blocked by this policy`() {
+        // (v1.2) Launching is allowed; only transactions are refused. The
+        // runtime accessibility guard is what blocks in-app taps/typing.
+        assertNull(SensitiveAppPolicy.refusalForText("bkash kholo"))
+        assertNull(SensitiveAppPolicy.refusalForText("nagad open koro"))
     }
 }

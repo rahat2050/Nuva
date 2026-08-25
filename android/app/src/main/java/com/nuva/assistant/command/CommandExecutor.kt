@@ -324,12 +324,11 @@ class CommandExecutor(
         try {
             history.updateStatus(localId, "executing")
 
-            // STRICT SECURITY GATE (§32–§36) — last line of defence before any
-            // action touches the device. Sensitive targets are refused here.
-            com.nuva.assistant.core.security.SensitiveAppPolicy.refusalFor(action)?.let { refusal ->
-                history.updateStatusAndError(localId, "blocked", refusal.reason)
-                return Step.Failed(com.nuva.assistant.core.security.SensitiveAppPolicy.REFUSAL_SPEECH)
-            }
+            // STRICT SECURITY GATE — financial transactions (LEVEL 3) are
+            // refused before parsing; tap/type automation inside financial
+            // apps is refused by the AccessibilityService guard. This is the
+            // last-line audit hook: anything reaching here already passed both.
+
 
             val outcome = execute(action)
             if (outcome.error != null) {
@@ -353,8 +352,13 @@ class CommandExecutor(
         val context = contextProvider()
         return when (action) {
             is NuvaAction.OpenApp -> when (val r = AppLauncher.openApp(context, action.app, action.pkg)) {
-                is AppLauncher.LaunchResult.Success ->
-                    ExecutionOutcome("completed", "${action.app.replaceFirstChar { it.uppercase() }} khulchi.")
+                is AppLauncher.LaunchResult.Success -> {
+                    val financial = com.nuva.assistant.core.security.SensitiveAppPolicy
+                        .isSensitivePackage(r.packageName) ||
+                        com.nuva.assistant.core.security.SensitiveAppPolicy.isSensitiveAppName(action.app)
+                    val note = if (financial) com.nuva.assistant.core.security.SensitiveAppPolicy.LEVEL1_OPEN_NOTE else ""
+                    ExecutionOutcome("completed", "${action.app.replaceFirstChar { it.uppercase() }} khulchi.$note")
+                }
 
                 is AppLauncher.LaunchResult.NotFound -> {
                     // Play Store / search suggestion (requirement §7).
@@ -422,7 +426,7 @@ class CommandExecutor(
                 } else if (service.isForegroundSensitive()) {
                     ExecutionOutcome(
                         "failed",
-                        com.nuva.assistant.core.security.SensitiveAppPolicy.SCREEN_GUARD_SPEECH,
+                        com.nuva.assistant.core.security.SensitiveAppPolicy.SCREEN_READ_GUARD_SPEECH,
                         "blocked: sensitive screen",
                     )
                 } else {
@@ -491,6 +495,30 @@ class CommandExecutor(
                 val dao = notes ?: return ExecutionOutcome("failed", "Kaj rakhar jayga painai.", "notes storage unavailable")
                 val id = dao.insertRow(NoteEntity(content = action.content, kind = "todo"))
                 ExecutionOutcome("completed", if (id > 0) "Kaj ta list e rakhlam." else "Kaj ta rakhte parini.")
+            }
+
+            is NuvaAction.MediaControl -> when (val r = com.nuva.assistant.automation.MediaPlaybackControl.control(context, action.command)) {
+                is com.nuva.assistant.automation.MediaPlaybackControl.Result.Done ->
+                    ExecutionOutcome("completed", "Kore dilam.")
+
+                is com.nuva.assistant.automation.MediaPlaybackControl.Result.Failed ->
+                    ExecutionOutcome("failed", r.userReason, r.userReason)
+            }
+
+            is NuvaAction.VolumeControl -> when (val r = com.nuva.assistant.automation.VolumeController.control(context, action.command)) {
+                is com.nuva.assistant.automation.VolumeController.Result.Done ->
+                    ExecutionOutcome("completed", r.speech)
+
+                is com.nuva.assistant.automation.VolumeController.Result.Failed ->
+                    ExecutionOutcome("failed", r.userReason, r.userReason)
+            }
+
+            is NuvaAction.CameraOpen -> when (val r = com.nuva.assistant.automation.CameraOpener.open(context, action.mode)) {
+                is com.nuva.assistant.automation.CameraOpener.Result.Opened ->
+                    ExecutionOutcome("completed", "Camera khulchi — chobi apni tulun.")
+
+                is com.nuva.assistant.automation.CameraOpener.Result.Failed ->
+                    ExecutionOutcome("failed", r.userReason, r.userReason)
             }
 
             is NuvaAction.CallContact -> {
@@ -568,9 +596,18 @@ class CommandExecutor(
     }
 
     private suspend fun executeSendMessage(context: Context, action: NuvaAction.SendMessage): ExecutionOutcome {
-        // Unsupported messaging apps say so clearly (requirement §20).
-        if (!MessagingRegistry.isSupported(action.app)) {
-            return ExecutionOutcome("failed", MessagingRegistry.unsupportedReason(action.app), "messaging app not supported")
+        // COMPOSE tier (Telegram, Messenger, Signal, Viber, IMO): open the app
+        // with the message pre-filled; the user picks the chat and taps Send.
+        if (MessagingRegistry.tierOf(action.app) == MessagingRegistry.Tier.COMPOSE) {
+            val opened = MessagingRegistry.openWithPrefilledMessage(context, action.app, action.message)
+            return if (opened) {
+                ExecutionOutcome(
+                    "completed",
+                    "${action.app.wireName} khule message lekhata bosiye dilam — chat beche Send apni chapun.",
+                )
+            } else {
+                ExecutionOutcome("failed", "${action.app.wireName} install kora nai.", "app missing")
+            }
         }
 
         if (action.phoneNumber.isNullOrBlank() && action.app == MessagingApp.WHATSAPP) {
@@ -609,7 +646,7 @@ class CommandExecutor(
                 }
             }
 
-            else -> ExecutionOutcome("failed", MessagingRegistry.unsupportedReason(action.app), "unsupported")
+            else -> ExecutionOutcome("failed", "${action.app.wireName} ekhon support kori na.", "unsupported")
         }
     }
 

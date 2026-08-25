@@ -69,7 +69,8 @@ class NuvaAccessibilityService : AccessibilityService() {
     // --- Node operations -------------------------------------------------------
 
     fun findNode(selector: UiSelector): AccessibilityNodeInfo? {
-        if (isForegroundSensitive()) return null
+        // Read-only lookup stays allowed inside financial apps (LEVEL 1
+        // navigation); the mutating operations below enforce LEVEL 3.
         val root = rootInActiveWindow ?: return null
         return NodeFinder.find(root, selector)
     }
@@ -124,7 +125,8 @@ class NuvaAccessibilityService : AccessibilityService() {
     }
 
     fun scrollNode(node: AccessibilityNodeInfo, direction: SwipeDirection): Boolean {
-        if (isForegroundSensitive()) return false // policy §34: no automation on sensitive screens
+        // Scrolling is allowed inside financial apps (LEVEL 1 navigation);
+        // taps/typing that could confirm a transaction stay blocked.
         val action = when (direction) {
             SwipeDirection.UP -> AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
             SwipeDirection.DOWN -> AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
@@ -183,7 +185,7 @@ class NuvaAccessibilityService : AccessibilityService() {
         durationMs: Long = 250,
         timeoutMs: Long = GESTURE_TIMEOUT_MS,
     ): Boolean {
-        if (isForegroundSensitive()) return false // policy §34
+        // Swipe stays allowed inside financial apps (LEVEL 1 navigation).
         val screen = resources.displayMetrics
         val path = Path().apply {
             moveTo(from.x * screen.widthPixels, from.y * screen.heightPixels)
@@ -220,6 +222,9 @@ class NuvaAccessibilityService : AccessibilityService() {
     // --- Screen reading --------------------------------------------------------
 
     fun readVisibleScreen(maxChars: Int = 4000): String? {
+        // LEVEL 2 fail-safe: while a financial app is foreground, no screen
+        // reading at all — we cannot reliably tell a public screen from a
+        // PIN/OTP/balance screen inside a wallet.
         if (isForegroundSensitive()) return null
         val root = rootInActiveWindow ?: return null
         val builder = StringBuilder()

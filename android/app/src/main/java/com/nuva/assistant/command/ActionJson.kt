@@ -110,6 +110,15 @@ object ActionJson {
         }
         is NuvaAction.CreateNote -> buildJsonObject { put("type", "CREATE_NOTE"); put("content", action.content) }
         is NuvaAction.CreateTodo -> buildJsonObject { put("type", "CREATE_TODO"); put("content", action.content) }
+        is NuvaAction.MediaControl -> buildJsonObject {
+            put("type", "MEDIA_CONTROL"); put("command", action.command.wireName)
+        }
+        is NuvaAction.VolumeControl -> buildJsonObject {
+            put("type", "VOLUME_CONTROL"); put("command", action.command.wireName)
+        }
+        is NuvaAction.CameraOpen -> buildJsonObject {
+            put("type", "CAMERA"); put("mode", action.mode.wireName)
+        }
     }
 
     private fun selectorJson(selector: UiSelector): JsonObject = buildJsonObject {

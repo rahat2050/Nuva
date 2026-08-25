@@ -60,6 +60,11 @@ object CommandParser {
         put("recorder", "voice recorder", "রেকর্ডার", canonical = "recorder")
         put("translate", "অনুবাদ", canonical = "translate")
         put("music", "গান", "gaan", canonical = "music")
+        // Financial apps — LEVEL 1: opening them by voice is allowed.
+        put("bkash", "বিকাশ", "b kash", "bকাশ", canonical = "bkash")
+        put("nagad", "নগদ", canonical = "nagad")
+        put("rocket", "রকেট", "dbbl rocket", canonical = "rocket")
+        put("upay", "উপায়", "উপাই", canonical = "upay")
     }
 
     private val PHONE_NUMBER = Regex("""(\+?88)?01[3-9]\d{8}|\+\d{8,15}""")
@@ -88,6 +93,9 @@ object CommandParser {
         return parseNavigation(text)
             ?: parseScreenReading(text)
             ?: parseDeviceStatus(text)
+            ?: parseMediaControl(text)
+            ?: parseVolumeControl(text)
+            ?: parseCamera(text)
             ?: parseSettings(text)
             ?: parseAlarm(text)
             ?: parseTimer(text)
@@ -179,6 +187,69 @@ object CommandParser {
         return null
     }
 
+    // --- 3b. Media transport (v1.2) -------------------------------------------------------
+
+    private fun parseMediaControl(t: String): CommandDecision? {
+        val hasMediaWord = listOf(
+            "gaan", "গান", "music", "song", "video", "ভিডিও", "media", "player", "giti", "গীত",
+            "track", "ট্র্যাক",
+        ).any { t.contains(it) }
+
+        val pause = listOf("pause koro", "pause korun", "pause", "thamo", "থামাও", "band koro music")
+            .any { t.contains(it) } && (hasMediaWord || t.contains("pause"))
+        val resume = listOf("resume koro", "resume korun", "resume", "abar chalao", "আবার চালাও")
+            .any { t.contains(it) } && (hasMediaWord || t.contains("resume"))
+        val next = hasMediaWord && listOf("next", "porer", "পরের", "agamir").any { t.contains(it) }
+        val previous = hasMediaWord && listOf("previous", "ager", "আগের", "agerta", "prev").any { t.contains(it) }
+
+        return when {
+            pause -> ok(NuvaAction.MediaControl(MediaCommand.PAUSE), "Music pause korlam.")
+            resume -> ok(NuvaAction.MediaControl(MediaCommand.PLAY), "Music abar chalacchi.")
+            next -> ok(NuvaAction.MediaControl(MediaCommand.NEXT), "Porer ta chalacchi.")
+            previous -> ok(NuvaAction.MediaControl(MediaCommand.PREVIOUS), "Ager ta chalacchi.")
+            else -> null
+        }
+    }
+
+    // --- 3c. Volume (v1.2) — direct control, Android permits it ---------------------------
+
+    private fun parseVolumeControl(t: String): CommandDecision? {
+        val mentionsVolume = listOf("volume", "ভলিউম", "shobdo", "শব্দ", "sound", "সাউন্ড").any { t.contains(it) }
+        if (!mentionsVolume) return null
+        return when {
+            listOf("mute", "নীরব", "চুপ", "bondho shobdo", "shobdo bondho", "শব্দ বন্ধ").any { t.contains(it) } ->
+                ok(NuvaAction.VolumeControl(VolumeCommand.MUTE), "Sound mute korlam.")
+
+            listOf("barao", "baran", "badhao", "beshi", "up", "বাড়াও", "বাড়ান", "বেশি", "চড়াও").any { t.contains(it) } ->
+                ok(NuvaAction.VolumeControl(VolumeCommand.UP), "Volume baracchi.")
+
+            listOf("kom koro", "koman", "kom", "namiye", "নামাও", "কম করো", "কমাও").any { t.contains(it) } ->
+                ok(NuvaAction.VolumeControl(VolumeCommand.DOWN), "Volume kome dicchi.")
+
+            else -> null // "volume setting" etc. falls through to parseSettings
+        }
+    }
+
+    // --- 3d. Camera (v1.2) ------------------------------------------------------------------
+
+    private fun parseCamera(t: String): CommandDecision? {
+        val mentionsCamera = listOf("camera", "ক্যামেরা", "chobi tolo", "ছবি তোলো").any { t.contains(it) }
+        if (!mentionsCamera) return null
+        return when {
+            listOf("chobi tolo", "photo tolo", "ছবি তোলো", "ছবি তুলে দাও", "take a photo", "picture tolo")
+                .any { t.contains(it) } ->
+                ok(
+                    NuvaAction.CameraOpen(CaptureMode.CAPTURE),
+                    "Camera khulchi photo mode e — shutter apni chapun.",
+                )
+
+            listOf("video", "ভিডিও").any { t.contains(it) } ->
+                ok(NuvaAction.CameraOpen(CaptureMode.VIDEO), "Video camera khulchi.")
+
+            else -> ok(NuvaAction.CameraOpen(CaptureMode.PHOTO), "Camera khulchi.")
+        }
+    }
+
     // --- 4. Settings & torch --------------------------------------------------------------
 
     private fun parseSettings(t: String): CommandDecision? {
@@ -192,10 +263,10 @@ object CommandParser {
                 "Android brightness NUVA sorasori badhate pare na — setting screen khulchi.",
             )
         }
-        if (listOf("volume", "sound setting", "শব্দ কম", "শব্দ বাড়াও", "ভলিউম", "সাউন্ড").any { t.contains(it) }) {
+        if (listOf("sound setting", "volume setting", "volume setting", "সাউন্ড সেটিং", "শব্দের সেটিং").any { t.contains(it) }) {
             return ok(
                 NuvaAction.OpenSettingScreen(SettingTarget.VOLUME),
-                "Volume setting khulchi — apni nije adjust korun.",
+                "Sound o volume setting screen khulchi.",
             )
         }
         if (listOf("do not disturb", "disturb", "dnd", "ডিস্টার্ব").any { t.contains(it) }) {
@@ -489,15 +560,16 @@ object CommandParser {
     private fun parseCloseApp(t: String): CommandDecision? {
         val verb = CLOSE_VERBS.firstOrNull { t.contains(it) } ?: return null
         val app = appNameFrom(t, verb) ?: return null
-        if (SensitiveAppPolicy.isSensitiveAppName(app)) return refused()
+        // LEVEL 1: closing/going home is normal navigation, always allowed.
         return ok(NuvaAction.CloseApp(app, null), "$app bondho kore home e jacchi.")
     }
 
     private fun parseOpenApp(t: String): CommandDecision? {
         val verb = OPEN_VERBS.firstOrNull { t.contains(it) } ?: return null
         val app = appNameFrom(t, verb) ?: return null
-        // Denylist check on the raw name too — banking apps never open by voice.
-        if (SensitiveAppPolicy.isSensitiveAppName(app)) return refused()
+        // LEVEL 1 (financial policy): launching a wallet/bank app by voice is
+        // ALLOWED. Transaction commands were already refused before parsing;
+        // in-app tap/type automation is blocked at the accessibility guard.
         val canonical = APP_ALIASES[app]
         return ok(
             NuvaAction.OpenApp(canonical ?: app, null),
@@ -612,8 +684,8 @@ object CommandParser {
         unsupported = true,
         risk = NuvaRisk.HIGH,
         requiresConfirmation = false,
-        speech = SensitiveAppPolicy.REFUSAL_SPEECH,
-        reasons = listOf(SensitiveAppPolicy.REFUSAL_REASON),
+        speech = SensitiveAppPolicy.TRANSACTION_REFUSAL,
+        reasons = listOf(SensitiveAppPolicy.TRANSACTION_REFUSAL_REASON),
         commandId = null,
         source = "offline-security",
     )

@@ -103,6 +103,21 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.SHOW_RECENTS
     }
 
+    /** Media playback control via the active MediaSession (v1.2). */
+    data class MediaControl(val command: MediaCommand) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.MEDIA_CONTROL
+    }
+
+    /** Direct volume changes — permitted by Android, no settings detour (v1.2). */
+    data class VolumeControl(val command: VolumeCommand) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.VOLUME_CONTROL
+    }
+
+    /** Open the camera app in a mode; CAPTURE opens the still-capture flow (v1.2). */
+    data class CameraOpen(val mode: CaptureMode) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CAMERA
+    }
+
     data class SearchWeb(val query: String) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.SEARCH_WEB
     }
@@ -217,6 +232,51 @@ enum class RelativeDay(val wireName: String) {
 
     companion object {
         fun fromWire(value: String?): RelativeDay? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/** Media transport commands (LOCAL-ONLY intent payload, v1.2). */
+enum class MediaCommand(val wireName: String) {
+    PLAY("play"),
+    PAUSE("pause"),
+    TOGGLE("toggle"),
+    NEXT("next"),
+    PREVIOUS("previous"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): MediaCommand? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/** Volume commands (LOCAL-ONLY intent payload, v1.2). */
+enum class VolumeCommand(val wireName: String) {
+    UP("up"),
+    DOWN("down"),
+    MUTE("mute"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): VolumeCommand? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/**
+ * Camera modes (LOCAL-ONLY intent payload, v1.2). CAPTURE launches the
+ * still-capture flow on an EXPLICIT user command only — the shutter stays
+ * under the user's control, NUVA never captures secretly.
+ */
+enum class CaptureMode(val wireName: String) {
+    PHOTO("photo"),
+    VIDEO("video"),
+    CAPTURE("capture"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): CaptureMode? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }
 

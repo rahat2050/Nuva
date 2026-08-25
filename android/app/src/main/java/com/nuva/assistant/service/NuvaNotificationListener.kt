@@ -71,6 +71,7 @@ class NuvaNotificationListener : NotificationListenerService() {
         val title: String?,
         val text: String?,
         val postedAt: Long,
+        val mediaSessionToken: android.media.session.MediaSession.Token? = null,
     )
 
     private fun parse(sbn: StatusBarNotification): NuvaNotification? {
@@ -79,6 +80,7 @@ class NuvaNotificationListener : NotificationListenerService() {
         val title = extras.getCharSequence("android.title")?.toString()
         val text = extras.getCharSequence("android.text")?.toString()
         if (title.isNullOrBlank() && text.isNullOrBlank()) return null
+        val token = mediaToken(extras)
         val label = runCatching {
             packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName, 0)).toString()
         }.getOrDefault(sbn.packageName.substringAfterLast('.'))
@@ -89,8 +91,19 @@ class NuvaNotificationListener : NotificationListenerService() {
             title = title,
             text = text,
             postedAt = sbn.postTime,
+            mediaSessionToken = token,
         )
     }
+
+    /** MediaSession token of the current media notification, for MEDIA_CONTROL. */
+    private fun mediaToken(extras: android.os.Bundle): android.media.session.MediaSession.Token? = runCatching {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            extras.getParcelable("android.mediaSession", android.media.session.MediaSession.Token::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            extras.getParcelable("android.mediaSession")
+        }
+    }.getOrNull()
 
     companion object {
         private const val MAX_STORED = 30
@@ -135,6 +148,17 @@ class NuvaNotificationListener : NotificationListenerService() {
             true
         } catch (err: Exception) {
             false
+        }
+
+        /**
+         * The newest active MediaSession token (from the media notification),
+         * used by MEDIA_CONTROL. Requires notification access.
+         */
+        fun activeMediaSessionToken(): android.media.session.MediaSession.Token? {
+            if (!isConnected) return null
+            synchronized(store) {
+                return store.firstOrNull { it.mediaSessionToken != null }?.mediaSessionToken
+            }
         }
     }
 

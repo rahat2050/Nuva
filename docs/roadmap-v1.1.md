@@ -80,3 +80,41 @@ Gaps found against the "practical voice-first assistant" brief:
 * Wake-word always-on on-device model.
 * Reply flows for notifications behind per-app plugins.
 * Multi-user / work-profile support.
+
+
+---
+
+# v1.2 — Three-level financial policy + maximum safe phone control
+
+Updated product spec (2026-08-26): financial apps are NOT blanket-blocked any more.
+The denylist concept was replaced by explicit levels, enforced locally:
+
+| Level | Scope | Behaviour |
+| ----- | ----- | --------- |
+| **1 — Normal access** | Launch wallet/bank apps by voice ("bKash kholo"), home/back/recents, scrolling, normal navigation | **Allowed.** The user is never blocked from their own apps. |
+| **2 — Sensitive information** | OTP, PIN, password, CVV, card number, auth codes, banking credentials, biometrics | **Never read/stored/typed.** Password fields skipped, OTP-like codes redacted everywhere, screen reading disabled while a financial app is foreground (fail-safe: a "public" screen cannot be reliably distinguished from a PIN/OTP screen). |
+| **3 — Financial transactions** | Send/receive money, cash out, bank transfer, payment, purchase, card transaction, recharge, payment confirmation, financial authorization | **Automation always refused** — before parsing, with the exact message "এই financial transaction NUVA নিজে করতে পারবে না। আপনি চাইলে নিজে manually করতে পারবেন।" No confirmation is ever offered. Tap/long-press/type automation is blocked inside financial apps because a tap is how a transaction gets confirmed. |
+
+Transaction detection matches ACTIONS ("taka pathao", "cash out", "card diye payment",
+"bank transfer", "recharge koro", …), never bare app names — so "bkash kholo" is LEVEL 1
+while "bkash diye taka pathao" is LEVEL 3.
+
+## v1.2 additions
+
+* **Media transport control** — pause/resume/next/previous through the active
+  MediaSession, discovered from the media notification (official route).
+* **Direct volume control** — up/down/mute via AudioManager ("volume barao").
+* **Camera** — open photo/video modes; "chobi tolo" opens the capture flow on an
+  explicit command; the shutter always stays in the user's hands.
+* **Messaging tiers** — FULL (WhatsApp sends after confirmation, SMS after
+  confirmation) and COMPOSE (Telegram, Messenger, Signal, Viber, IMO open with
+  the message pre-filled via share intent; the user taps Send).
+* Financial apps get package hints + Bangla aliases so voice launch resolves
+  directly when installed.
+
+## Still NOT implemented (honest limitations)
+
+* Notification replies (per-app RemoteInput integration needed).
+* File-content search / gallery media search (storage permission model varies).
+* Blind all-apps automation — semantic targets only, safe failure when the UI
+  changed.

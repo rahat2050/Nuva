@@ -275,18 +275,84 @@ class CommandParserTest {
         assertTrue(decision!!.unsupported)
         assertEquals(NuvaRisk.HIGH, decision.risk)
         assertNull(decision.action)
-        assertTrue(decision.reasons.first().contains("sensitive"))
+        // Exact product wording, always (LEVEL 3).
+        assertTrue(decision.speech.contains("financial transaction NUVA নিজে করতে পারবে না"))
+        assertTrue(decision.reasons.first().contains("financial transaction"))
 
         val bangla = CommandParser.parse("নুভা বিকাশে ৫০০০ টাকা পাঠাও")
         assertTrue(bangla!!.unsupported)
     }
 
     @Test
-    fun `opening a banking app by voice is refused`() {
+    fun `opening a banking app is allowed at level 1`() {
         val decision = CommandParser.parse("nuva bkash khulo")
         assertNotNull(decision)
-        assertTrue(decision!!.unsupported)
-        assertEquals(NuvaRisk.HIGH, decision.risk)
+        assertEquals(NuvaIntent.OPEN_APP, decision!!.intent)
+        assertEquals("bkash", (decision.action as NuvaAction.OpenApp).app)
+        assertEquals(NuvaRisk.LOW, decision.risk)
+
+        val bangla = CommandParser.parse("নুভা বিকাশ খোলো")
+        assertEquals(NuvaIntent.OPEN_APP, bangla!!.intent)
+    }
+
+    @Test
+    fun `media playback control parses`() {
+        val pause = CommandParser.parse("nuva music pause koro")
+        assertEquals(NuvaIntent.MEDIA_CONTROL, pause!!.intent)
+        assertEquals(MediaCommand.PAUSE, (pause.action as NuvaAction.MediaControl).command)
+
+        val next = CommandParser.parse("nuva porer gaan chalao na, next")
+        // "next" + media word → NEXT even without chalao
+        val nextCmd = CommandParser.parse("nuva next track")
+        assertEquals(MediaCommand.NEXT, (nextCmd!!.action as NuvaAction.MediaControl).command)
+
+        val bangla = CommandParser.parse("গান থামাও")
+        assertEquals(MediaCommand.PAUSE, (bangla!!.action as NuvaAction.MediaControl).command)
+    }
+
+    @Test
+    fun `volume control parses directly`() {
+        val up = CommandParser.parse("nuva volume barao")
+        assertEquals(NuvaIntent.VOLUME_CONTROL, up!!.intent)
+        assertEquals(VolumeCommand.UP, (up.action as NuvaAction.VolumeControl).command)
+
+        val down = CommandParser.parse("নুভা শব্দ কম করো")
+        assertEquals(VolumeCommand.DOWN, (down!!.action as NuvaAction.VolumeControl).command)
+
+        val mute = CommandParser.parse("nuva sound mute koro")
+        assertEquals(VolumeCommand.MUTE, (mute!!.action as NuvaAction.VolumeControl).command)
+
+        // "volume setting" still opens the settings screen instead
+        val settings = CommandParser.parse("nuva volume setting khulo")
+        assertEquals(NuvaIntent.OPEN_SETTING, settings!!.intent)
+    }
+
+    @Test
+    fun `camera commands parse with explicit capture`() {
+        val photo = CommandParser.parse("nuva camera khulo")
+        assertEquals(NuvaIntent.CAMERA, photo!!.intent)
+        assertEquals(CaptureMode.PHOTO, (photo.action as NuvaAction.CameraOpen).mode)
+
+        val capture = CommandParser.parse("nuva chobi tolo")
+        assertEquals(CaptureMode.CAPTURE, (capture!!.action as NuvaAction.CameraOpen).mode)
+
+        val video = CommandParser.parse("nuva video camera khulo")
+        assertEquals(CaptureMode.VIDEO, (video!!.action as NuvaAction.CameraOpen).mode)
+    }
+
+    @Test
+    fun `card payment and bank transfer commands are refused`() {
+        for (cmd in listOf(
+                "nuva card diye payment koro",
+                "nuva bank transfer koro 5000 taka",
+                "নুভা বিকাশে টাকা পাঠাও",
+                "nuva 100 taka recharge koro",
+            )) {
+            val decision = CommandParser.parse(cmd)
+            assertNotNull("parser must handle: $cmd", decision)
+            assertTrue(decision!!.unsupported)
+            assertEquals(NuvaRisk.HIGH, decision.risk)
+        }
     }
 
     @Test

@@ -115,7 +115,28 @@ object CommandValidator {
             NuvaIntent.SET_REMINDER -> validateReminder(actionJson)
             NuvaIntent.CREATE_NOTE -> validateNote(actionJson)
             NuvaIntent.CREATE_TODO -> validateTodo(actionJson)
+            NuvaIntent.MEDIA_CONTROL -> validateMediaControl(actionJson)
+            NuvaIntent.VOLUME_CONTROL -> validateVolumeControl(actionJson)
+            NuvaIntent.CAMERA -> validateCamera(actionJson)
         }
+    }
+
+    private fun validateMediaControl(json: JsonObject): ValidatedAction {
+        val command = MediaCommand.fromWire(json.str("command"))
+            ?: return ValidatedAction.Invalid(listOf("MEDIA_CONTROL requires a known command"))
+        return ValidatedAction.Valid(NuvaAction.MediaControl(command))
+    }
+
+    private fun validateVolumeControl(json: JsonObject): ValidatedAction {
+        val command = VolumeCommand.fromWire(json.str("command"))
+            ?: return ValidatedAction.Invalid(listOf("VOLUME_CONTROL requires a known command"))
+        return ValidatedAction.Valid(NuvaAction.VolumeControl(command))
+    }
+
+    private fun validateCamera(json: JsonObject): ValidatedAction {
+        val mode = CaptureMode.fromWire(json.str("mode"))
+            ?: return ValidatedAction.Invalid(listOf("CAMERA requires a known mode"))
+        return ValidatedAction.Valid(NuvaAction.CameraOpen(mode))
     }
 
     private fun validateSearchWeb(json: JsonObject): ValidatedAction {

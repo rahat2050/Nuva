@@ -125,15 +125,22 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
 * **8 LOCAL-ONLY intents** (`NuvaIntent.localOnly`): recents, web search, device status,
   settings/torch, notification summary, reminder, note, to-do. `NuvaIntent.fromWire()` refuses
   them, so **no server response can ever trigger one** — the AI registry stays frozen at 15.
-* **Strict security denylist** (`core/security/SensitiveAppPolicy`): banking/wallet packages and
-  names are refused before execution, automation and screen reading are blocked while a
-  sensitive app is foreground, password fields are never read and OTP-like codes are redacted
-  from every summary.
+* **Three-level financial policy** (`core/security/SensitiveAppPolicy`, v1.2):
+  LEVEL 1 — wallet/bank apps can be launched by voice and navigated (scroll);
+  LEVEL 2 — OTP/PIN/password/card data is never read, stored or typed (password
+  fields skipped, OTP-like codes redacted, screen reading disabled inside
+  financial apps); LEVEL 3 — transaction automation (send money, payment, cash
+  out, transfer, recharge, payment confirmation) is always refused with a fixed
+  Bangla message and never offered a confirmation.
 * **Contacts + calls/messages**: contact-name resolution with an explicit multi-match choice;
   SMS sends only after confirmation (compose-screen fallback); WhatsApp unchanged; other
   messaging apps clearly refused with reasons.
-* **Phone utilities**: battery/time/date/network/storage answers, torch toggle, settings
-  screens, calendar-prefilled reminders, local notes & to-dos.
+* **Phone utilities**: battery/time/date/network/storage answers, torch toggle, direct
+  volume up/down/mute, media pause/resume/next/previous (active MediaSession), camera
+  photo/video/capture-open, settings screens, calendar-prefilled reminders, local
+  notes & to-dos.
+* **Messaging tiers**: WhatsApp + SMS send after confirmation; Telegram/Messenger/
+  Signal/Viber/IMO open with the message pre-filled (user taps Send).
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

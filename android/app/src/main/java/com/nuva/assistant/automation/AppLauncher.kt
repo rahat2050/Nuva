@@ -42,6 +42,11 @@ object AppLauncher {
         "play store" to "com.android.vending",
         "recorder" to "com.android.soundrecorder",
         "music" to "com.android.music",
+        // Financial apps (LEVEL 1: opening allowed; transactions always blocked elsewhere)
+        "bkash" to "com.bKash.customerapp",
+        "nagad" to "com.konasl.mobileapp",
+        "rocket" to "bd.com.dbbl.mobilebanking",
+        "upay" to "com.upayouth.apps.upay",
     )
 
     fun resolvePackage(app: String, serverHint: String?): String? =
@@ -111,20 +116,15 @@ object AppLauncher {
     }
 
     fun openApp(context: Context, app: String, serverHint: String?): LaunchResult {
-        // Denylist first — never launch a banking/payment app by voice.
-        if (com.nuva.assistant.core.security.SensitiveAppPolicy.isSensitiveAppName(app)) {
-            return LaunchResult.NotFound(app, playStoreSearchUrl(app))
-        }
-
+        // Financial-policy LEVEL 1: launching any app — including wallets — is
+        // allowed. Transactions are blocked elsewhere (parser + accessibility
+        // guard), not by refusing to open the user's own apps.
         val hintPkg = resolvePackage(app, serverHint)
         val launchIntent: Intent? = when {
-            hintPkg != null && !com.nuva.assistant.core.security.SensitiveAppPolicy.isSensitivePackage(hintPkg) ->
-                context.packageManager.getLaunchIntentForPackage(hintPkg)
-
+            hintPkg != null -> context.packageManager.getLaunchIntentForPackage(hintPkg)
             else -> {
                 // Dynamic resolution: search installed apps by label (v1.1).
                 findInstalledApp(context, app)
-                    ?.takeIf { !com.nuva.assistant.core.security.SensitiveAppPolicy.isSensitivePackage(it.packageName) }
                     ?.let { context.packageManager.getLaunchIntentForPackage(it.packageName) }
             }
         }
