@@ -59,7 +59,8 @@ class OnboardingViewModel : ViewModel() {
     fun finish(onDone: () -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             NuvaContainer.preferences.setOnboardingDone(true)
-            onDone()
+            // Navigation must happen on the main thread.
+            kotlinx.coroutines.withContext(Dispatchers.Main) { onDone() }
         }
     }
 }
