@@ -315,7 +315,7 @@ object CommandParser {
             return ok(NuvaAction.CreateTodo(content), "To-do list e add korchi.")
         }
         if (listOf("kaj moto", "kaj list").any { t.contains(it) }) {
-            val content = contentAfter(t, it = "list") ?: contentAfter(t, "moto") ?: return null
+            val content = contentAfter(t, "list") ?: contentAfter(t, "moto") ?: return null
             return ok(NuvaAction.CreateTodo(content), "To-do list e add korchi.")
         }
 
