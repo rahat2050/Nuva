@@ -30,4 +30,83 @@
     <string name="settings_voice">উত্তর পড়ে শোনাও</string>
     <string name="settings_direct_call">সরাসরি কল (ডায়ালার ছাড়া)</string>
     <string name="settings_wake_word">ওয়েক ওয়ার্ড “Hey Nuva”</string>
+    <!-- v1.1: home / typed fallback -->
+    <string name="typed_hint">লিখে কমান্ড দিন…</string>
+    <string name="send">পাঠান</string>
+    <string name="voice_failed_typed_hint">ভয়েস কাজ করেনি — কমান্ডটা লিখে দিন:</string>
+    <string name="contact_choice_title">কোন কন্টাক্ট?</string>
+    <string name="contact_choice_hint">এই নামে কয়েকজন পাওয়া গেছে। একজন বেছে নিন:</string>
+    <string name="retry">আবার চেষ্টা</string>
+    <string name="accessibility_setup_link">ধাপে ধাপে সেটআপ গাইডের জন্য এখানে চাপুন →</string>
+    <string name="accessibility_guide_title">অ্যাক্সেসিবিলিটি চালু করুন</string>
+    <string name="accessibility_guide_step1">১. সেটিংস → অ্যাক্সেসিবিলিটি → ইনস্টল করা অ্যাপ</string>
+    <string name="accessibility_guide_step2">২. “নুভা অটোমেশন”-এ চাপ দিয়ে চালু করুন</string>
+    <string name="accessibility_guide_step3">৩. নুভায় ফিরে আসুন — স্ক্রিন পড়া, ট্যাপ, টাইপ কাজ করবে</string>
+    <string name="accessibility_guide_privacy">নুভা শুধু আপনার বলা কাজ করে। স্ক্রিন রেকর্ড করে না, আর ব্যাংকিং/পেমেন্ট অ্যাপে অটোমেশন সবসময় বন্ধ থাকে।</string>
+    <string name="open_settings">সেটিংস খুলুন</string>
+    <string name="later">পরে</string>
+    <string name="confirm_generic">কাজটি করব?</string>
+
+    <!-- v1.1: history -->
+    <string name="clear">মুছুন</string>
+    <string name="filter_all">সব</string>
+    <string name="filter_completed">সফল</string>
+    <string name="filter_failed">ব্যর্থ</string>
+    <string name="filter_pending">অপেক্ষমাণ</string>
+    <string name="failure_reason">কারণ</string>
+    <string name="status_completed">সম্পন্ন</string>
+    <string name="status_failed">ব্যর্থ</string>
+    <string name="status_rejected">বাতিল</string>
+    <string name="status_blocked">ব্লকড (নিরাপত্তা)</string>
+    <string name="status_unsupported">সাপোর্টেড নয়</string>
+    <string name="status_executing">চলছে…</string>
+    <string name="status_pending">নিশ্চিতকরণের অপেক্ষায়</string>
+    <string name="status_choice">কন্টাক্ট বাছাই</string>
+
+    <!-- v1.1: onboarding -->
+    <string name="onboarding_title">নুভা সেটআপ</string>
+    <string name="onboarding_intro">যে পারমিশন দরকার শুধু সেটাই, কখন দরকার তখনই চাওয়া হবে। সবই ঐচ্ছিক — না দিলে নুভা বলে দেবে কোন ফিচার কী কারণে বন্ধ থাকবে।</string>
+    <string name="perm_mic_title">🎙 মাইক্রোফোন</string>
+    <string name="perm_mic_desc">আপনার ভয়েস কমান্ড শোনার জন্য। শোনার ইন্ডিকেটর দেখা যাওয়ার সময়ই কেবল মাইক চলে — কখনো লুকিয়ে রেকর্ড করে না।</string>
+    <string name="perm_notifications_title">🔔 নোটিফিকেশন</string>
+    <string name="perm_notifications_desc">নুভার শোনার স্ট্যাটাস ও ফলাফল নোটিফিকেশনে দেখাতে। ঐচ্ছিক।</string>
+    <string name="perm_accessibility_title">♿ অ্যাক্সেসিবিলিটি সার্ভিস</string>
+    <string name="perm_accessibility_desc">স্ক্রিন পড়ে শোনানো ও আপনার বলা বাটনে চাপ দেওয়ার জন্য। সিস্টেম সেটিংস থেকে নিজ হাতে চালু করতে হয় — নুভা নিজে কখনো চালু করতে পারে না।</string>
+    <string name="perm_contacts_title">👥 কন্টাক্ট</string>
+    <string name="perm_contacts_desc">“রহিমকে কল করো” বললে নম্বর খুঁজতে। প্রথম কল/মেসেজ কমান্ডের সময়েই কেবল চাওয়া হয়।</string>
+    <string name="perm_sms_title">✉ এসএমএস</string>
+    <string name="perm_sms_desc">আপনি নিশ্চিত করার পর এসএমএস পাঠাতে। না দিলে নুভা লেখা বসিয়ে এসএমএস স্ক্রিন খুলে দেবে, সেন্ড আপনি চাপবেন।</string>
+    <string name="perm_notif_listener_title">📩 নোটিফিকেশন অ্যাক্সেস</string>
+    <string name="perm_notif_listener_desc">বললে নোটিফিকেশন পড়ে শোনানোর জন্য। ব্যাংকিং নোটিফিকেশন কখনো পড়া হয় না, OTP সবসময় লুকানো থাকে।</string>
+    <string name="perm_granted">✓ দেওয়া আছে</string>
+    <string name="perm_optional">ঐচ্ছিক</string>
+    <string name="perm_required">দরকার</string>
+    <string name="perm_open_settings">সিস্টেম সেটিংস খুলুন</string>
+    <string name="perm_allow">অনুমতি দিন</string>
+    <string name="onboarding_security_note">নিরাপত্তার প্রতিশ্রুতি: ব্যাংকিং, বিকাশ/নগদ/রকেট বা টাকার লেনদেনের কোনো অটোমেশন নুভা করে না; OTP/PIN/পাসওয়ার্ড কখনো পড়ে না; কল, মেসেজ বা রিমাইন্ডারের আগে অবশ্যই জিজ্ঞেস করে।</string>
+    <string name="onboarding_done">শেষ — নুভা ব্যবহার শুরু করুন</string>
+    <string name="onboarding_features">নুভা কী কী পারে?</string>
+
+    <!-- v1.1: feature support -->
+    <string name="support_title">নুভা কী পারে, কী পারে না</string>
+    <string name="support_subtitle">সৎ তালিকা — যা নির্ভরযোগ্যভাবে করা যায় না, তার সাথে কারণ লেখা আছে।</string>
+    <string name="support_supported">এখন কাজ করে</string>
+    <string name="support_unsupported">সাপোর্টেড নয় (কারণসহ)</string>
+
+    <!-- v1.1: settings -->
+    <string name="settings_health_check">সংযোগ পরীক্ষা</string>
+    <string name="settings_tts_test">ভয়েস পরীক্ষা (TTS)</string>
+    <string name="settings_status_title">স্ট্যাটাস</string>
+    <string name="settings_open_setup">পারমিশন সেটআপ</string>
+    <string name="settings_open_support">সাপোর্টেড ফিচার</string>
+
+    <!-- v1.1: memory/notes -->
+    <string name="todos_title">টু-ডু (ভয়েসে)</string>
+    <string name="notes_title">নোট (ভয়েসে)</string>
+    <string name="memories_title">স্মৃতি</string>
+    <string name="undo">ফেরত</string>
+    <string name="done">সম্পন্ন</string>
+    <string name="delete">মুছুন</string>
+
+    <string name="notification_listener_label">নুভা নোটিফিকেশন রিডার</string>
 </resources>

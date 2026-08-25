@@ -44,6 +44,15 @@ class MemoryViewModel : ViewModel() {
         .all
         .stateIn(CoroutineScope(Dispatchers.IO), SharingStarted.Lazily, emptyList())
 
+    /** Voice-captured notes & to-dos (v1.1) — local only. */
+    val notes = NuvaContainer.database.noteDao()
+        .byKind("note")
+        .stateIn(CoroutineScope(Dispatchers.IO), SharingStarted.Lazily, emptyList())
+
+    val todos = NuvaContainer.database.noteDao()
+        .byKind("todo")
+        .stateIn(CoroutineScope(Dispatchers.IO), SharingStarted.Lazily, emptyList())
+
     var message = mutableStateOf<String?>(null)
         private set
 
@@ -69,11 +78,25 @@ class MemoryViewModel : ViewModel() {
             message.value = "Synced — pushed ${report.pushedMemories}, pulled ${report.pulledMemories}"
         }
     }
+
+    fun toggleTodo(id: Long, done: Boolean) {
+        CoroutineScope(Dispatchers.IO).launch {
+            NuvaContainer.database.noteDao().setDone(id, done)
+        }
+    }
+
+    fun deleteNote(id: Long) {
+        CoroutineScope(Dispatchers.IO).launch {
+            NuvaContainer.database.noteDao().delete(id)
+        }
+    }
 }
 
 @Composable
 fun MemoryScreen(viewModel: MemoryViewModel = viewModel()) {
     val memories by viewModel.memories.collectAsState()
+    val notes by viewModel.notes.collectAsState()
+    val todos by viewModel.todos.collectAsState()
     val message by viewModel.message
     var key by remember { mutableStateOf("") }
     var value by remember { mutableStateOf("") }
@@ -115,6 +138,45 @@ fun MemoryScreen(viewModel: MemoryViewModel = viewModel()) {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
         }
 
+        if (todos.isNotEmpty()) {
+            Text(stringResource(R.string.todos_title), style = MaterialTheme.typography.titleMedium)
+        }
+        todos.forEach { todo ->
+            Card(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        (if (todo.done) "✓ " else "○ ") + todo.content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { viewModel.toggleTodo(todo.id, !todo.done) }) {
+                        Text(if (todo.done) stringResource(R.string.undo) else stringResource(R.string.done))
+                    }
+                }
+            }
+        }
+
+        if (notes.isNotEmpty()) {
+            Text(stringResource(R.string.notes_title), style = MaterialTheme.typography.titleMedium)
+        }
+        notes.forEach { note ->
+            Card(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(note.content, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { viewModel.deleteNote(note.id) }) { Text(stringResource(R.string.delete)) }
+                }
+            }
+        }
+
+        Text(stringResource(R.string.memories_title), style = MaterialTheme.typography.titleMedium)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(memories, key = { it.id }) { memory ->
                 Card(Modifier.fillMaxWidth()) {

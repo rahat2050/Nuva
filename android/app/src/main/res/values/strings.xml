@@ -30,4 +30,83 @@
     <string name="settings_voice">Speak replies out loud</string>
     <string name="settings_direct_call">Direct call (skip dialer)</string>
     <string name="settings_wake_word">Wake word “Hey Nuva”</string>
+    <!-- v1.1: home / typed fallback -->
+    <string name="typed_hint">Type a command…</string>
+    <string name="send">Send</string>
+    <string name="voice_failed_typed_hint">Voice did not work — write the command instead:</string>
+    <string name="contact_choice_title">Which contact?</string>
+    <string name="contact_choice_hint">Several contacts match that name. Pick one:</string>
+    <string name="retry">Retry</string>
+    <string name="accessibility_setup_link">Tap here for the step-by-step setup guide →</string>
+    <string name="accessibility_guide_title">Enable Accessibility</string>
+    <string name="accessibility_guide_step1">1. Open Settings → Accessibility → Installed apps</string>
+    <string name="accessibility_guide_step2">2. Tap “NUVA Automation” and switch it on</string>
+    <string name="accessibility_guide_step3">3. Come back to NUVA — screen reading, taps and typing will work</string>
+    <string name="accessibility_guide_privacy">NUVA only acts on your commands. It never records screens, and banking/payment apps are always blocked from automation.</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="later">Later</string>
+    <string name="confirm_generic">Shall I do this?</string>
+
+    <!-- v1.1: history -->
+    <string name="clear">Clear</string>
+    <string name="filter_all">All</string>
+    <string name="filter_completed">Done</string>
+    <string name="filter_failed">Failed</string>
+    <string name="filter_pending">Pending</string>
+    <string name="failure_reason">Reason</string>
+    <string name="status_completed">completed</string>
+    <string name="status_failed">failed</string>
+    <string name="status_rejected">cancelled</string>
+    <string name="status_blocked">blocked (security)</string>
+    <string name="status_unsupported">not supported</string>
+    <string name="status_executing">running…</string>
+    <string name="status_pending">awaiting confirmation</string>
+    <string name="status_choice">choosing contact</string>
+
+    <!-- v1.1: onboarding -->
+    <string name="onboarding_title">Set up NUVA</string>
+    <string name="onboarding_intro">Give only the permissions you want, when you want them. Everything is optional — NUVA simply tells you what needs which permission.</string>
+    <string name="perm_mic_title">🎙 Microphone</string>
+    <string name="perm_mic_desc">Needed to hear your voice commands. The mic only runs while the listening indicator is visible — never in the background.</string>
+    <string name="perm_notifications_title">🔔 Notifications</string>
+    <string name="perm_notifications_desc">Shows NUVA\'s listening status and results as a notification. Optional.</string>
+    <string name="perm_accessibility_title">♿ Accessibility service</string>
+    <string name="perm_accessibility_desc">Lets NUVA read the screen aloud and press buttons you name (screen reading, WhatsApp send, scroll). Enabled manually in system settings — NUVA can never turn it on itself.</string>
+    <string name="perm_contacts_title">👥 Contacts</string>
+    <string name="perm_contacts_desc">Needed to find a number when you say “call Rahim”. Requested only when you first run a call/message command.</string>
+    <string name="perm_sms_title">✉ SMS</string>
+    <string name="perm_sms_desc">Lets NUVA send an SMS after you confirm. Without it NUVA opens the SMS screen pre-filled and you press Send yourself.</string>
+    <string name="perm_notif_listener_title">📩 Notification access</string>
+    <string name="perm_notif_listener_desc">Needed to read your notifications aloud on command. Banking notifications are never read and OTP codes are always hidden.</string>
+    <string name="perm_granted">✓ granted</string>
+    <string name="perm_optional">optional</string>
+    <string name="perm_required">required</string>
+    <string name="perm_open_settings">Open system settings</string>
+    <string name="perm_allow">Allow</string>
+    <string name="onboarding_security_note">Security promise: NUVA never automates banking, bKash/Nagad/Rocket or any money transfer, never reads OTP/PIN/password, and always asks before calls, messages or reminders.</string>
+    <string name="onboarding_done">Done — start using NUVA</string>
+    <string name="onboarding_features">What can NUVA do?</string>
+
+    <!-- v1.1: feature support -->
+    <string name="support_title">What NUVA can &amp; cannot do</string>
+    <string name="support_subtitle">Honest list — anything not reliably automatable is marked with the reason.</string>
+    <string name="support_supported">Works now</string>
+    <string name="support_unsupported">Not supported (and why)</string>
+
+    <!-- v1.1: settings -->
+    <string name="settings_health_check">Test connection</string>
+    <string name="settings_tts_test">Test voice (TTS)</string>
+    <string name="settings_status_title">Status</string>
+    <string name="settings_open_setup">Permission setup</string>
+    <string name="settings_open_support">Supported features</string>
+
+    <!-- v1.1: memory/notes -->
+    <string name="todos_title">To-dos (voice)</string>
+    <string name="notes_title">Notes (voice)</string>
+    <string name="memories_title">Memories</string>
+    <string name="undo">Undo</string>
+    <string name="done">Done</string>
+    <string name="delete">Delete</string>
+
+    <string name="notification_listener_label">NUVA Notification Reader</string>
 </resources>
