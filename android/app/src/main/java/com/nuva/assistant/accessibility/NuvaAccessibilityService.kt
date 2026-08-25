@@ -9,6 +9,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.nuva.assistant.command.ScreenPoint
 import com.nuva.assistant.command.SwipeDirection
 import com.nuva.assistant.command.UiSelector
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
@@ -34,18 +35,47 @@ class NuvaAccessibilityService : AccessibilityService() {
         return super.onUnbind(intent)
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // Track the foreground package so the sensitive-screen guard always
+        // knows which app is in front (fail-safe: unknown ⇒ treat as unknown,
+        // package-specific checks then decide).
+        event?.packageName?.let { foregroundPackage = it.toString() }
+    }
 
     override fun onInterrupt() = Unit
+
+    // --- Sensitive-screen guard (policy §32–§36) -------------------------------
+
+    @Volatile
+    var foregroundPackage: String? = null
+        private set
+
+    /**
+     * True when the app in front of the user is on the banking/payment
+     * denylist. EVERY mutating automation call (tap/type/scroll/swipe) and
+     * screen read refuses to run while this is true — NUVA must never become
+     * a keylogger or transfer drone on a money screen.
+     */
+    fun isForegroundSensitive(): Boolean {
+        val pkg = rootInActiveWindow?.packageName?.toString() ?: foregroundPackage ?: return false
+        if (SensitiveAppPolicy.isSensitivePackage(pkg)) return true
+        // Fall back to the launcher label for label-only denylist hits.
+        val label = runCatching {
+            packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+        }.getOrNull()
+        return SensitiveAppPolicy.isSensitiveAppName(label)
+    }
 
     // --- Node operations -------------------------------------------------------
 
     fun findNode(selector: UiSelector): AccessibilityNodeInfo? {
+        if (isForegroundSensitive()) return null
         val root = rootInActiveWindow ?: return null
         return NodeFinder.find(root, selector)
     }
 
     fun clickNode(node: AccessibilityNodeInfo): Boolean {
+        if (isForegroundSensitive()) return false // policy §34: no automation on sensitive screens
         var current: AccessibilityNodeInfo? = node
         var depth = 0
         while (current != null && depth < MAX_PARENT_CLIMB) {
@@ -57,6 +87,7 @@ class NuvaAccessibilityService : AccessibilityService() {
     }
 
     fun longClickNode(node: AccessibilityNodeInfo): Boolean {
+        if (isForegroundSensitive()) return false // policy §34: no automation on sensitive screens
         var current: AccessibilityNodeInfo? = node
         var depth = 0
         while (current != null && depth < MAX_PARENT_CLIMB) {
@@ -72,6 +103,7 @@ class NuvaAccessibilityService : AccessibilityService() {
     }
 
     fun setText(node: AccessibilityNodeInfo, text: String): Boolean {
+        if (isForegroundSensitive()) return false // policy §34: no automation on sensitive screens
         var current: AccessibilityNodeInfo? = node
         var depth = 0
         while (current != null && depth < MAX_PARENT_CLIMB) {
@@ -92,6 +124,7 @@ class NuvaAccessibilityService : AccessibilityService() {
     }
 
     fun scrollNode(node: AccessibilityNodeInfo, direction: SwipeDirection): Boolean {
+        if (isForegroundSensitive()) return false // policy §34: no automation on sensitive screens
         val action = when (direction) {
             SwipeDirection.UP -> AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
             SwipeDirection.DOWN -> AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
@@ -113,6 +146,8 @@ class NuvaAccessibilityService : AccessibilityService() {
 
     fun goBack(): Boolean = performGlobalAction(GLOBAL_ACTION_BACK)
 
+    fun showRecents(): Boolean = performGlobalAction(GLOBAL_ACTION_RECENTS)
+
     /** The currently focused editable node (search field already open), if any. */
     fun findFocusedEditable(): AccessibilityNodeInfo? {
         val root = rootInActiveWindow ?: return null
@@ -132,6 +167,7 @@ class NuvaAccessibilityService : AccessibilityService() {
      * the gesture to complete. API 26+ compatible.
      */
     suspend fun tapAt(point: ScreenPoint, longClick: Boolean = false, timeoutMs: Long = GESTURE_TIMEOUT_MS): Boolean {
+        if (isForegroundSensitive()) return false // policy §34: no taps on money screens
         val screen = resources.displayMetrics
         val x = (point.x * screen.widthPixels).coerceIn(0f, screen.widthPixels.toFloat())
         val y = (point.y * screen.heightPixels).coerceIn(0f, screen.heightPixels.toFloat())
@@ -147,6 +183,7 @@ class NuvaAccessibilityService : AccessibilityService() {
         durationMs: Long = 250,
         timeoutMs: Long = GESTURE_TIMEOUT_MS,
     ): Boolean {
+        if (isForegroundSensitive()) return false // policy §34
         val screen = resources.displayMetrics
         val path = Path().apply {
             moveTo(from.x * screen.widthPixels, from.y * screen.heightPixels)
@@ -183,15 +220,20 @@ class NuvaAccessibilityService : AccessibilityService() {
     // --- Screen reading --------------------------------------------------------
 
     fun readVisibleScreen(maxChars: Int = 4000): String? {
+        if (isForegroundSensitive()) return null
         val root = rootInActiveWindow ?: return null
         val builder = StringBuilder()
         collectText(root, builder, maxChars)
         val text = builder.toString().trim()
-        return text.ifEmpty { null }
+        if (text.isEmpty()) return null
+        // OTP/PIN-like codes never leave the reader (policy §33).
+        return SensitiveAppPolicy.redactCodes(text)
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder, maxChars: Int) {
         if (out.length >= maxChars) return
+        // Password / PIN fields are NEVER read, in any app.
+        if (node.isPassword) return
         node.text?.let { out.appendLine(it) }
         node.contentDescription?.let { out.appendLine(it) }
         for (i in 0 until node.childCount) {
