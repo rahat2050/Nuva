@@ -92,6 +92,24 @@ object ActionJson {
         is NuvaAction.ReadScreen -> buildJsonObject {
             put("type", "READ_SCREEN"); action.scope?.let { put("scope", it.wireName) }
         }
+
+        // LOCAL-ONLY (v1.1)
+        is NuvaAction.ShowRecents -> buildJsonObject { put("type", "SHOW_RECENTS") }
+        is NuvaAction.SearchWeb -> buildJsonObject { put("type", "SEARCH_WEB"); put("query", action.query) }
+        is NuvaAction.DeviceStatusQuery -> buildJsonObject {
+            put("type", "DEVICE_STATUS"); put("query", action.query.wireName)
+        }
+        is NuvaAction.OpenSettingScreen -> buildJsonObject {
+            put("type", "OPEN_SETTING"); put("target", action.target.wireName)
+        }
+        is NuvaAction.ReadNotifications -> buildJsonObject { put("type", "READ_NOTIFICATIONS") }
+        is NuvaAction.SetReminder -> buildJsonObject {
+            put("type", "SET_REMINDER"); put("title", action.title)
+            action.whenMillis?.let { put("when_millis", it) }
+            action.humanWhen?.let { put("human_when", it) }
+        }
+        is NuvaAction.CreateNote -> buildJsonObject { put("type", "CREATE_NOTE"); put("content", action.content) }
+        is NuvaAction.CreateTodo -> buildJsonObject { put("type", "CREATE_TODO"); put("content", action.content) }
     }
 
     private fun selectorJson(selector: UiSelector): JsonObject = buildJsonObject {

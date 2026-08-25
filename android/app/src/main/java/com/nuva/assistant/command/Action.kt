@@ -96,6 +96,49 @@ sealed interface NuvaAction {
     data class ReadScreen(val scope: ReadScreenScope?) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.READ_SCREEN
     }
+
+    // --- LOCAL-ONLY actions (v1.1) — built by CommandParser, never by the AI --
+
+    data object ShowRecents : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.SHOW_RECENTS
+    }
+
+    data class SearchWeb(val query: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.SEARCH_WEB
+    }
+
+    data class DeviceStatusQuery(val query: DeviceStatusKind) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.DEVICE_STATUS
+    }
+
+    data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
+    }
+
+    data object ReadNotifications : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.READ_NOTIFICATIONS
+    }
+
+    /**
+     * Reminder via the Calendar app: NUVA opens a prefilled event — the user
+     * taps Save, so the calendar is never silently edited (policy §37).
+     * [whenMillis] null = let the user pick the time in the calendar app.
+     */
+    data class SetReminder(
+        val title: String,
+        val whenMillis: Long?,
+        val humanWhen: String?,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.SET_REMINDER
+    }
+
+    data class CreateNote(val content: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CREATE_NOTE
+    }
+
+    data class CreateTodo(val content: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CREATE_TODO
+    }
 }
 
 enum class SwipeDirection { UP, DOWN, LEFT, RIGHT;
@@ -174,6 +217,42 @@ enum class RelativeDay(val wireName: String) {
 
     companion object {
         fun fromWire(value: String?): RelativeDay? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/** Device-status questions answered locally (LOCAL-ONLY intent payload). */
+enum class DeviceStatusKind(val wireName: String) {
+    BATTERY("battery"),
+    TIME("time"),
+    DATE("date"),
+    NETWORK("network"),
+    STORAGE("storage"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): DeviceStatusKind? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/**
+ * System setting targets. Android restricts most direct changes by third-party
+ * apps, so every target except TORCH opens the matching settings screen and
+ * the user flips the switch (policy §27).
+ */
+enum class SettingTarget(val wireName: String) {
+    TORCH("torch"),
+    BRIGHTNESS("brightness"),
+    VOLUME("volume"),
+    DND("dnd"),
+    WIFI("wifi"),
+    BLUETOOTH("bluetooth"),
+    GENERAL_SETTINGS("general_settings"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): SettingTarget? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }
 
