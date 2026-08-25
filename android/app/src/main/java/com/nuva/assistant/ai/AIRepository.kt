@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
  * in (see SupabaseRepository).
  */
 class AIRepository(
-    baseUrlProvider: () -> String,
+    private val baseUrlProvider: () -> String,
     private val tokenProvider: suspend () -> String?,
     private val deviceIdProvider: () -> String?,
 ) {

@@ -201,7 +201,9 @@ class NuvaAccessibilityService : AccessibilityService() {
 
     /** Best-effort screen bounds of the active window, for diagnostics. */
     @Suppress("unused")
-    fun activeWindowBounds(): Rect? = rootInActiveWindow?.getBoundsInScreen(Rect())
+    fun activeWindowBounds(): Rect? = rootInActiveWindow?.let { root ->
+        Rect().also(root::getBoundsInScreen)
+    }
 
     companion object {
         @Volatile

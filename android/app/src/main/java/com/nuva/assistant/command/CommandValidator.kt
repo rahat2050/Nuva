@@ -137,6 +137,7 @@ object CommandValidator {
         val direction = SwipeDirection.fromWire(json.str("direction"))
             ?: return ValidatedAction.Invalid(listOf("SCROLL requires direction (up|down|left|right)"))
         val amount = json.int("amount")?.takeIf { it in 1..20 }
+            ?: return ValidatedAction.Invalid(listOf("SCROLL requires amount (1..20)"))
         return ValidatedAction.Valid(NuvaAction.Scroll(direction, amount, selector(json["target"] as? JsonObject)))
     }
 
