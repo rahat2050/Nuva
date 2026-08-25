@@ -96,7 +96,7 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
         if (granted) viewModel.startListening()
     }
 
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsState(initial = VoiceController.State.Idle)
     val pending by viewModel.pending.collectAsState()
     val recent by viewModel.recent.collectAsState()
 

@@ -55,6 +55,7 @@ class SpeechRecognizerController(private val context: Context) {
             }
 
             override fun onBeginningOfSpeech() = Unit
+            override fun onEndOfSpeech() = Unit
             override fun onRmsChanged(rmsdB: Float) = Unit
             override fun onBufferReceived(buffer: ByteArray?) = Unit
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
