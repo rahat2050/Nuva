@@ -30,8 +30,16 @@ class VoiceController(
         data class Transcribed(val text: String) : State
         data object Processing : State
         data class AwaitingConfirmation(val pendingId: Long, val decision: CommandDecision) : State
+        data class AwaitingContactChoice(
+            val pendingId: Long,
+            val decision: CommandDecision,
+            val matches: List<com.nuva.assistant.contacts.ContactResolver.ContactMatch>,
+        ) : State
+
         data class Done(val speech: String, val screenText: String? = null) : State
-        data class Failed(val speech: String) : State
+
+        /** [fromVoice] false ⇒ recognition failed and the typed fallback is offered. */
+        data class Failed(val speech: String, val fromVoice: Boolean = false) : State
     }
 
     private val _state = MutableStateFlow<State>(State.Idle)
@@ -72,7 +80,8 @@ class VoiceController(
                         }
 
                         is SpeechRecognizerController.VoiceEvent.Error -> {
-                            _state.value = State.Failed(event.speech)
+                            // Recognition failed → typed fallback is offered in the UI.
+                            _state.value = State.Failed(event.speech, fromVoice = true)
                             speakIfEnabled(event.speech)
                         }
                     }
@@ -105,7 +114,12 @@ class VoiceController(
                 is CommandExecutor.Step.AwaitingConfirmation -> {
                     onDecision(step.decision)
                     _state.value = State.AwaitingConfirmation(step.pendingId, step.decision)
-                    speakIfEnabled(step.decision.speech.ifBlank { "Korbo?" })
+                    speakIfEnabled(step.decision.speech.ifBlank { "Korbo? Nishchit korun." })
+                }
+
+                is CommandExecutor.Step.AwaitingContactChoice -> {
+                    _state.value = State.AwaitingContactChoice(step.pendingId, step.decision, step.matches)
+                    speakIfEnabled("Ei nam e koyekta contact paoa geche — ekta beche nin.")
                 }
 
                 is CommandExecutor.Step.Executing -> _state.value = State.Processing
@@ -126,6 +140,30 @@ class VoiceController(
     fun confirm(pendingId: Long) {
         mainScope.launch {
             when (val step = NuvaContainer.commandExecutor.confirm(pendingId)) {
+                is CommandExecutor.Step.Done -> {
+                    _state.value = State.Done(step.speech)
+                    speakIfEnabled(step.speech)
+                }
+
+                is CommandExecutor.Step.Failed -> {
+                    _state.value = State.Failed(step.speech)
+                    speakIfEnabled(step.speech)
+                }
+
+                else -> _state.value = State.Idle
+            }
+        }
+    }
+
+    /** The user picked one contact out of several matches → confirm again with it. */
+    fun chooseContact(pendingId: Long, match: com.nuva.assistant.contacts.ContactResolver.ContactMatch) {
+        mainScope.launch {
+            when (val step = NuvaContainer.commandExecutor.chooseContact(pendingId, match)) {
+                is CommandExecutor.Step.AwaitingConfirmation -> {
+                    _state.value = State.AwaitingConfirmation(step.pendingId, step.decision)
+                    speakIfEnabled("${match.displayName} — nishchit korun?")
+                }
+
                 is CommandExecutor.Step.Done -> {
                     _state.value = State.Done(step.speech)
                     speakIfEnabled(step.speech)

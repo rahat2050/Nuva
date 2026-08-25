@@ -254,6 +254,10 @@ class WakeWordService : Service() {
         overlay.showStatus(FloatingAssistantOverlay.PopupState.PROCESSING, "Processing…", cleanText)
         when (val step = NuvaContainer.commandExecutor.process(cleanText)) {
             is CommandExecutor.Step.AwaitingConfirmation -> showConfirmation(step)
+            is CommandExecutor.Step.AwaitingContactChoice -> showTerminal(
+                success = false,
+                speech = "Ei nam e koyekta contact mille — NUVA app khule ekta beche nin.",
+            )
             is CommandExecutor.Step.Done -> showTerminal(success = true, speech = step.speech, detail = step.screenText)
             is CommandExecutor.Step.Failed -> showTerminal(success = false, speech = step.speech)
             is CommandExecutor.Step.Decision -> {

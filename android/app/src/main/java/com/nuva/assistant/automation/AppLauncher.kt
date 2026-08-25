@@ -34,6 +34,14 @@ object AppLauncher {
         "calculator" to "com.android.calculator2",
         "settings" to "com.android.settings",
         "phone" to "com.android.dialer",
+        "contacts" to "com.android.contacts",
+        "gallery" to "com.android.gallery3d",
+        "files" to "com.android.filemanager",
+        "calendar" to "com.android.calendar",
+        "translate" to "com.google.android.apps.translate",
+        "play store" to "com.android.vending",
+        "recorder" to "com.android.soundrecorder",
+        "music" to "com.android.music",
     )
 
     fun resolvePackage(app: String, serverHint: String?): String? =
@@ -41,21 +49,105 @@ object AppLauncher {
 
     sealed interface LaunchResult {
         data class Success(val packageName: String) : LaunchResult
-        data class NotFound(val app: String) : LaunchResult
+
+        /** App not installed — carries a Play Store search suggestion (v1.1). */
+        data class NotFound(val app: String, val playStoreUrl: String) : LaunchResult
+    }
+
+    fun playStoreSearchUrl(app: String): String =
+        "https://play.google.com/store/search?q=" + Uri.encode(app) + "&c=apps"
+
+    /** One launchable installed app with its user-visible label. */
+    data class InstalledApp(val packageName: String, val label: String, val normalizedLabel: String)
+
+    @Volatile
+    private var installedCache: List<InstalledApp>? = null
+    @Volatile
+    private var installedCacheAt: Long = 0
+
+    /**
+     * Every launchable app on the phone (cached 60 s). This is what makes
+     * "Nuva <any app name> khulo" work — not just a hard-coded package list.
+     */
+    fun installedLaunchableApps(context: Context, forceRefresh: Boolean = false): List<InstalledApp> {
+        val now = System.currentTimeMillis()
+        val cache = installedCache
+        if (!forceRefresh && cache != null && now - installedCacheAt < 60_000) return cache
+        val pm = context.packageManager
+        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = runCatching {
+            pm.queryIntentActivities(launcherIntent, 0).map { info ->
+                val label = info.loadLabel(pm).toString()
+                InstalledApp(
+                    packageName = info.activityInfo.packageName,
+                    label = label,
+                    normalizedLabel = normalizeLabel(label),
+                )
+            }.distinctBy { it.packageName }
+        }.getOrDefault(emptyList())
+        installedCache = apps
+        installedCacheAt = now
+        return apps
+    }
+
+    private fun normalizeLabel(label: String): String =
+        label.lowercase().replace(Regex("""[^a-z0-9\u0980-\u09FF ]"""), "").replace(Regex("\\s+"), " ").trim()
+
+    /**
+     * Finds an installed app by spoken/written name: exact alias hit first,
+     * then label exact match, then label starts-with, then contains.
+     */
+    fun findInstalledApp(context: Context, app: String): InstalledApp? {
+        val key = normalizeLabel(app)
+        if (key.isBlank()) return null
+        val apps = installedLaunchableApps(context)
+        apps.firstOrNull { it.normalizedLabel == key }?.let { return it }
+        // Alias may differ from the label ("maps" → "Maps"); map through hints.
+        resolvePackage(app, null)?.let { pkg ->
+            apps.firstOrNull { it.packageName == pkg }?.let { return it }
+        }
+        apps.firstOrNull { it.normalizedLabel.startsWith(key) }?.let { return it }
+        return apps.firstOrNull { it.normalizedLabel.contains(key) }
     }
 
     fun openApp(context: Context, app: String, serverHint: String?): LaunchResult {
-        val pkg = resolvePackage(app, serverHint)
-            ?: return LaunchResult.NotFound(app)
+        // Denylist first — never launch a banking/payment app by voice.
+        if (com.nuva.assistant.core.security.SensitiveAppPolicy.isSensitiveAppName(app)) {
+            return LaunchResult.NotFound(app, playStoreSearchUrl(app))
+        }
 
-        val launchIntent: Intent? = context.packageManager.getLaunchIntentForPackage(pkg)
+        val hintPkg = resolvePackage(app, serverHint)
+        val launchIntent: Intent? = when {
+            hintPkg != null && !com.nuva.assistant.core.security.SensitiveAppPolicy.isSensitivePackage(hintPkg) ->
+                context.packageManager.getLaunchIntentForPackage(hintPkg)
+
+            else -> {
+                // Dynamic resolution: search installed apps by label (v1.1).
+                findInstalledApp(context, app)
+                    ?.takeIf { !com.nuva.assistant.core.security.SensitiveAppPolicy.isSensitivePackage(it.packageName) }
+                    ?.let { context.packageManager.getLaunchIntentForPackage(it.packageName) }
+            }
+        }
         return if (launchIntent != null) {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(launchIntent)
-            LaunchResult.Success(pkg)
+            runCatching { context.startActivity(launchIntent) }.fold(
+                onSuccess = { LaunchResult.Success(launchIntent.`package` ?: app) },
+                onFailure = { LaunchResult.NotFound(app, playStoreSearchUrl(app)) },
+            )
         } else {
-            LaunchResult.NotFound(app)
+            LaunchResult.NotFound(app, playStoreSearchUrl(app))
         }
+    }
+
+    /** Opens the Play Store on the search page for [app] (missing-app suggestion). */
+    fun openPlayStoreSearch(context: Context, app: String): Boolean {
+        val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=${Uri.encode(app)}&c=apps"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val http = Intent(Intent.ACTION_VIEW, Uri.parse(playStoreSearchUrl(app)))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return runCatching { context.startActivity(market) }
+            .recoverCatching { context.startActivity(http) }
+            .isSuccess
     }
 
     /** "Close" = open the home screen; force-stop is not possible for third-party apps. */
