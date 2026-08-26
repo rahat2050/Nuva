@@ -688,6 +688,19 @@ def parse_daily_skill(t):
         return ok({"kind":"search","query":t}, "SEARCH_WEB")
     return None
 
+def parse_extended_daily_skill(t):
+    # Representative entity × task pairs from the exact 500-entry Kotlin matrix.
+    pairs = [
+        (["private tutor","home tutor","গৃহশিক্ষক"], ["nearby","near me","কাছের"]),
+        (["passport","পাসপোর্ট"], ["ki kagoj lagbe","required documents","কী কাগজ লাগবে"]),
+        (["excel","এক্সেল"], ["tutorial","ধাপে ধাপে"]),
+        (["washing machine","ওয়াশিং মেশিন"], ["repair","problem fix","মেরামত"]),
+        (["router","রাউটার"], ["user manual","ব্যবহারের নিয়ম","ম্যানুয়াল"]),
+    ]
+    if any(any(e in t for e in entities) and any(k in t for k in tasks) for entities,tasks in pairs):
+        return ok({"kind":"search","query":t}, "SEARCH_WEB")
+    return None
+
 def parse_knowledge(t):
     questions = ["what ","how ","why ","who ","where ","when ","ki ","kivabe","keno","kothay","kokhon",
                  "কী ","কি ","কিভাবে","কেন","কোথায়","কখন"]
@@ -703,7 +716,8 @@ def rule_table(t):
             or parse_realtime(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
-            or parse_scroll(t) or parse_close(t) or parse_open(t) or parse_daily_skill(t) or parse_knowledge(t))
+            or parse_scroll(t) or parse_close(t) or parse_open(t) or parse_daily_skill(t)
+            or parse_extended_daily_skill(t) or parse_knowledge(t))
 
 def parse_prepared(t):
     if is_money(t): return refused()
@@ -808,6 +822,12 @@ check(parse("parcel tracking ZX123")["intent"] == "SEARCH_WEB", "daily sourced s
 registry_source = (Path(__file__).parent.parent / "app/src/main/java/com/nuva/assistant/command/DailySkillRegistry.kt").read_text()
 registry_ids = re.findall(r'^\s*skill\("([^"]+)"', registry_source, re.MULTILINE)
 check(len(registry_ids) == 100 and len(set(registry_ids)) == 100, "exact 100 unique daily skills")
+extended_source = (Path(__file__).parent.parent / "app/src/main/java/com/nuva/assistant/command/ExtendedDailySkillRegistry.kt").read_text()
+check(re.search(r"EXPECTED_SKILL_COUNT\s*=\s*500", extended_source) is not None, "extended registry declares 500 skills")
+check(parse("nearby private tutor")["intent"] == "SEARCH_WEB", "extended service skill")
+check(parse("passport ki kagoj lagbe")["intent"] == "SEARCH_WEB", "extended public skill")
+check(parse("excel tutorial")["intent"] == "SEARCH_WEB", "extended learning skill")
+check(parse("washing machine repair")["intent"] == "SEARCH_WEB", "extended product skill")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

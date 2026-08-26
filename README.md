@@ -13,6 +13,8 @@ you say into a validated action, asks before doing anything risky, and carries i
 "Shopping list e dim dudh add koro." → saves a local shopping item
 "Parcel tracking ZX123."             → opens a sourced tracking search
 "120 km 60 kmph travel time koto?"  → calculates ETA offline
+"Passport ki kagoj lagbe?"           → opens sourced document requirements
+"LG F4 washing machine repair UE."  → preserves model/error in product help search
 ```
 
 ## Project status
@@ -21,7 +23,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v1.9 passes** — practical assistant → universal control → daily utility engine | ✅ Implemented in code (real-device QA still pending): safe phone control, 1,000+ offline calculation/conversion forms, advanced daily formulas, and an exact 100-skill sourced lookup registry; see [`docs/supported-features.md`](docs/supported-features.md) |
+| **v1.1–v2.0 passes** — practical assistant → universal control → daily utility engine | ✅ Implemented in code (real-device QA still pending): safe phone control, 1,000+ offline calculation/conversion forms, advanced formulas, and 600 sourced skills (100 broad + exactly 500 entity×task); see [`docs/supported-features.md`](docs/supported-features.md) |
 
 `backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
@@ -141,7 +143,8 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [architecture.md](docs/architecture.md)    | Pipeline, modules, data model, AI boundary        |
 | [commands.md](docs/commands.md)            | API contract + all 15 server actions              |
 | [daily-utility-commands.md](docs/daily-utility-commands.md) | Offline daily calculations, conversions and examples |
-| [100-daily-skills.md](docs/100-daily-skills.md) | Numbered v1.9 registry of 100 sourced practical lookups |
+| [100-daily-skills.md](docs/100-daily-skills.md) | Numbered registry of 100 broad sourced lookups |
+| [500-extended-skills.md](docs/500-extended-skills.md) | v2.0 entity×task matrices for exactly 500 precise skills |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |

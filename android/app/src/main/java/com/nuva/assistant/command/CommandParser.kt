@@ -198,6 +198,7 @@ object CommandParser {
         ?: parseCloseApp(text)
         ?: parseOpenApp(text)
         ?: parseDailySkill(text)
+        ?: parseExtendedDailySkill(text)
         ?: parseKnowledgeSearch(text)
 
     private fun parseDailySkill(text: String): CommandDecision? {
@@ -207,6 +208,16 @@ object CommandParser {
             "হালনাগাদ ও sourced তথ্য ওয়েবে খুঁজছি।"
         } else {
             "Updated sourced information web e khujchi."
+        }
+        return ok(NuvaAction.SearchWeb(match.query), speech)
+    }
+
+    private fun parseExtendedDailySkill(text: String): CommandDecision? {
+        val match = ExtendedDailySkillRegistry.resolve(text) ?: return null
+        val speech = if (text.any { it.code in 0x0980..0x09FF }) {
+            "নির্দিষ্ট তথ্যটি sourced web result-এ খুঁজছি।"
+        } else {
+            "Specific information sourced web result e khujchi."
         }
         return ok(NuvaAction.SearchWeb(match.query), speech)
     }
@@ -224,9 +235,9 @@ object CommandParser {
         ).any { text.contains(it) }
         if (asksCapabilities) {
             val answer = if (text.any { it.code in 0x0980..0x09FF }) {
-                "আমি ফোন কন্ট্রোল, কল-মেসেজ, রিমাইন্ডার, নোট-লিস্ট, উন্নত হিসাব, BMI, EMI, তারিখ, হাজারের বেশি কনভার্সন এবং স্বাস্থ্য, ভ্রমণ, বাজার, শিক্ষা, সরকারি সেবা ও নিরাপত্তার ১০০টি sourced daily skill চালাতে পারি। Features পেজে পুরো তালিকা আছে।"
+                "আমি ফোন কন্ট্রোল, কল-মেসেজ, রিমাইন্ডার, নোট-লিস্ট, উন্নত হিসাব, হাজারের বেশি কনভার্সন এবং মোট ৬০০টি sourced daily skill চালাতে পারি—এর মধ্যে ৫০০টি precise service, সরকারি কাজ, learning ও product-help skill। Features পেজে তালিকা আছে।"
             } else {
-                "Ami phone control, call-message, reminder, note-list, advanced calculation, BMI, EMI, date, hajarer beshi conversion, ar health, travel, shopping, education, public service o safety-r 100 ta sourced daily skill chalate pari. Features page e full list ache."
+                "Ami phone control, call-message, reminder, note-list, advanced calculation, hajarer beshi conversion, ar mot 600 ta sourced daily skill chalate pari—er moddhe 500 ta precise service, public-work, learning o product-help skill. Features page e list ache."
             }
             return ok(NuvaAction.LocalAnswer(answer, "assistant_help"), answer)
         }

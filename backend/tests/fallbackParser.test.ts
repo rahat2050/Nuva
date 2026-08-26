@@ -72,6 +72,9 @@ describe('parseFallback', () => {
       'parcel tracking ZX123',
       'passport application',
       'internet speed test',
+      'passport ki kagoj lagbe',
+      'excel tutorial',
+      'washing machine repair',
     ]) {
       const result = parseFallback(phrase);
       expect(result?.rule, phrase).toBe('OPEN_URL_KNOWLEDGE');

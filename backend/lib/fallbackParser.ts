@@ -171,7 +171,7 @@ const RULES: Rule[] = [
         /^(what|how|why|who|where|when|which|ki|kivabe|keno|kothay|kokhon|কী|কি|কিভাবে|কীভাবে|কেন|কোথায়|কখন)\b/.test(text) ||
         /\b(ki|keno|kothay|kokhon|koto|kemon|কী|কি|কেন|কোথায়|কখন|কত|কেমন)[?.।]*$/.test(text);
       const usefulTopic =
-        /(recipe|রেসিপি|রান্না|meaning|মানে|dictionary|অভিধান|translate|translation|অনুবাদ|near me|nearby|কাছাকাছি|schedule|সময়সূচি|routine|price|দাম কত|bus|train|flight|বাস|ট্রেন|ফ্লাইট|doctor|hospital|medicine|ডাক্তার|হাসপাতাল|ওষুধ|school|college|job|স্কুল|কলেজ|চাকরি|how to|parcel tracking|courier track|passport application|nid info|birth registration|speed test|fact check|scam check|qibla direction|public holiday|cybercrime report|গাছের যত্ন)/.test(text);
+        /(recipe|রেসিপি|রান্না|meaning|মানে|dictionary|অভিধান|translate|translation|অনুবাদ|near me|nearby|কাছাকাছি|schedule|সময়সূচি|routine|price|দাম কত|bus|train|flight|বাস|ট্রেন|ফ্লাইট|doctor|hospital|medicine|ডাক্তার|হাসপাতাল|ওষুধ|school|college|job|স্কুল|কলেজ|চাকরি|how to|parcel tracking|courier track|passport application|nid info|birth registration|speed test|fact check|scam check|qibla direction|public holiday|cybercrime report|গাছের যত্ন|required documents|ki kagoj lagbe|eligibility|official fees|opening hours|contact number|customer reviews|appointment information|available today|beginner guide|tutorial|worked examples|practice exercises|cheat sheet|buying guide|user manual|repair|troubleshooting|ব্যবহারের নিয়ম|মেরামত)/.test(text);
       if ((!question && !usefulTopic) || text.length < 3) return null;
       const query = text.replace(/[.,?!।]+$/g, '').trim();
       return { type: 'OPEN_URL', url: `https://www.google.com/search?q=${encodeURIComponent(query)}` };

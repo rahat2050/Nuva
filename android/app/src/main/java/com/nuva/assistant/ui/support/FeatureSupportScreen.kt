@@ -49,7 +49,7 @@ val SUPPORTED_FEATURES = listOf(
     "নোট, টু-ডু, শপিং/বাজারের তালিকা ও খরচের নোট ভয়েসে লেখা এবং আবার পড়ে শোনানো (শুধু ফোনে থাকে)",
     "অফলাইন হিসাব — +, −, ×, ÷, bracket, power, square root, factorial, percentage, discount, VAT/tip, bill split",
     "দৈনন্দিন calculator — BMI/BMR, পানি, EMI/interest, profit-loss, unit price, savings, mileage/fuel cost/ETA, statistics, ratio, grade, geometry, download time, date, random",
-    "নতুন ১০০টি sourced daily skill — health/emergency, travel/nearby, household/shopping, education/work, market/civic/faith, digital safety ও lifestyle",
+    "৬০০টি sourced daily skill — ১০০ broad shortcut + ৫০০ precise entity×task skill: local service, সরকারি আবেদন, learning ও product help",
     "১,০০০+ command form: length/weight/volume/area/বাংলাদেশি জমি/speed/time/data/temperature/energy/pressure conversion",
     "ব্যাটারি, সময়, তারিখ, নেটওয়ার্ক, স্টোরেজ জিজ্ঞাসা — ফোন থেকেই তাৎক্ষণিক উত্তর, ইন্টারনেট/AI লাগে না",
     "টর্চ টগল; ব্রাইটনেস/সাউন্ড/DND/ওয়াইফাই/ব্লুটুথ সেটিং স্ক্রিন",

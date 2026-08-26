@@ -1,4 +1,4 @@
-# NUVA — Supported features (v1.9)
+# NUVA — Supported features (v2.0)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -43,11 +43,14 @@ results stay on-device. Shopping/grocery lists reuse the local to-do store; expe
 notes. `shopping list dekhao`, `todo list poro`, `note gulo dekhao` and `khoroch gulo poro` read the
 matching local items back without a network call.
 
-## 100 sourced daily skills — SUPPORTED
-An exact 100-entry, data-validated registry covers health/emergency, travel/nearby, household/
-shopping, education/work, financial information, civic/faith, digital safety and lifestyle lookups.
-Details such as a parcel code are preserved in the query. All skills are read-only live searches;
-transaction and credential policies run first. Full numbered list: [`100-daily-skills.md`](100-daily-skills.md).
+## 600 sourced daily skills — SUPPORTED
+The original exact 100-entry registry covers health/emergency, travel/nearby, household/shopping,
+education/work, financial information, civic/faith, digital safety and lifestyle lookups. v2.0 adds
+**exactly 500** precise matrix-generated skills: 25 local services × 8 tasks (200), 20 public
+services × 5 tasks (100), 20 learning subjects × 5 tasks (100), and 20 household products × 5
+tasks (100). An entity and task must both match, while location/model/error details are preserved.
+All skills are read-only live searches; transaction and credential policies run first.
+Lists: [`100-daily-skills.md`](100-daily-skills.md) · [`500-extended-skills.md`](500-extended-skills.md).
 
 ## Device utilities & current information — SUPPORTED
 Torch, battery/time/date/network/storage answers read from the phone at execution time (offline;

@@ -176,6 +176,22 @@ class CommandParserTest {
     }
 
     @Test
+    fun `five hundred matrix generated skills require entity plus task`() {
+        listOf(
+            "nearby private tutor",
+            "passport ki kagoj lagbe",
+            "excel tutorial",
+            "washing machine repair",
+            "রাউটার ব্যবহারের নিয়ম",
+        ).forEach { phrase ->
+            val decision = CommandParser.parse(phrase)
+            assertNotNull(phrase, decision)
+            assertEquals(phrase, NuvaIntent.SEARCH_WEB, decision!!.intent)
+        }
+        assertNull(CommandParser.parse("required documents"))
+    }
+
+    @Test
     fun `universal parser is connected to the main rule table`() {
         assertEquals(NuvaIntent.PRESS, CommandParser.parse("Send button press koro")!!.intent)
         assertEquals(NuvaIntent.CLEAR_TEXT, CommandParser.parse("lekhata muchhe dao")!!.intent)

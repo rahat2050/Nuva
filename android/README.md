@@ -142,10 +142,10 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   notes & to-dos.
 * **Messaging tiers**: WhatsApp + SMS send after confirmation; Telegram/Messenger/
   Signal/Viber/IMO open with the message pre-filled (user taps Send).
-* **v1.8–v1.9 daily utility packs**: 1,000+ offline calculation/conversion command forms,
-  advanced study/travel/health/budget formulas, shopping/expense list read-back, and an exact
-  100-entry read-only registry for sourced health, travel, household, education, civic, safety and
-  lifestyle lookups.
+* **v1.8–v2.0 daily utility packs**: 1,000+ offline calculation/conversion command forms,
+  advanced study/travel/health/budget formulas, shopping/expense list read-back, 100 broad sourced
+  skills, and exactly 500 precise entity×task skills for local services, public services, learning
+  and product help.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.
