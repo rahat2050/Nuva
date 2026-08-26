@@ -78,6 +78,15 @@ class CommandExecutor(
     val busy: Flow<Boolean> = _busy.asStateFlow()
 
     /**
+     * Remaining steps of a multi-action plan ("WhatsApp kholo AR Rohim-ke
+     * message dau …"). Each step ran/will run through the SAME pipeline —
+     * validation, contact resolution, security and per-action confirmation —
+     * so a plan never bypasses a gate. Cleared when the user cancels.
+     */
+    private val planQueue = ArrayDeque<CommandDecision>()
+    private var planTotalSteps: Int = 0
+
+    /**
      * Full pipeline for one utterance (voice or typed). Never throws — every
      * failure becomes a [Step.Failed] with a user-sayable reason.
      */
@@ -85,6 +94,17 @@ class CommandExecutor(
         if (text.isBlank()) return Step.Failed("Kichu bolejni. Ar ektu jore bolen.")
         _busy.value = true
         try {
+            // Multi-step plan? ("WhatsApp kholo ar Rohim-ke message dau …")
+            val plan = CommandParser.parseCompound(text)
+            if (plan != null && plan.size > 1) {
+                planQueue.clear()
+                planQueue.addAll(plan.drop(1))
+                planTotalSteps = plan.size
+                val first = plan.first()
+                val firstStep = handleDecision("${text} · 1/$planTotalSteps ${first.intent?.wireName ?: ""}", first)
+                return drainPlan(firstStep)
+            }
+
             val decision = interpret(text) ?: return Step.Failed("Bujhte parini, ektu onno bhabe bolen.")
             return handleDecision(text, decision)
         } catch (err: AIRepository.ApiCallException) {
@@ -94,6 +114,31 @@ class CommandExecutor(
         } finally {
             _busy.value = false
         }
+    }
+
+    /**
+     * Drains the remaining plan steps after each completed one. Any step that
+     * needs confirmation PAUSES the plan (its own dialog); after the user
+     * confirms, [confirm] resumes the queue. A failed step aborts the rest.
+     */
+    private suspend fun drainPlan(step: Step): Step {
+        var current = step
+        var index = planTotalSteps - planQueue.size
+        while (current is Step.Done && planQueue.isNotEmpty()) {
+            val next = planQueue.removeFirst()
+            index++
+            val label = "· $index/$planTotalSteps ${next.intent?.wireName ?: ""}"
+            current = if (current.status == "unsupported" || current.status == "rejected") {
+                // An unsupported/rejected step ends the plan cleanly.
+                current
+            } else {
+                handleDecision(label, next)
+            }
+        }
+        if (planQueue.isEmpty() && current is Step.Done && planTotalSteps > 1) {
+            planTotalSteps = 0
+        }
+        return current
     }
 
     /**
@@ -301,7 +346,7 @@ class CommandExecutor(
             commandId = pending.serverCommandId,
             source = "pending",
         )
-        return executeDecision(decision, action, pending.localCommandId ?: 0L)
+        return drainPlan(executeDecision(decision, action, pending.localCommandId ?: 0L))
     }
 
     /** Called when the user rejects the confirmation dialog. */
@@ -310,6 +355,13 @@ class CommandExecutor(
         pendingActions.updateStatus(pendingId, "rejected")
         if (pending.localCommandId != null) history.updateStatus(pending.localCommandId, "rejected")
         reportRemoteById(pending.serverCommandId, "rejected", null)
+        // Cancelling one step cancels the whole remaining plan — never run
+        // half-approved sequences.
+        if (planQueue.isNotEmpty()) {
+            planQueue.clear()
+            planTotalSteps = 0
+            return Step.Done("Thik ache, koreni — baki plan-er kajgulo o cancel kore dilam.", "rejected")
+        }
         return Step.Done("Thik ache, koreni.", "rejected")
     }
 

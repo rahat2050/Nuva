@@ -22,9 +22,9 @@ object CommandParser {
     // Language-agnostic verb/helper word lists ---------------------------------
 
     private val OPEN_VERBS = listOf(
-        "open koro", "open korun", "open", "khule dao", "khulo", "khulun", "chalu koro",
-        "চালু করো", "চালু করুন", "খোলো", "খুলে দাও", "খুলুন", "launch koro", "launch",
-        "start koro", "চালাও",
+        "open koro", "open korun", "open", "khule dao", "kholo dao", "kholo", "khulo", "kholun", "khulun",
+        "chalu koro", "চালু করো", "চালু করুন", "খোলো", "খুলে দাও", "খুলুন",
+        "launch koro", "launch", "start koro", "চালাও",
     )
     private val CLOSE_VERBS = listOf(
         "close koro", "close korun", "close", "band koro", "bondho koro", "bondho korun",
@@ -67,7 +67,13 @@ object CommandParser {
         put("upay", "উপায়", "উপাই", canonical = "upay")
     }
 
-    private val PHONE_NUMBER = Regex("""(\+?88)?01[3-9]\d{8}|\+\d{8,15}""")
+    // Bangladeshi/Intl numbers, tolerant of spaces/hyphens inside ("01712-345678").
+    private val PHONE_NUMBER = Regex("""(\+?88)?01[3-9](?:[\s-]?\d){8}|\+\d{8,15}""")
+
+    /** "rohim-ke" → "rohim ke", "whatsapp-e" → "whatsapp e" (keeps URLs intact). */
+    private val HYPHEN_SUFFIX = Regex("""-(ke|kei|keu|kar|e|te|er|r)\b""")
+
+    private fun digitsOnly(raw: String): String = raw.filter { it.isDigit() || it == '+' }
 
     // --- Public API -------------------------------------------------------------
 
@@ -78,40 +84,22 @@ object CommandParser {
      * matches — the caller then falls back to the AI path.
      */
     fun parse(rawText: String): CommandDecision? {
-        val normalized = NuvaDateTimeParser.normalize(rawText)
-        val text = stripWakeWord(normalized)
-        if (text.isBlank()) return null
-
-        // 0) SECURITY FIRST — money/banking/credential requests are refused
-        //    locally, never sent to any server (policy §32–§36).
-        SensitiveAppPolicy.refusalForText(text)?.let { return refused() }
-        if (SensitiveAppPolicy.mentionsCredentials(text)) {
-            return unsupported("OTP, PIN ba password NUVA kochu kore na — egulo nije likhun.")
-        }
-
-        // Ordered rule table — the first hit wins.
-        return parseNavigation(text)
-            ?: parseScreenReading(text)
-            ?: parseDeviceStatus(text)
-            ?: parseMediaControl(text)
-            ?: parseVolumeControl(text)
-            ?: parseCamera(text)
-            ?: parseSettings(text)
-            ?: parseAlarm(text)
-            ?: parseTimer(text)
-            ?: parseReminder(text)
-            ?: parseNoteTodo(text)
-            ?: parseCall(text)
-            ?: parseSendMessage(text)
-            ?: parsePlayMedia(text)
-            ?: parseWeb(text)
-            ?: parseScrollSwipe(text)
-            ?: parseCloseApp(text)
-            ?: parseOpenApp(text)
+        val text = prepare(rawText) ?: return null
+        return parsePrepared(text)
     }
 
     private fun stripWakeWord(text: String): String =
         WAKE_WORDS.replace(text, "").replace(Regex("^[,.!\\s]+"), "").trim()
+
+    /** Shared utterance preparation: normalize → wake-strip → hyphen suffixes. */
+    private fun prepare(rawText: String): String? {
+        val normalized = NuvaDateTimeParser.normalize(rawText)
+        val text = stripWakeWord(normalized)
+        if (text.isBlank()) return null
+        return HYPHEN_SUFFIX.replace(text) { m -> " ${m.groupValues[1]} " }
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
 
     /**
      * Removes a filler word/phrase. `\b` is ASCII-only in JVM regex, so Bangla
@@ -123,6 +111,149 @@ object CommandParser {
         } else {
             text.replace(word, " ")
         }
+
+    // --- 0b. Compound / multi-step commands (v1.3) ---------------------------------
+    //
+    // "WhatsApp kholo ar Rohim-ke message dau ami agamikal asbona"
+    //   → [OPEN_APP(whatsapp), SEND_MESSAGE(whatsapp, Rohim, "ami agamikal asbona")]
+    //
+    // Connectors: ar / ebong / and / tarpor / then / আর / এবং / তারপর.
+    // Splitting is CONSERVATIVE: a split is accepted only when the left side
+    // parses to a non-message, non-call action — so message content that
+    // contains " ar " ("ami ar ashbo") can never be cut in half.
+
+    private val CONNECTORS = listOf(" ar ", " ebong ", " and ", " tarpor ", " আর ", " এবং ", " তারপর ", " then ", "; ")
+
+    /**
+     * Parses a full utterance into an ordered action plan. Returns a
+     * single-element list for simple commands, null when nothing is
+     * understood (the AI path then takes over).
+     */
+    fun parseCompound(rawText: String): List<CommandDecision>? {
+        val text = prepare(rawText) ?: return null
+
+        // Security first — a refused utterance is refused as a whole.
+        SensitiveAppPolicy.refusalForText(text)?.let { return listOf(refused()) }
+        if (SensitiveAppPolicy.mentionsCredentials(text)) {
+            return listOf(unsupported("OTP, PIN ba password NUVA kochu kore na — egulo nije likhun."))
+        }
+
+        val whole = parsePrepared(text)
+        if (whole != null && !whole.unsupported && looksLikeCleanMessage(whole)) {
+            // A complete call/message command whose content may contain
+            // connector words ("ami ar ashbo") — never split it.
+            return listOf(whole)
+        }
+
+        val plan = splitPlan(text, depth = 0)
+        if (plan != null && plan.size >= 2) return plan
+
+        return listOfNotNull(whole)
+    }
+
+    /**
+     * A SendMessage is "clean" (never split) only when the extracted contact
+     * does not contain leftover device-action words — otherwise the utterance
+     * was probably a compound mis-read as one message ("whatsapp kholo ar
+     * rohim ke message dau …") and deserves a proper split.
+     */
+    private fun looksLikeCleanMessage(decision: CommandDecision): Boolean {
+        val send = decision.action as? NuvaAction.SendMessage ?: return false
+        val contact = send.contact.lowercase()
+        val suspicious = listOf(" ar ", "kholo", "bondho", "band ", "open", "launch").any { contact.contains(it) }
+        return !suspicious && send.message.isNotBlank()
+    }
+
+    /** parse() for already-prepared text (no re-normalization). */
+    private fun parsePrepared(text: String): CommandDecision? {
+        SensitiveAppPolicy.refusalForText(text)?.let { return refused() }
+        if (SensitiveAppPolicy.mentionsCredentials(text)) {
+            return unsupported("OTP, PIN ba password NUVA kochu kore na — egulo nije likhun.")
+        }
+        return ruleTable(text)
+    }
+
+    private fun ruleTable(text: String): CommandDecision? = parseNavigation(text)
+        ?: parseScreenReading(text)
+        ?: parseDeviceStatus(text)
+        ?: parseMediaControl(text)
+        ?: parseVolumeControl(text)
+        ?: parseCamera(text)
+        ?: parseSettings(text)
+        ?: parseAlarm(text)
+        ?: parseTimer(text)
+        ?: parseReminder(text)
+        ?: parseNoteTodo(text)
+        ?: parseCall(text)
+        ?: parseSendMessage(text)
+        ?: parsePlayMedia(text)
+        ?: parseWeb(text)
+        ?: parseScrollSwipe(text)
+        ?: parseCloseApp(text)
+        ?: parseOpenApp(text)
+
+    private fun splitPlan(text: String, depth: Int): List<CommandDecision>? {
+        if (depth > 2 || text.isBlank()) return null
+        for (connector in CONNECTORS) {
+            var from = 0
+            while (true) {
+                val idx = text.indexOf(connector, from)
+                if (idx < 0) break
+                val leftRaw = text.substring(0, idx).trim()
+                val rightRaw = text.substring(idx + connector.length).trim()
+                from = idx + connector.length
+
+                val left = leftRaw.takeIf { it.isNotBlank() }?.let { parsePrepared(it) } ?: continue
+                if (left.unsupported) continue
+                // A MESSAGE carries free text and may legally contain the
+                // connector itself ("…bole dao ami ar ashbo") — never accept
+                // it as the left side of a split. Calls carry no content, so
+                // splitting after a call is safe.
+                if (left.action is NuvaAction.SendMessage) continue
+                if (leftRaw.split(" ").size > 8) continue
+
+                // The TAIL is parsed whole first — a trailing message keeps
+                // its own inner connectors ("ami ar ashbo") intact.
+                val wholeTail = parsePrepared(rightRaw)
+                val rest: List<CommandDecision> = when {
+                    wholeTail != null -> listOf(wholeTail)
+                    else -> splitPlan(rightRaw, depth + 1).orEmpty()
+                }
+                if (rest.isEmpty()) continue
+
+                return refinePlan(listOf(left) + rest)
+            }
+        }
+        return null
+    }
+
+    /** Context rule: "YouTube kholo ar X search koro" → search inside YouTube. */
+    private fun refinePlan(plan: List<CommandDecision>): List<CommandDecision> {
+        val mediaApp = plan.firstNotNullOfOrNull { step ->
+            (step.action as? NuvaAction.OpenApp)?.takeIf { it.app == "youtube" || it.app == "spotify" }
+        } ?: return plan
+        return plan.map { step ->
+            val search = step.action as? NuvaAction.SearchWeb
+            if (search != null) {
+                CommandDecision(
+                    intent = NuvaIntent.PLAY_MEDIA,
+                    action = NuvaAction.PlayMedia(
+                        search.query,
+                        if (mediaApp.app == "spotify") MediaApp.SPOTIFY else MediaApp.YOUTUBE,
+                    ),
+                    unsupported = false,
+                    risk = NuvaRisk.LOW,
+                    requiresConfirmation = false,
+                    speech = "YouTube e \"${search.query}\" khujchi.",
+                    reasons = listOf("parsed on-device"),
+                    commandId = null,
+                    source = "offline",
+                )
+            } else {
+                step
+            }
+        }
+    }
 
     // --- 1. Navigation ------------------------------------------------------------
 
@@ -412,10 +543,11 @@ object CommandParser {
         ).any { t.contains(it) }
         if (!isCall) return null
 
-        // Raw number beats everything: "call koro 01712345678"
+        // Raw number beats everything: "call koro 01712345678" / "01712-345678"
         PHONE_NUMBER.find(t)?.let { m ->
-            val action = NuvaAction.CallContact(m.value, m.value)
-            return ok(action, "Call: ${m.value} — nishchit korun.", risk = NuvaRisk.MEDIUM)
+            val number = digitsOnly(m.value)
+            val action = NuvaAction.CallContact(number, number)
+            return ok(action, "Call: $number — nishchit korun.", risk = NuvaRisk.MEDIUM)
         }
 
         val name = contactName(t, callMode = true) ?: return unsupported("Kake call korbo? Nam bole din.")
@@ -427,18 +559,30 @@ object CommandParser {
     private val WHATSAPP_WORDS = listOf("whatsapp e", "whatsapp", "হোয়াটসঅ্যাপে", "হোয়াটসঅ্যাপ", "hatsapp e", "whats app")
     private val SMS_WORDS = listOf("sms", "es em es", "message e", "এসএমএস", "এস এম এস", "মেসেজে", "text koro")
 
+    /** Markers that imply "say this to someone" even without an app name. */
+    private val SAY_MARKERS = listOf(
+        "message dau", "message dao", "msg dau", "msg dao",
+        "bolo", "bole dao", "bole din", "bolun", "bolen", "bolena",
+        "বলো", "বলুন", "বলে দাও", "বলে দিন", "মেসেজ দাও",
+    )
+
     private fun parseSendMessage(t: String): CommandDecision? {
         val appWords = WHATSAPP_WORDS.firstOrNull { t.contains(it) }
         val smsWords = SMS_WORDS.firstOrNull { t.contains(it) }
-        if (appWords == null && smsWords == null) return null
-        val app = if (appWords != null) MessagingApp.WHATSAPP else MessagingApp.SMS
+        val sayMarker = SAY_MARKERS.firstOrNull { t.contains(it) }
+        if (appWords == null && smsWords == null && sayMarker == null) return null
+        // No app named → default WhatsApp (BD's most used); the confirmation
+        // dialog always shows the app before anything is sent.
+        val app = if (appWords != null) MessagingApp.WHATSAPP
+        else if (smsWords != null) MessagingApp.SMS
+        else MessagingApp.WHATSAPP
 
-        val sendVerb = listOf("pathao", "pathan", "pathiye dao", "পাঠাও", "পাঠান", "send koro", "send korun")
-            .any { t.contains(it) } || t.contains("message") || t.contains("মেসেজ")
+        val sendVerb = listOf("pathao", "pathan", "pathiye dao", "পাঠাও", "পাঠান", "send koro", "send korun", "dau")
+            .any { t.contains(it) } || t.contains("message") || t.contains("মেসেজ") || sayMarker != null
 
         // Just opening the app: "whatsapp khulo" is handled by parseOpenApp.
 
-        val number = PHONE_NUMBER.find(t)?.value
+        val number = PHONE_NUMBER.find(t)?.let { digitsOnly(it.value) }
         val name = contactName(t, callMode = false)
         if (name.isNullOrBlank() && number.isNullOrBlank()) {
             return if (sendVerb) unsupported("Kake pathabo? Contact er nam bole din.") else null
@@ -464,8 +608,9 @@ object CommandParser {
         Regex("""["'“”](.+?)["'“”]""").find(t)?.let { return it.groupValues[1].trim() }
 
         val markers = listOf(
-            "bole dao", "bole din", "bolun", "bolena", "bolen", "bole diya", "message:", "msg:",
-            "message e", "বলে দাও", "বলে দিন", "বলুন", "বলো", "মেসেজ:", "মেসেজে",
+            "message dau", "message dao", "msg dau", "msg dao", "message:", "msg:",
+            "message pathao", "bole dao", "bole din", "bolun", "bolena", "bolen", "bole diya",
+            "bolo", "message e", "বলে দাও", "বলে দিন", "বলুন", "বলো", "মেসেজ দাও", "মেসেজ:", "মেসেজে",
             "pathao", "pathan", "pathiye dao", "পাঠাও", "পাঠান", "send koro", "send korun",
         )
         for (m in markers) {
@@ -599,7 +744,9 @@ object CommandParser {
         // "X ke call koro" / "X ke phone koro" / "X ke whatsapp e message pathao"
         Regex("""^(.*?)(\s+ke|\s+কে|\s+keর)\s+""").find(s)?.let { m ->
             val candidate = m.groupValues[1].trim()
-            if (candidate.length in 2..60 && !candidate.contains("call") && !candidate.contains("phone")) {
+            val suspicious = listOf("call", "phone", "kholo", "bondho", "open", "launch").any { candidate.contains(it) } ||
+                candidate.contains(" ar ")
+            if (candidate.length in 2..60 && !suspicious) {
                 return cleanName(candidate)
             }
         }

@@ -35,7 +35,7 @@
     <string name="send">Send</string>
     <string name="voice_failed_typed_hint">Voice did not work — write the command instead:</string>
     <string name="contact_choice_title">Which contact?</string>
-    <string name="contact_choice_hint">Several contacts match that name. Pick one:</string>
+    <string name="contact_choice_hint">Multiple contacts found — which one? (NUVA never guesses)</string>
     <string name="retry">Retry</string>
     <string name="accessibility_setup_link">Tap here for the step-by-step setup guide →</string>
     <string name="accessibility_guide_title">Enable Accessibility</string>

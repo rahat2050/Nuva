@@ -118,3 +118,41 @@ while "bkash diye taka pathao" is LEVEL 3.
 * File-content search / gallery media search (storage permission model varies).
 * Blind all-apps automation — semantic targets only, safe failure when the UI
   changed.
+
+
+---
+
+# v1.3 — Natural-language commands & multi-step action plans
+
+Command-interpretation rules (2026-08-26 product spec):
+
+* **"Hey Nuva" is ONLY the wake phrase.** After activation, the complete
+  natural-language command is captured in one listening session — no
+  predefined short phrases required.
+* **Nothing is hard-coded.** Contact names, app names, message content,
+  dates/times, URLs and queries are all DYNAMICALLY extracted from the
+  utterance; resolution happens through Contacts / installed apps at run
+  time. Multiple contact matches always ask "কোনজন?" — NUVA never guesses.
+* **Hyphenated natural speech** works ("Rohim-ke", "WhatsApp-e"), Bangla
+  numerals inside content are normalized, hyphenated BD phone numbers
+  ("01712-345678") resolve to digits.
+* **No app named → WhatsApp default** ("Mim-ke bolo …"), shown clearly in
+  the confirmation dialog before anything is sent.
+* **Kinship prefixes** ("amar bhai Sakib") fall back gracefully: full phrase
+  → phrase-minus-relationship-words → bare name.
+* **"kholo"/"khulo" spelling variants** both open apps.
+* **Compound commands** ("WhatsApp kholo AR Rohim-ke message dau …") produce
+  an ordered action plan. Splitting is conservative: a split is accepted only
+  when the left clause is a non-message device action, so message content
+  containing " ar " ("ami ar ashbo") can never be cut. Every plan step runs
+  through the SAME pipeline (validation → security → contact resolution →
+  confirmation) — a plan never bypasses a gate; cancelling one step cancels
+  the remaining plan. Context rule: "YouTube kholo ar X search koro" turns
+  the search into a YouTube media search.
+* **After a command completes, NUVA returns to wake-word listening** — one
+  wake event = one command; nothing is executed from background audio.
+* Groq/AI still never executes anything: it can only propose one of the 15
+  frozen actions, re-validated locally.
+
+Verification: `android/tools/parser_mirror_check.py` mirrors the pure JVM
+logic 1:1 and asserts the full behaviour offline (~150 checks).

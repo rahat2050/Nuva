@@ -362,6 +362,89 @@ class CommandParserTest {
         assertTrue(decision!!.unsupported)
     }
 
+    // --- v1.3: natural language, hyphens, defaults, compounds ------------------------------------
+
+    @Test
+    fun `hyphenated natural sentence parses`() {
+        val decision = CommandParser.parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")
+        val send = decision!!.action as NuvaAction.SendMessage
+        assertEquals(MessagingApp.WHATSAPP, send.app)
+        assertEquals("rohim", send.contact.lowercase())
+        assertEquals("ami agamikal asbona", send.message)
+        assertTrue(decision.requiresConfirmation)
+    }
+
+    @Test
+    fun `message without an app name defaults to whatsapp`() {
+        val decision = CommandParser.parse("Hey Nuva, Mim-ke bolo ami 10 minit pore ashtesi")
+        val send = decision!!.action as NuvaAction.SendMessage
+        assertEquals(MessagingApp.WHATSAPP, send.app)
+        assertEquals("mim", send.contact.lowercase())
+        assertTrue(send.message.contains("ashtesi"))
+        assertTrue(decision.requiresConfirmation)
+    }
+
+    @Test
+    fun `kinship prefix stays part of the contact phrase`() {
+        val decision = CommandParser.parse("Hey Nuva, amar bhai Sakib-ke call koro")
+        val call = decision!!.action as NuvaAction.CallContact
+        assertTrue(call.contact.lowercase().contains("sakib"))
+    }
+
+    @Test
+    fun `hyphenated phone numbers are normalized to digits`() {
+        val decision = CommandParser.parse("nuva 01712-345678 ke call koro")
+        assertEquals("01712345678", (decision!!.action as NuvaAction.CallContact).phoneNumber)
+    }
+
+    @Test
+    fun `kholo spelling variant opens apps`() {
+        assertEquals("whatsapp", (CommandParser.parse("whatsapp kholo")!!.action as NuvaAction.OpenApp).app)
+        assertEquals("chrome", (CommandParser.parse("chrome kholo")!!.action as NuvaAction.OpenApp).app)
+    }
+
+    @Test
+    fun `compound command produces an ordered plan`() {
+        val plan = CommandParser.parseCompound("Hey Nuva, WhatsApp kholo ar Rohim-ke message dau ami agamikal asbona")
+        assertEquals(2, plan!!.size)
+        assertEquals("whatsapp", (plan[0].action as NuvaAction.OpenApp).app)
+        val send = plan[1].action as NuvaAction.SendMessage
+        assertEquals("rohim", send.contact.lowercase())
+        assertEquals("ami agamikal asbona", send.message)
+        assertTrue(plan[1].requiresConfirmation)
+    }
+
+    @Test
+    fun `compound chrome plus search plan works`() {
+        val plan = CommandParser.parseCompound("Hey Nuva, Chrome kholo ar Google-e best laptop under 50000 search koro")
+        assertEquals(2, plan!!.size)
+        assertEquals("chrome", (plan[0].action as NuvaAction.OpenApp).app)
+        val search = plan[1].action as NuvaAction.SearchWeb
+        assertEquals("best laptop under 50000", search.query)
+    }
+
+    @Test
+    fun `youtube context converts search into play media`() {
+        val plan = CommandParser.parseCompound("Hey Nuva, YouTube kholo ar Rahat Ahmed search koro")
+        assertEquals(2, plan!!.size)
+        val play = plan[1].action as NuvaAction.PlayMedia
+        assertEquals("rahat ahmed", play.query)
+        assertEquals(MediaApp.YOUTUBE, play.app)
+    }
+
+    @Test
+    fun `connector inside message content is never split`() {
+        val decision = CommandParser.parse("rohim ke whatsapp e bole dao ami ar ashbo")
+        assertEquals("ami ar ashbo", (decision!!.action as NuvaAction.SendMessage).message)
+    }
+
+    @Test
+    fun `compound containing a transaction is refused as a whole`() {
+        val plan = CommandParser.parseCompound("bkash kholo ar rohim ke 500 taka pathao")
+        assertTrue(plan!![0].unsupported)
+        assertEquals(NuvaRisk.HIGH, plan[0].risk)
+    }
+
     // --- Unknown → null (AI path takes over) ----------------------------------------------------------------
 
     @Test

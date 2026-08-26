@@ -35,7 +35,7 @@
     <string name="send">পাঠান</string>
     <string name="voice_failed_typed_hint">ভয়েস কাজ করেনি — কমান্ডটা লিখে দিন:</string>
     <string name="contact_choice_title">কোন কন্টাক্ট?</string>
-    <string name="contact_choice_hint">এই নামে কয়েকজন পাওয়া গেছে। একজন বেছে নিন:</string>
+    <string name="contact_choice_hint">একাধিক contact পাওয়া গেছে। কোনজন? (নুভা কখনো অনুমান করে না)</string>
     <string name="retry">আবার চেষ্টা</string>
     <string name="accessibility_setup_link">ধাপে ধাপে সেটআপ গাইডের জন্য এখানে চাপুন →</string>
     <string name="accessibility_guide_title">অ্যাক্সেসিবিলিটি চালু করুন</string>
