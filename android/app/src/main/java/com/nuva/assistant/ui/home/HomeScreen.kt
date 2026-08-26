@@ -354,10 +354,14 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
                 }
             },
             confirmButton = {
-                Button(onClick = { viewModel.confirm() }) { Text(stringResource(R.string.confirm_yes)) }
+                Button(onClick = { viewModel.confirm() }) {
+                    Text(summary?.confirmLabel ?: stringResource(R.string.confirm_yes))
+                }
             },
             dismissButton = {
-                OutlinedButton(onClick = { viewModel.reject() }) { Text(stringResource(R.string.confirm_no)) }
+                OutlinedButton(onClick = { viewModel.reject() }) {
+                    Text(summary?.cancelLabel ?: stringResource(R.string.confirm_no))
+                }
             },
         )
     }

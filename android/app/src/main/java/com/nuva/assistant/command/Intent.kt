@@ -39,6 +39,7 @@ enum class NuvaIntent(val wireName: String, val localOnly: Boolean = false) {
     MEDIA_CONTROL("MEDIA_CONTROL", localOnly = true),
     VOLUME_CONTROL("VOLUME_CONTROL", localOnly = true),
     CAMERA("CAMERA", localOnly = true),
+    OPEN_CHAT("OPEN_CHAT", localOnly = true),
     ;
 
     companion object {

@@ -50,6 +50,8 @@ class CommandExecutor(
     private val contactResolver: ContactResolver = ContactResolver(contextProvider),
     private val deviceStatus: DeviceStatusProvider = DeviceStatusProvider(contextProvider),
     private val notes: NoteDao? = null,
+    /** Conversational context (v1.4): last app/chat/contact with a safe TTL. */
+    val contextMemory: ContextMemory.Session = ContextMemory.Session(),
 ) {
 
     sealed interface Step {
@@ -184,11 +186,25 @@ class CommandExecutor(
             return Step.Done(speech, "unsupported")
         }
 
-        var action = decision.action
+        var action = applyContext(text, decision.action)
 
-        // Contact resolution for calls/messages BEFORE anything is confirmed,
-        // so the confirmation dialog always shows a real number (§16–§19).
+        // Contact resolution for calls/messages/chats BEFORE anything is
+        // confirmed, so the confirmation dialog always shows a real number.
         when (action) {
+            is NuvaAction.OpenChat -> if (action.phoneNumber.isNullOrBlank()) {
+                return when (val r = resolveContact(action.contact, localId, text, decision)) {
+                    is ContactStep.Resolved -> {
+                        action = action.copy(contact = r.name ?: action.contact, phoneNumber = r.number)
+                        proceed(text, decision.copy(action = action), action, localId)
+                    }
+
+                    is ContactStep.Choice -> return r.step
+                    is ContactStep.Fail -> return Step.Failed(r.speech).also {
+                        history.updateStatusAndError(localId, "failed", r.reason)
+                    }
+                }
+            }
+
             is NuvaAction.CallContact -> if (action.phoneNumber.isNullOrBlank()) {
                 return when (val r = resolveContact(action.contact, localId, text, decision)) {
                     is ContactStep.Resolved -> {
@@ -223,6 +239,50 @@ class CommandExecutor(
         return proceed(text, decision, action, localId)
     }
 
+    /**
+     * Conversational context (v1.4): pronouns ("ওকে") resolve to the last
+     * contact; a messaging action without an explicit app inherits the app
+     * we just had open. Never invents — nothing in context, nothing done.
+     */
+    private fun applyContext(text: String, action: NuvaAction): NuvaAction {
+        val mentionsWhatsApp = text.contains("whatsapp") || text.contains("হোয়াটসঅ্যাপ")
+        return when (action) {
+            is NuvaAction.OpenChat -> {
+                val contact = contextMemory.resolveContactReference(action.contact)
+                    ?: return action // pronoun with no context — handled below
+                val app = if (!mentionsWhatsApp) {
+                    contextMessagingOverride(action.app)
+                } else {
+                    action.app
+                }
+                action.copy(app = app, contact = contact)
+            }
+
+            is NuvaAction.SendMessage -> {
+                val contact = contextMemory.resolveContactReference(action.contact) ?: return action
+                val app = if (!mentionsWhatsApp && action.app == MessagingApp.WHATSAPP) {
+                    contextMessagingOverride(action.app)
+                } else {
+                    action.app
+                }
+                action.copy(app = app, contact = contact)
+            }
+
+            is NuvaAction.CallContact ->
+                contextMemory.resolveContactReference(action.contact)?.let { action.copy(contact = it) } ?: action
+
+            else -> action
+        }
+    }
+
+    private fun contextMessagingOverride(default: MessagingApp): MessagingApp {
+        val last = contextMemory.lastMessagingApp ?: return default
+        return MessagingApp.fromWire(last.lowercase()) ?: default
+    }
+
+    private fun pronounWithoutContext(action: NuvaAction): Boolean =
+        ContextMemory.isContactPronoun(action.contact) && contextMemory.lastContact == null
+
     private sealed interface ContactStep {
         data class Resolved(val number: String, val name: String?) : ContactStep
         data class Choice(val step: Step.AwaitingContactChoice) : ContactStep
@@ -235,6 +295,13 @@ class CommandExecutor(
         text: String,
         decision: CommandDecision,
     ): ContactStep {
+        // A pronoun ("ওকে") with no live context can never be resolved.
+        if (ContextMemory.isContactPronoun(name)) {
+            return ContactStep.Fail(
+                "Kake bole shunlam na — contact er nam ta bolen.",
+                "pronoun without context",
+            )
+        }
         return when (val r = contactResolver.resolve(name)) {
             is ContactResolver.Resolution.NoPermission ->
                 ContactStep.Fail(
@@ -382,10 +449,24 @@ class CommandExecutor(
             // last-line audit hook: anything reaching here already passed both.
 
 
-            val outcome = execute(action)
+            var outcome = execute(action)
+
+            // SMART RECOVERY (v1.4): classify the failure; exactly ONE retry
+            // for transient kinds (timeout / UI changed) on open-style
+            // actions. Everything else stops and explains — never blind loops.
             if (outcome.error != null) {
-                history.updateStatusAndError(localId, outcome.status, outcome.error)
-            } else {
+                val kind = FailureClassifier.classify(outcome.error)
+                if (FailureClassifier.canSafeRetry(kind) && action is com.nuva.assistant.command.NuvaAction.OpenApp ||
+                    FailureClassifier.canSafeRetry(kind) && action is NuvaAction.OpenChat
+                ) {
+                    outcome = execute(action)
+                }
+                if (outcome.error != null) {
+                    val finalKind = FailureClassifier.classify(outcome.error)
+                    history.updateStatusAndError(localId, outcome.status, "[${finalKind.name}] ${outcome.error}")
+                }
+            }
+            if (outcome.error == null) {
                 history.updateStatus(localId, outcome.status)
             }
             reportRemote(decision, outcome.status, outcome.error)
@@ -409,7 +490,10 @@ class CommandExecutor(
                         .isSensitivePackage(r.packageName) ||
                         com.nuva.assistant.core.security.SensitiveAppPolicy.isSensitiveAppName(action.app)
                     val note = if (financial) com.nuva.assistant.core.security.SensitiveAppPolicy.LEVEL1_OPEN_NOTE else ""
-                    ExecutionOutcome("completed", "${action.app.replaceFirstChar { it.uppercase() }} khulchi.$note")
+                    // Conversational context: remember the app we just opened.
+                    val messaging = MessagingApp.fromWire(action.app.lowercase()) != null
+                    contextMemory.onAppOpened(action.app.lowercase(), messaging)
+                    ExecutionOutcome("completed", "${action.app.replaceFirstChar { it.uppercase() }} খুলেছি।$note")
                 }
 
                 is AppLauncher.LaunchResult.NotFound -> {
@@ -549,6 +633,19 @@ class CommandExecutor(
                 ExecutionOutcome("completed", if (id > 0) "Kaj ta list e rakhlam." else "Kaj ta rakhte parini.")
             }
 
+            is NuvaAction.OpenChat -> when (val r = com.nuva.assistant.automation.ChatOpener.open(context, action)) {
+                is com.nuva.assistant.automation.ChatOpener.Result.Opened -> {
+                    contextMemory.onChatOpened(action.app.wireName, action.contact, action.phoneNumber)
+                    ExecutionOutcome(
+                        "completed",
+                        if (r.verified) r.speech else r.speech + " (verify korar sokti ekhon nai)",
+                    )
+                }
+
+                is com.nuva.assistant.automation.ChatOpener.Result.Failed ->
+                    ExecutionOutcome("failed", r.speech, r.reason)
+            }
+
             is NuvaAction.MediaControl -> when (val r = com.nuva.assistant.automation.MediaPlaybackControl.control(context, action.command)) {
                 is com.nuva.assistant.automation.MediaPlaybackControl.Result.Done ->
                     ExecutionOutcome("completed", "Kore dilam.")
@@ -581,9 +678,9 @@ class CommandExecutor(
                     val direct = preferences.directCallBlocking()
                     val ok = AppLauncher.dial(context, number, direct)
                     if (ok) {
-                        ExecutionOutcome("completed", "${action.contact} ke call korchi.")
+                        ExecutionOutcome("completed", "${action.contact}-কে কল করছি।")
                     } else {
-                        ExecutionOutcome("failed", "Call korte parini.", "dial failed")
+                        ExecutionOutcome("failed", "Call করা যায়নি।", "dial failed")
                     }
                 }
             }
@@ -676,8 +773,10 @@ class CommandExecutor(
 
         return when (action.app) {
             MessagingApp.WHATSAPP -> when (val r = WhatsAppAutomation.sendMessage(context, action)) {
-                is WhatsAppAutomation.Result.Sent ->
-                    ExecutionOutcome("completed", "${action.contact} ke message pathiyeci.")
+                is WhatsAppAutomation.Result.Sent -> {
+                    contextMemory.onMessageSent()
+                    ExecutionOutcome("completed", "${action.contact}-এর message পাঠানো হয়েছে।")
+                }
 
                 is WhatsAppAutomation.Result.Failed ->
                     ExecutionOutcome("failed", r.userReason, r.userReason)
@@ -687,8 +786,10 @@ class CommandExecutor(
                 val number = action.phoneNumber
                     ?: return ExecutionOutcome("failed", "${action.contact} er number painai.", "no phone number")
                 when (val r = SmsAutomation.sendOrCompose(context, number, action.message)) {
-                    is SmsAutomation.Result.Sent ->
-                        ExecutionOutcome("completed", "${action.contact} ke SMS pathiyeci.")
+                    is SmsAutomation.Result.Sent -> {
+                        contextMemory.onMessageSent()
+                        ExecutionOutcome("completed", "${action.contact}-এর SMS পাঠানো হয়েছে।")
+                    }
 
                     is SmsAutomation.Result.ComposeOpened ->
                         ExecutionOutcome("completed", r.reason)

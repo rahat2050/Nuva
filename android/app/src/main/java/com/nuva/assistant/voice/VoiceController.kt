@@ -119,7 +119,11 @@ class VoiceController(
 
                 is CommandExecutor.Step.AwaitingContactChoice -> {
                     _state.value = State.AwaitingContactChoice(step.pendingId, step.decision, step.matches)
-                    speakIfEnabled("Ei nam e koyekta contact paoa geche — ekta beche nin.")
+                    val name = (step.decision.action as? com.nuva.assistant.command.NuvaAction.SendMessage)?.contact
+                        ?: (step.decision.action as? com.nuva.assistant.command.NuvaAction.CallContact)?.contact
+                        ?: (step.decision.action as? com.nuva.assistant.command.NuvaAction.OpenChat)?.contact
+                        ?: ""
+                    speakIfEnabled("আমি ${name}নামে একাধিক contact পেয়েছি। কোনজন?")
                 }
 
                 is CommandExecutor.Step.Executing -> _state.value = State.Processing

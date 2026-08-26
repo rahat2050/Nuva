@@ -185,6 +185,7 @@ object CommandParser {
         ?: parseReminder(text)
         ?: parseNoteTodo(text)
         ?: parseCall(text)
+        ?: parseChatOpen(text)
         ?: parseSendMessage(text)
         ?: parsePlayMedia(text)
         ?: parseWeb(text)
@@ -537,6 +538,15 @@ object CommandParser {
     // --- 8. Calls ---------------------------------------------------------------------------
 
     private fun parseCall(t: String): CommandDecision? {
+        // Pronoun follow-up: "oke call koro" → resolved from context by the executor.
+        val pronounCall = ContextMemory.PRONOUN_CONTACTS.firstOrNull { p ->
+            t.startsWith("$p ") || t.startsWith("$p,")
+        } != null && listOf("call", "phone", "ফোন", "কল").any { t.contains(it) }
+        if (pronounCall) {
+            val pronoun = ContextMemory.PRONOUN_CONTACTS.first { p -> t.startsWith("$p ") || t.startsWith("$p,") }
+            return ok(NuvaAction.CallContact(pronoun, null), "Last contact ke call korbo — nishchit korun.", risk = NuvaRisk.MEDIUM)
+        }
+
         val isCall = listOf(
             "call koro", "call korun", "call dao", "call diya jao", "phone koro", "phone korun",
             "ফোন করো", "ফোন করুন", "কল করো", "কল দাও", "dial koro", "যোগাযোগ করো",
@@ -552,6 +562,46 @@ object CommandParser {
 
         val name = contactName(t, callMode = true) ?: return unsupported("Kake call korbo? Nam bole din.")
         return ok(NuvaAction.CallContact(name, null), "$name ke call korbo — nishchit korun.", risk = NuvaRisk.MEDIUM)
+    }
+
+    // --- 8b. Chat open (v1.4) — "Rohim-er chat kholo" ---------------------------------------
+
+    private val CHAT_MARKERS = listOf(" er chat", " chat", " er chat e", "ের চ্যাট", "এর চ্যাট", " চ্যাট")
+
+    private fun parseChatOpen(t: String): CommandDecision? {
+        val hasOpenVerb = OPEN_VERBS.any { t.contains(it) }
+        if (!hasOpenVerb) return null
+        val marker = CHAT_MARKERS.firstOrNull { t.contains(it) } ?: return null
+
+        val app = when {
+            WHATSAPP_WORDS.any { t.contains(it) } -> MessagingApp.WHATSAPP
+            SMS_WORDS.any { t.contains(it) } -> MessagingApp.SMS
+            t.contains("telegram") -> MessagingApp.TELEGRAM
+            t.contains("messenger") -> MessagingApp.MESSENGER
+            t.contains("signal") -> MessagingApp.SIGNAL
+            t.contains("viber") -> MessagingApp.VIBER
+            t.contains("imo") -> MessagingApp.IMO
+            else -> MessagingApp.WHATSAPP // executor overrides from context when present
+        }
+
+        val idx = t.indexOf(marker)
+        var rawName = if (idx > 0) t.substring(0, idx).trim() else ""
+        // Bangla possessive suffix: "রহিমের" → "রহিম".
+        if (rawName.length > 3 && (rawName.endsWith("ের") || rawName.endsWith("এর"))) {
+            rawName = rawName.dropLast(2)
+        }
+        // Pronouns pass through — the executor resolves them from context.
+        val contact = ContextMemory.PRONOUN_CONTACTS.firstOrNull { p -> rawName.endsWith(p) || rawName == p }
+            ?: cleanName(rawName)
+
+        if (contact.isNullOrBlank()) {
+            return unsupported("Kake চ্যাট খুলব — contact er nam bole din.")
+        }
+        val display = if (ContextMemory.isContactPronoun(contact)) contact else contact
+        return ok(
+            NuvaAction.OpenChat(app, display, null),
+            "${display.replaceFirstChar { it.uppercase() }}-er chat khulchi.",
+        )
     }
 
     // --- 9. Messages ------------------------------------------------------------------------
@@ -570,7 +620,10 @@ object CommandParser {
         val appWords = WHATSAPP_WORDS.firstOrNull { t.contains(it) }
         val smsWords = SMS_WORDS.firstOrNull { t.contains(it) }
         val sayMarker = SAY_MARKERS.firstOrNull { t.contains(it) }
-        if (appWords == null && smsWords == null && sayMarker == null) return null
+        val pronoun = ContextMemory.PRONOUN_CONTACTS.firstOrNull { p ->
+            t.startsWith("$p ") || t.startsWith("$p,") || t.contains(" $p ")
+        }
+        if (appWords == null && smsWords == null && sayMarker == null && pronoun == null) return null
         // No app named → default WhatsApp (BD's most used); the confirmation
         // dialog always shows the app before anything is sent.
         val app = if (appWords != null) MessagingApp.WHATSAPP
@@ -583,7 +636,7 @@ object CommandParser {
         // Just opening the app: "whatsapp khulo" is handled by parseOpenApp.
 
         val number = PHONE_NUMBER.find(t)?.let { digitsOnly(it.value) }
-        val name = contactName(t, callMode = false)
+        val name = contactName(t, callMode = false) ?: pronoun
         if (name.isNullOrBlank() && number.isNullOrBlank()) {
             return if (sendVerb) unsupported("Kake pathabo? Contact er nam bole din.") else null
         }

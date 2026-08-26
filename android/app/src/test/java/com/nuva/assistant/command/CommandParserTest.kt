@@ -362,6 +362,59 @@ class CommandParserTest {
         assertTrue(decision!!.unsupported)
     }
 
+    // --- v1.4: chat open + pronoun follow-ups ------------------------------------------------------
+
+    @Test
+    fun `chat open extracts the contact`() {
+        val decision = CommandParser.parse("Rohim-er chat kholo")
+        assertEquals(NuvaIntent.OPEN_CHAT, decision!!.intent)
+        val chat = decision.action as NuvaAction.OpenChat
+        assertEquals("rohim", chat.contact.lowercase())
+        assertEquals(MessagingApp.WHATSAPP, chat.app)
+        assertEquals(NuvaRisk.LOW, decision.risk) // opens, never sends
+    }
+
+    @Test
+    fun `bangla chat open works`() {
+        val decision = CommandParser.parse("নুভা রহিমের চ্যাট খোলো")
+        val chat = decision!!.action as NuvaAction.OpenChat
+        assertEquals("রহিম", chat.contact)
+    }
+
+    @Test
+    fun `explicit app in chat open is respected`() {
+        val decision = CommandParser.parse("Rohim-er chat Telegram-e kholo")
+        val chat = decision!!.action as NuvaAction.OpenChat
+        assertEquals(MessagingApp.TELEGRAM, chat.app)
+    }
+
+    @Test
+    fun `bangla pronoun message parses and requires confirmation`() {
+        val decision = CommandParser.parse("ওকে বলো আমি কাল আসব না")
+        val send = decision!!.action as NuvaAction.SendMessage
+        assertTrue(ContextMemory.isContactPronoun(send.contact))
+        assertEquals("আমি কাল আসব না", send.message)
+        assertTrue(decision.requiresConfirmation)
+    }
+
+    @Test
+    fun `banglish pronoun message and call work`() {
+        val send = CommandParser.parse("oke bolo ami 10 minute e ashi")!!.action as NuvaAction.SendMessage
+        assertTrue(ContextMemory.isContactPronoun(send.contact))
+        assertEquals("ami 10 minute e ashi", send.message)
+
+        val call = CommandParser.parse("tar ke call koro")!!.action as NuvaAction.CallContact
+        assertTrue(ContextMemory.isContactPronoun(call.contact))
+        assertEquals(NuvaRisk.MEDIUM, CommandParser.parse("tar ke call koro")!!.risk)
+    }
+
+    @Test
+    fun `taka send koro is refused as a transaction`() {
+        val decision = CommandParser.parse("nuva bkash e 5000 taka send koro")
+        assertTrue(decision!!.unsupported)
+        assertEquals(NuvaRisk.HIGH, decision.risk)
+    }
+
     // --- v1.3: natural language, hyphens, defaults, compounds ------------------------------------
 
     @Test

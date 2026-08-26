@@ -19,16 +19,21 @@ object ConfirmationSummary {
         val riskLabel: String,
         /** One-sentence "what will happen". */
         val detail: String,
+        /** Action-specific confirm button label (SEND for messages, CALL…). */
+        val confirmLabel: String = "হ্যাঁ, করো",
+        val cancelLabel: String = "বাতিল",
     )
 
     fun build(action: NuvaAction, risk: NuvaRisk, contactName: String? = null): Summary {
         val lines = mutableListOf<Line>()
         val title: String
         val detail: String
+        var confirmLabelOverride: String? = null
 
         when (action) {
             is NuvaAction.CallContact -> {
                 title = "কল করা হবে"
+                confirmLabelOverride = "CALL"
                 lines += Line("যোগাযোগ", action.contact.ifBlank { contactName ?: "" })
                 action.phoneNumber?.let { lines += Line("নম্বর", it) }
                 detail = "${action.phoneNumber ?: action.contact} নম্বরে কল যাবে।"
@@ -36,6 +41,7 @@ object ConfirmationSummary {
 
             is NuvaAction.SendMessage -> {
                 title = "মেসেজ পাঠানো হবে"
+                confirmLabelOverride = "SEND"
                 lines += Line("অ্যাপ", action.app.wireName.uppercase())
                 lines += Line("প্রাপক", action.contact.ifBlank { contactName ?: "" })
                 action.phoneNumber?.let { lines += Line("নম্বর", it) }
@@ -102,6 +108,8 @@ object ConfirmationSummary {
             risk = risk,
             riskLabel = riskLabel(risk),
             detail = detail,
+            confirmLabel = confirmLabelOverride ?: "হ্যাঁ, করো",
+            cancelLabel = "CANCEL",
         )
     }
 

@@ -118,6 +118,20 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.CAMERA
     }
 
+    /**
+     * Open a specific chat in a messaging app WITHOUT sending anything
+     * (v1.4). WhatsApp uses the wa.me deep link when a number is known;
+     * other apps open their chat/search screen honestly. LOW risk — nothing
+     * leaves the device; sending is a separate confirmed SEND_MESSAGE.
+     */
+    data class OpenChat(
+        val app: MessagingApp,
+        val contact: String,
+        val phoneNumber: String?,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_CHAT
+    }
+
     data class SearchWeb(val query: String) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.SEARCH_WEB
     }

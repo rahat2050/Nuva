@@ -51,6 +51,14 @@ class WakeWordService : Service() {
 
     private var wakeJob: Job? = null
     private var commandJob: Job? = null
+
+    /**
+     * Follow-up session (v1.4): after the popup opens from a VERIFIED wake
+     * event, a short conversational workflow is allowed — up to
+     * [MAX_FOLLOW_UPS] additional commands with shared context, then NUVA
+     * re-arms pure wake-word listening. The popup NEVER opens by itself.
+     */
+    private var followUpsLeft: Int = 0
     private var recognizer: SpeechRecognizerController? = null
 
     override fun onCreate() {
@@ -187,6 +195,7 @@ class WakeWordService : Service() {
         wakeJob?.cancel()
         wakeJob = null
         commandJob?.cancel()
+        followUpsLeft = if (fromWake) MAX_FOLLOW_UPS else 0
 
         commandJob = scope.launch {
             overlay.showStatus(
@@ -256,7 +265,7 @@ class WakeWordService : Service() {
             is CommandExecutor.Step.AwaitingConfirmation -> showConfirmation(step)
             is CommandExecutor.Step.AwaitingContactChoice -> showTerminal(
                 success = false,
-                speech = "Ei nam e koyekta contact mille — NUVA app khule ekta beche nin.",
+                speech = "একাধিক contact পাওয়া গেছে — NUVA app খুলে একজন বেছে নিন।",
             )
             is CommandExecutor.Step.Done -> showTerminal(success = true, speech = step.speech, detail = step.screenText)
             is CommandExecutor.Step.Failed -> showTerminal(success = false, speech = step.speech)
@@ -321,7 +330,16 @@ class WakeWordService : Service() {
         commandJob = null
         scope.launch {
             delay(4_100)
-            rearmIfEnabled()
+            // Conversational follow-up: keep the session briefly open after a
+            // SUCCESS so "Rohim-er chat kholo" → "ওকে বলো …" works without a
+            // new wake word. Failures always return to wake listening.
+            if (success && followUpsLeft > 0) {
+                followUpsLeft--
+                overlay.showStatus(FloatingAssistantOverlay.PopupState.LISTENING, "NUVA", "আর কিছু? শুনছি…")
+                listenForCommandOnce()
+            } else {
+                rearmIfEnabled()
+            }
         }
     }
 
@@ -411,6 +429,8 @@ class WakeWordService : Service() {
     private class WakeDetectedCancellation : RuntimeException()
 
     companion object {
+        /** Extra commands allowed in one wake session after the first success. */
+        private const val MAX_FOLLOW_UPS = 2
         private const val CHANNEL_ID = "nuva_wake_word"
         private const val NOTIFICATION_ID = 43
         private const val WAKE_RESTART_DELAY_MS = 450L

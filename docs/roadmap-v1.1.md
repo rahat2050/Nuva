@@ -156,3 +156,36 @@ Command-interpretation rules (2026-08-26 product spec):
 
 Verification: `android/tools/parser_mirror_check.py` mirrors the pure JVM
 logic 1:1 and asserts the full behaviour offline (~150 checks).
+
+
+---
+
+# v1.4 — Context-aware natural commands & verified execution
+
+* **ContextMemory** (pure, tested): last app / messaging app / chat contact
+  with a 5-minute TTL, RAM-only, contact cleared right after a send — so
+  "WhatsApp kholo" → "Rohim-er chat kholo" → "ওকে বলো আমি কাল আসব না" works
+  as one short conversation without repeating anything, and can never leak a
+  stale recipient.
+* **OPEN_CHAT** local action: opens a specific WhatsApp chat via wa.me with
+  foreground-package verification (LOW risk, sends nothing).
+* **Pronoun resolution**: "ওকে/oke/take/tar ke" resolve from context; no
+  context ⇒ NUVA asks instead of guessing.
+* **Verified WhatsApp send**: wait for the WhatsApp package → find composer →
+  type → VERIFY the chat title matches the recipient → only then Send.
+* **FailureClassifier**: every failure is classified (target changed /
+  permission / app missing / UI changed / network / timeout / unsupported),
+  explained in Bangla, recorded in history with its kind; exactly one retry
+  for transient kinds on open-style actions, never blind loops.
+* **Follow-up session**: one verified wake event allows the command plus up
+  to 2 follow-ups with shared context; failures return to pure wake
+  listening; the popup never opens by itself.
+* **EntityResolver/EntityNormalizers**: one reusable façade for CONTACT /
+  APP / URL / DATE-TIME resolution (shared candidate logic, JVM-tested).
+* **SEND/CANCEL confirmation buttons** for messages, CALL for calls.
+* **Bangla-first responses** + TTS auto-selects the bn-BD voice for Bangla
+  script.
+* Transaction patterns extended ("taka send", "money send", "cash in").
+
+See `docs/v1.1-final-audit.md` for the full SUPPORTED / ANDROID-LIMITED /
+UNSUPPORTED / BLOCKED matrix and the natural-command architecture diagram.

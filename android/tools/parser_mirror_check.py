@@ -130,7 +130,7 @@ FIN_PKG = [p.strip().lower() for p in [
 FIN_NAMES = ["bkash","b kash","nagad","rocket","upay","ucash","mycash","tap and pay","mobile banking",
  "bank","banking","payment","wallet","cash","বিকাশ","বিক্যাশ","নগদ","রকেট","উপায়","উপাই","মোবাইল ব্যাংকিং",
  "ব্যাংক","ব্যাঙ্ক","পেমেন্ট","ওয়ালেট","ক্যাশ"]
-TRANSACTIONS = ["send money","cash out","send taka","taka pathao","taka pathan","tk pathao","taka dao",
+TRANSACTIONS = ["send money","cash out","send taka","taka send","money send","cash in","taka pathao","taka pathan","tk pathao","taka dao",
  "taka transfer","transfer money","bank transfer","send tk","add money","top up","mobile recharge",
  "recharge koro","pay the bill","bill pay","payment koro","payment korun","pay koro","make payment",
  "purchase koro","buy koro with card","card diye","card payment","confirm payment","payment confirm",
@@ -191,6 +191,7 @@ _put("rocket","rocket","রকেট","dbbl rocket"); _put("upay","upay","উপ
 PHONE_NUMBER = re.compile(r"(\+?88)?01[3-9](?:[\s-]?\d){8}|\+\d{8,15}")
 HYPHEN_SUFFIX = re.compile(r"-(ke|kei|keu|kar|e|te|er|r)\b")
 def digits_only(raw): return "".join(c for c in raw if c.isdigit() or c == "+")
+PRONOUNS = ["oke","o ke","take","tar ke","takei","tarke","ওকে","ওর কে","তাকে","তার কে","একে"]
 WHATSAPP_WORDS = ["whatsapp e","whatsapp","হোয়াটসঅ্যাপে","হোয়াটসঅ্যাপ","hatsapp e","whats app"]
 SMS_WORDS = ["sms","es em es","message e","এসএমএস","এস এম এস","মেসেজে","text koro"]
 SAY_MARKERS = ["message dau","message dao","msg dau","msg dao","bolo","bole dao","bole din","bolun",
@@ -361,6 +362,9 @@ def parse_note_todo(t):
     return None
 
 def parse_call(t):
+    pronoun_start = next((p for p in PRONOUNS if t.startswith(p + " ")), None)
+    if pronoun_start and any(w in t for w in ["call","phone","ফোন","কল"]):
+        return ok({"kind":"call","contact":pronoun_start,"number":None}, "CALL_CONTACT", risk="MEDIUM", base="MEDIUM")
     if not any(w in t for w in ["call koro","call korun","call dao","call diya jao","phone koro","phone korun",
         "ফোন করো","ফোন করুন","কল করো","কল দাও","dial koro","যোগাযোগ করো"]): return None
     m = PHONE_NUMBER.search(t)
@@ -371,17 +375,42 @@ def parse_call(t):
     if not name: return unsupported("Kake call korbo? Nam bole din.")
     return ok({"kind":"call","contact":name,"number":None}, "CALL_CONTACT", risk="MEDIUM", base="MEDIUM")
 
+CHAT_MARKERS = [" er chat"," chat","ের চ্যাট","এর চ্যাট"," চ্যাট"]
+
+def parse_chat_open(t):
+    if not any(v in t for v in OPEN_VERBS): return None
+    marker = next((m for m in CHAT_MARKERS if m in t), None)
+    if marker is None: return None
+    if any(w in t for w in WHATSAPP_WORDS): app = "WHATSAPP"
+    elif any(w in t for w in SMS_WORDS): app = "SMS"
+    elif "telegram" in t: app = "TELEGRAM"
+    elif "messenger" in t: app = "MESSENGER"
+    elif "signal" in t: app = "SIGNAL"
+    elif "viber" in t: app = "VIBER"
+    elif "imo" in t: app = "IMO"
+    else: app = "WHATSAPP"
+    idx = t.find(marker)
+    raw = t[:idx].strip() if idx > 0 else ""
+    if len(raw) > 3 and (raw.endswith("ের") or raw.endswith("এর")):
+        raw = raw[:-2]
+    pronoun = next((p for p in PRONOUNS if raw.endswith(p) or raw == p), None)
+    contact = pronoun if pronoun else clean_name(raw)
+    if not contact or not contact.strip():
+        return unsupported("Kake chat khulbo — nam bole din.")
+    return ok({"kind":"openchat","app":app,"contact":contact,"number":None}, "OPEN_CHAT")
+
 def parse_send(t):
     app_w = next((w for w in WHATSAPP_WORDS if w in t), None)
     sms_w = next((w for w in SMS_WORDS if w in t), None)
     say = next((w for w in SAY_MARKERS if w in t), None)
-    if app_w is None and sms_w is None and say is None: return None
+    pronoun = next((p for p in PRONOUNS if t.startswith(p + " ") or (" " + p + " ") in t), None)
+    if app_w is None and sms_w is None and say is None and pronoun is None: return None
     app = "WHATSAPP" if app_w else ("SMS" if sms_w else "WHATSAPP")
     send_verb = any(w in t for w in ["pathao","pathan","pathiye dao","পাঠাও","পাঠান","send koro","send korun","dau"]) \
         or "message" in t or "মেসেজ" in t or say is not None
     m = PHONE_NUMBER.search(t)
     number = digits_only(m.group(0)) if m else None
-    name = contact_name(t, False)
+    name = contact_name(t, False) or pronoun
     if (not name or not name.strip()) and not number:
         return unsupported("Kake pathabo?") if send_verb else None
     message = extract_message(t)
@@ -507,7 +536,7 @@ def rule_table(t):
     return (parse_nav(t) or parse_screen(t) or parse_status(t) or parse_media_ctl(t)
             or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
-            or parse_call(t) or parse_send(t) or parse_media(t) or parse_web(t)
+            or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_web(t)
             or parse_scroll(t) or parse_close(t) or parse_open(t))
 
 def parse_prepared(t):
@@ -633,6 +662,32 @@ check(p9 and p9["intent"]=="CALL_CONTACT" and p9["action"]["number"]=="017123456
 
 p10 = parse_compound("bkash kholo ar rohim ke 500 taka pathao")
 check(p10 and p10[0]["unsupported"] and p10[0]["risk"]=="HIGH", "compound refused on transaction")
+
+# ---- v1.4: chat open, pronouns, transaction patterns ----
+ch = parse("Rohim-er chat kholo")
+check(ch and ch["intent"]=="OPEN_CHAT" and ch["action"]["contact"].lower()=="rohim", "chat open rohim")
+check(ch["risk"]=="LOW" and ch["confirm"] is False, "chat open is low risk")
+chb = parse("নুভা রহিমের চ্যাট খোলো")
+check(chb and chb["action"]["contact"]=="রহিম", "chat open bangla")
+cht = parse("Rohim-er chat Telegram-e kholo")
+check(cht and cht["action"]["app"]=="TELEGRAM", "chat open explicit app")
+
+pr = parse("ওকে বলো আমি কাল আসব না")
+check(pr and pr["intent"]=="SEND_MESSAGE" and pr["action"]["contact"] in PRONOUNS, "bangla pronoun message")
+check(pr["action"]["message"]=="আমি কাল আসব না" and pr["confirm"], "pronoun message confirms")
+pr2 = parse("oke bolo ami 10 minute e ashi")
+check(pr2 and pr2["action"]["contact"] in PRONOUNS and pr2["action"]["message"]=="ami 10 minute e ashi", "banglish pronoun message")
+pr3 = parse("tar ke call koro")
+check(pr3 and pr3["intent"]=="CALL_CONTACT" and pr3["action"]["contact"] in PRONOUNS and pr3["confirm"], "pronoun call")
+
+ts = parse("nuva bkash e 5000 taka send koro")
+check(ts and ts["unsupported"] and ts["risk"]=="HIGH", "taka send refused")
+
+mx = parse_compound("Hey Nuva, Chrome kholo and search koro Bangladesh weather")
+check(mx and len(mx)==2 and mx[1]["action"]["query"]=="bangladesh weather", "english connector")
+
+g = parse_compound("Hey Nuva, WhatsApp kholo ar Rohim-ke bolo ami agamikal asbona")
+check(g and len(g)==2 and g[1]["action"]["message"]=="ami agamikal asbona" and g[1]["confirm"], "golden sentence with bolo")
 
 print()
 print("PASS" if not FAIL else f"{len(FAIL)} FAILURES")

@@ -118,6 +118,7 @@ object CommandValidator {
             NuvaIntent.MEDIA_CONTROL -> validateMediaControl(actionJson)
             NuvaIntent.VOLUME_CONTROL -> validateVolumeControl(actionJson)
             NuvaIntent.CAMERA -> validateCamera(actionJson)
+            NuvaIntent.OPEN_CHAT -> validateOpenChat(actionJson)
         }
     }
 
@@ -137,6 +138,15 @@ object CommandValidator {
         val mode = CaptureMode.fromWire(json.str("mode"))
             ?: return ValidatedAction.Invalid(listOf("CAMERA requires a known mode"))
         return ValidatedAction.Valid(NuvaAction.CameraOpen(mode))
+    }
+
+    private fun validateOpenChat(json: JsonObject): ValidatedAction {
+        val app = MessagingApp.fromWire(json.str("app"))
+            ?: return ValidatedAction.Invalid(listOf("OPEN_CHAT requires a supported app"))
+        val contact = json.str("contact")?.takeIf { it.isNotEmpty() && it.length <= 120 }
+            ?: return ValidatedAction.Invalid(listOf("OPEN_CHAT requires contact"))
+        val phone = json.str("phone_number")?.takeIf { PHONE_PATTERN.matches(it) }
+        return ValidatedAction.Valid(NuvaAction.OpenChat(app, contact, phone))
     }
 
     private fun validateSearchWeb(json: JsonObject): ValidatedAction {

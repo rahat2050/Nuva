@@ -119,6 +119,10 @@ object ActionJson {
         is NuvaAction.CameraOpen -> buildJsonObject {
             put("type", "CAMERA"); put("mode", action.mode.wireName)
         }
+        is NuvaAction.OpenChat -> buildJsonObject {
+            put("type", "OPEN_CHAT"); put("app", action.app.wireName); put("contact", action.contact)
+            action.phoneNumber?.let { put("phone_number", it) }
+        }
     }
 
     private fun selectorJson(selector: UiSelector): JsonObject = buildJsonObject {
