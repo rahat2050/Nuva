@@ -53,12 +53,12 @@ class WakeWordService : Service() {
     private var commandJob: Job? = null
 
     /**
-     * Follow-up session (v1.4): after the popup opens from a VERIFIED wake
-     * event, a short conversational workflow is allowed — up to
-     * [MAX_FOLLOW_UPS] additional commands with shared context, then NUVA
-     * re-arms pure wake-word listening. The popup NEVER opens by itself.
+     * Follow-up session (v1.4), modelled by [WakeSessionState]: after the
+     * popup opens from a VERIFIED wake event, a short conversational flow is
+     * allowed (≤ [WakeSessionState.DEFAULT_MAX_FOLLOW_UPS] follow-ups), then
+     * NUVA re-arms pure wake-word listening. The popup NEVER opens by itself.
      */
-    private var followUpsLeft: Int = 0
+    private val wakeSession = WakeSessionState()
     private var recognizer: SpeechRecognizerController? = null
 
     override fun onCreate() {
@@ -195,7 +195,7 @@ class WakeWordService : Service() {
         wakeJob?.cancel()
         wakeJob = null
         commandJob?.cancel()
-        followUpsLeft = if (fromWake) MAX_FOLLOW_UPS else 0
+        if (fromWake) wakeSession.onVerifiedWake() else wakeSession.onDismissed()
 
         commandJob = scope.launch {
             overlay.showStatus(
@@ -333,8 +333,7 @@ class WakeWordService : Service() {
             // Conversational follow-up: keep the session briefly open after a
             // SUCCESS so "Rohim-er chat kholo" → "ওকে বলো …" works without a
             // new wake word. Failures always return to wake listening.
-            if (success && followUpsLeft > 0) {
-                followUpsLeft--
+            if (wakeSession.onCommandFinished(success)) {
                 overlay.showStatus(FloatingAssistantOverlay.PopupState.LISTENING, "NUVA", "আর কিছু? শুনছি…")
                 listenForCommandOnce()
             } else {
@@ -429,8 +428,6 @@ class WakeWordService : Service() {
     private class WakeDetectedCancellation : RuntimeException()
 
     companion object {
-        /** Extra commands allowed in one wake session after the first success. */
-        private const val MAX_FOLLOW_UPS = 2
         private const val CHANNEL_ID = "nuva_wake_word"
         private const val NOTIFICATION_ID = 43
         private const val WAKE_RESTART_DELAY_MS = 450L

@@ -188,6 +188,7 @@ object CommandParser {
         ?: parseChatOpen(text)
         ?: parseSendMessage(text)
         ?: parsePlayMedia(text)
+        ?: parseMaps(text)
         ?: parseWeb(text)
         ?: parseScrollSwipe(text)
         ?: parseCloseApp(text)
@@ -701,6 +702,34 @@ object CommandParser {
             NuvaAction.PlayMedia(finalQuery, if (spotify) MediaApp.SPOTIFY else MediaApp.YOUTUBE),
             "YouTube e \"$finalQuery\" khujchi.",
         )
+    }
+
+    // --- 10b. Maps / LOCATION (v1.4) ----------------------------------------------------------
+
+    private fun parseMaps(t: String): CommandDecision? {
+        val hasMapWord = t.contains("map") || t.contains("ম্যাপ") ||
+            t.contains("location") || t.contains("কোথায়") || t.contains("kothay")
+        if (!hasMapWord) return null
+
+        val query: String? = when {
+            t.contains("map e") -> contentAfter(t, "map e")
+            t.contains("maps e") -> contentAfter(t, "maps e")
+            t.contains("er location") -> t.substringBefore(" er location").trim().takeIf { it.isNotBlank() }
+            t.contains("er map") -> t.substringBefore(" er map").trim().takeIf { it.isNotBlank() }
+            t.contains("কোথায়") || t.contains("kothay") ->
+                t.replace("kothay", " ").replace("কোথায়", " ").replace("ache", " ").replace("আছে", " ")
+                    .replace(Regex("""\s+"""), " ").trim(' ', '-', '.', ',', '!', '?').ifBlank { null }
+            else -> null
+        } ?: return null
+
+        // Place phrases may carry filler words; strip the common ones.
+        val cleaned = query.split(" ")
+            .filterNot { it in listOf("khujho", "dekhao", "dekhan", "bolo", "jao", "koro", "korun") }
+            .joinToString(" ").trim()
+        if (cleaned.length !in 2..120) return null
+
+        val url = com.nuva.assistant.resolver.EntityNormalizers.mapsSearchUrl(cleaned)
+        return ok(NuvaAction.OpenUrl(url), "\"$cleaned\" map e khujchi.")
     }
 
     // --- 11. Web -----------------------------------------------------------------------------

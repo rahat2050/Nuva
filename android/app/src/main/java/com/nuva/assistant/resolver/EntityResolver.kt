@@ -55,6 +55,15 @@ object EntityNormalizers {
         val m = Regex("""\bhttps?://[^\s]+""").find(text) ?: return null
         return m.value.trimEnd('.', ',', '!', '?')
     }
+
+    /**
+     * LOCATION entity (v1.4): any place query becomes a Google Maps search
+     * URL — opened in Maps/browser by Android's chooser. No location
+     * permission is needed or asked for.
+     */
+    fun mapsSearchUrl(query: String): String =
+        "https://www.google.com/maps/search/?api=1&query=" +
+            java.net.URLEncoder.encode(query.trim(), "UTF-8")
 }
 
 /**

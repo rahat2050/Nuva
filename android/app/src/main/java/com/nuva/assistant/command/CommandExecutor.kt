@@ -107,7 +107,9 @@ class CommandExecutor(
                 return drainPlan(firstStep)
             }
 
-            val decision = interpret(text) ?: return Step.Failed("Bujhte parini, ektu onno bhabe bolen.")
+            val decision = interpret(text) ?: return Step.Failed(
+                "পুরো command-টা বুঝিনি — আপনি কি বলতে চাচ্ছেন অন্য কিছু? একটু অন্যভাবে বলুন বা লিখে দিন।",
+            )
             return handleDecision(text, decision)
         } catch (err: AIRepository.ApiCallException) {
             return Step.Failed(err.speech)
@@ -456,14 +458,20 @@ class CommandExecutor(
             // actions. Everything else stops and explains — never blind loops.
             if (outcome.error != null) {
                 val kind = FailureClassifier.classify(outcome.error)
-                if (FailureClassifier.canSafeRetry(kind) && action is com.nuva.assistant.command.NuvaAction.OpenApp ||
-                    FailureClassifier.canSafeRetry(kind) && action is NuvaAction.OpenChat
-                ) {
-                    outcome = execute(action)
+                val retriable = FailureClassifier.canSafeRetry(kind) &&
+                    (action is NuvaAction.OpenApp || action is NuvaAction.OpenChat)
+                var retried = false
+                if (retriable) {
+                    outcome = execute(action) // exactly ONE safe retry, same validated action
+                    retried = true
                 }
                 if (outcome.error != null) {
                     val finalKind = FailureClassifier.classify(outcome.error)
-                    history.updateStatusAndError(localId, outcome.status, "[${finalKind.name}] ${outcome.error}")
+                    val retryNote = if (retried) " (auto-retried once: ${kind.name})" else ""
+                    history.updateStatusAndError(localId, outcome.status, "[${finalKind.name}]${retryNote} ${outcome.error}")
+                } else if (retried) {
+                    // §11: the retry RESULT is recorded too — success after retry.
+                    history.updateStatusAndError(localId, outcome.status, "auto-retry succeeded (${kind.name})")
                 }
             }
             if (outcome.error == null) {

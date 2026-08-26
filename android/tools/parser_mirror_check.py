@@ -448,6 +448,20 @@ def parse_media(t):
     cleaned = re.sub(r"\s+", " ", q).strip(" -,.!?") or "bangla gaan"
     return ok({"kind":"play","query":cleaned,"app":"SPOTIFY" if spotify else "YOUTUBE"}, "PLAY_MEDIA")
 
+def parse_maps(t):
+    if not (any(w in t for w in ["map","ম্যাপ","location","কোথায়","kothay"])): return None
+    q = None
+    if "map e" in t: q = content_after(t, "map e")
+    elif "maps e" in t: q = content_after(t, "maps e")
+    elif "er location" in t: q = t.split(" er location")[0].strip() or None
+    elif "er map" in t: q = t.split(" er map")[0].strip() or None
+    elif "কোথায়" in t or "kothay" in t:
+        q = re.sub(r"\s+", " ", t.replace("kothay"," ").replace("কোথায়"," ").replace("ache"," ").replace("আছে"," ")).strip(" -,.!?") or None
+    if not q: return None
+    cleaned = " ".join(w for w in q.split(" ") if w not in ["khujho","dekhao","dekhan","bolo","jao","koro","korun"]).strip()
+    if not (2 <= len(cleaned) <= 120): return None
+    return ok({"kind":"url","url":"https://www.google.com/maps/search/?api=1&query=" + cleaned.replace(" ","%20")}, "OPEN_URL")
+
 def parse_web(t):
     markers = ["khujho","khujen","khunji","search koro","search korun","google e","google a","খোঁজো",
                "খুঁজে দাও","সার্চ করো","গুগলে"]
@@ -536,7 +550,7 @@ def rule_table(t):
     return (parse_nav(t) or parse_screen(t) or parse_status(t) or parse_media_ctl(t)
             or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
-            or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_web(t)
+            or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
             or parse_scroll(t) or parse_close(t) or parse_open(t))
 
 def parse_prepared(t):
@@ -688,6 +702,16 @@ check(mx and len(mx)==2 and mx[1]["action"]["query"]=="bangladesh weather", "eng
 
 g = parse_compound("Hey Nuva, WhatsApp kholo ar Rohim-ke bolo ami agamikal asbona")
 check(g and len(g)==2 and g[1]["action"]["message"]=="ami agamikal asbona" and g[1]["confirm"], "golden sentence with bolo")
+
+# ---- v1.4b: maps/LOCATION, retry note, clarifying copy ----
+mp = parse("nuva dhaka er map dekhao")
+check(mp and mp["intent"]=="OPEN_URL" and "maps/search" in mp["action"]["url"] and "dhaka" in mp["action"]["url"], "dhaka map")
+mp2 = parse("map e cox bazar khujho")
+check(mp2 and "cox%20bazar" in mp2["action"]["url"] or (mp2 and "cox" in mp2["action"]["url"]), "map e cox bazar")
+mp3 = parse("rail station kothay")
+check(mp3 and "rail%20station" in mp3["action"]["url"] or (mp3 and "rail" in mp3["action"]["url"]), "kothay map")
+gm = parse("google maps khulo")
+check(gm and gm["intent"]=="OPEN_APP", "google maps app still opens")
 
 print()
 print("PASS" if not FAIL else f"{len(FAIL)} FAILURES")

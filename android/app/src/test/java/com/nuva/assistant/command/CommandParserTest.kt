@@ -362,6 +362,33 @@ class CommandParserTest {
         assertTrue(decision!!.unsupported)
     }
 
+    // --- v1.4b: maps / LOCATION --------------------------------------------------------------------
+
+    @Test
+    fun `map queries open a maps search`() {
+        val decision = CommandParser.parse("nuva dhaka er map dekhao")
+        assertEquals(NuvaIntent.OPEN_URL, decision!!.intent)
+        val url = (decision.action as NuvaAction.OpenUrl).url
+        assertTrue(url.contains("maps/search"))
+        assertTrue(url.contains("dhaka"))
+
+        val banglish = CommandParser.parse("map e cox bazar khujho")
+        assertTrue((banglish!!.action as NuvaAction.OpenUrl).url.contains("cox"))
+    }
+
+    @Test
+    fun `kothay question becomes a maps search`() {
+        val decision = CommandParser.parse("rail station kothay")
+        val url = (decision!!.action as NuvaAction.OpenUrl).url
+        assertTrue(url.contains("maps/search"))
+        assertTrue(url.contains("rail"))
+    }
+
+    @Test
+    fun `opening the maps app still works`() {
+        assertEquals(NuvaIntent.OPEN_APP, CommandParser.parse("google maps khulo")!!.intent)
+    }
+
     // --- v1.4: chat open + pronoun follow-ups ------------------------------------------------------
 
     @Test

@@ -123,7 +123,8 @@ class VoiceController(
                         ?: (step.decision.action as? com.nuva.assistant.command.NuvaAction.CallContact)?.contact
                         ?: (step.decision.action as? com.nuva.assistant.command.NuvaAction.OpenChat)?.contact
                         ?: ""
-                    speakIfEnabled("আমি ${name}নামে একাধিক contact পেয়েছি। কোনজন?")
+                    val namePart = if (name.isNullOrBlank()) "" else " $name নামের"
+                    speakIfEnabled("আমি$namePart একাধিক contact পেয়েছি। কোনজন?")
                 }
 
                 is CommandExecutor.Step.Executing -> _state.value = State.Processing
