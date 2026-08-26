@@ -49,7 +49,7 @@ object SettingsOpener {
             context.startActivity(intent)
             Result.ManualStep("NUVA-র notification settings khulchi.")
         } catch (err: Exception) {
-            start(context, android.provider.Settings.ACTION_NOTIFICATION_SETTINGS, "Notification settings khulchi.")
+            start(context, "android.settings.NOTIFICATION_SETTINGS", "Notification settings khulchi.")
         }
 
         SettingTarget.APP_SETTINGS -> try {
@@ -109,12 +109,12 @@ object SettingsOpener {
                 )
                 Result.Done
             } catch (err: Exception) {
-                start(context, Settings.ACTION_NOTIFICATION_POLICY_SETTINGS, "Do Not Disturb setting khule dicchi.")
+                start(context, Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS, "Do Not Disturb setting khule dicchi.")
             }
         } else {
             start(
                 context,
-                Settings.ACTION_NOTIFICATION_POLICY_SETTINGS,
+                Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS,
                 "DND NUVA sorasori badhate pare na — setting ta khule dicchi, ekbar access dile por theke parbo.",
             )
         }

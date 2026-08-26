@@ -35,7 +35,7 @@ object WhatsAppAutomation {
 
     sealed interface Result {
         data object Sent : Result
-        data class Failed(val userReason: String) : Result
+        data class Failed(val userReason: String, val detail: String? = null) : Result
     }
 
     suspend fun sendMessage(context: Context, action: NuvaAction.SendMessage): Result {

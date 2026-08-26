@@ -71,7 +71,7 @@ object EntityNormalizers {
  * live in [EntityNormalizers] so they are JVM-testable without a device.
  */
 class EntityResolver(
-    contextProvider: () -> Context,
+    private val contextProvider: () -> Context,
     private val contacts: ContactResolver = ContactResolver(contextProvider),
 ) {
 

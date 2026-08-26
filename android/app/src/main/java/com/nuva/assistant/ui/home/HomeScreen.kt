@@ -240,7 +240,7 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
         // Accessibility setup guide (req §13).
         if (!NuvaAccessibilityService.isRunning) {
             Spacer(Modifier.height(12.dp))
-            Card(Modifier.fillMaxWidth(), onClick = { showAccessibilityGuide = true }) {
+            Card(onClick = { showAccessibilityGuide = true }, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
                     Text(
                         stringResource(R.string.accessibility_disabled),
