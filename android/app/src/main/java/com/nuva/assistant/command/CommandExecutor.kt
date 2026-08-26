@@ -654,6 +654,67 @@ class CommandExecutor(
                     ExecutionOutcome("failed", r.speech, r.reason)
             }
 
+            is NuvaAction.Press -> executePress()
+
+            is NuvaAction.ClearText -> {
+                val service = com.nuva.assistant.accessibility.NuvaAccessibilityService.instance
+                if (service == null) {
+                    ExecutionOutcome("failed", "এই কাজে Accessibility permission লাগবে — Settings থেকে NUVA চালু করুন।", "accessibility missing")
+                } else {
+                    val node = service.findFocusedEditable()
+                    if (node == null) {
+                        ExecutionOutcome("failed", "কোনো লেখার ঘর সিলেক্ট করা নেই।", "no focused input")
+                    } else if (service.clearText(node)) {
+                        ExecutionOutcome("completed", "লেখাটা মুছে দিয়েছি।")
+                    } else {
+                        ExecutionOutcome("failed", "মুছতে পারিনি।", "clear failed")
+                    }
+                }
+            }
+
+            is NuvaAction.OpenNotificationShade -> {
+                val service = com.nuva.assistant.accessibility.NuvaAccessibilityService.instance
+                if (service != null && service.openNotificationShade()) {
+                    ExecutionOutcome("completed", "নোটিফিকেশন প্যানেল খুলেছি।")
+                } else {
+                    ExecutionOutcome("failed", "নোটিফিকেশন প্যানেল খুলতে Accessibility permission লাগবে।", "accessibility missing")
+                }
+            }
+
+            is NuvaAction.OpenNotificationApp -> {
+                val snapshot = NuvaNotificationListener.safeSnapshot()
+                val notification = snapshot.getOrNull(action.ordinal - 1)
+                if (notification == null) {
+                    ExecutionOutcome("failed", "নোটিফিকেশন পাওয়া যায়নি — Notification access দেওয়া আছে কি না দেখুন।", "notification access missing")
+                } else {
+                    val launchIntent = context.packageManager.getLaunchIntentForPackage(notification.packageName)
+                    if (launchIntent != null) {
+                        launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        val launched = runCatching { context.startActivity(launchIntent); true }.getOrDefault(false)
+                        if (launched) {
+                            ExecutionOutcome("completed", "${notification.appLabel} অ্যাপটি খুলেছি।")
+                        } else {
+                            ExecutionOutcome("failed", "অ্যাপটি খুলতে পারিনি।", "launch failed")
+                        }
+                    } else {
+                        ExecutionOutcome("failed", "${notification.appLabel} আবার খোলা যাচ্ছে না।", "no launch intent")
+                    }
+                }
+            }
+
+            is NuvaAction.DescribeScreen -> {
+                val service = com.nuva.assistant.accessibility.NuvaAccessibilityService.instance
+                val state = service?.captureScreenState()
+                when {
+                    service == null -> ExecutionOutcome("failed", "Accessibility permission লাগবে — Settings থেকে NUVA চালু করুন।", "accessibility missing")
+                    state == null -> ExecutionOutcome("failed", "স্ক্রিন পড়া গেল না।", "no window")
+                    else -> {
+                        val summary = com.nuva.assistant.accessibility.ScreenStateModel.summarize(state)
+                        ExecutionOutcome("completed", summary, null, state.visibleText.ifBlank { null })
+                    }
+                }
+            }
+
             is NuvaAction.MediaControl -> when (val r = com.nuva.assistant.automation.MediaPlaybackControl.control(context, action.command)) {
                 is com.nuva.assistant.automation.MediaPlaybackControl.Result.Done ->
                     ExecutionOutcome("completed", "Kore dilam.")
@@ -747,6 +808,50 @@ class CommandExecutor(
                 else -> when (val r = BrowserAutomation.searchWeb(context, action.query)) {
                     is BrowserAutomation.Result.Opened -> ExecutionOutcome("completed", "Khujchi.")
                     is BrowserAutomation.Result.Failed -> ExecutionOutcome("failed", r.userReason, r.userReason)
+                }
+            }
+        }
+    }
+
+    /**
+     * App-agnostic press (Phase 5): resolve the target from the CURRENT
+     * screen's safe state. Exactly one match ⇒ tap; none/many ⇒ honest
+     * stop-and-ask. Financial screens are refused outright (LEVEL 3).
+     */
+    private suspend fun executePress(label: String?): com.nuva.assistant.command.CommandExecutor.ExecutionOutcome {
+        val service = com.nuva.assistant.accessibility.NuvaAccessibilityService.instance
+            ?: return ExecutionOutcome("failed", "এই কাজে Accessibility permission লাগবে — Settings থেকে NUVA চালু করুন।", "accessibility missing")
+        val state = service.captureScreenState()
+            ?: return ExecutionOutcome("failed", "স্ক্রিন পড়া গেল না।", "no window")
+        if (state.sensitiveScreen) {
+            return ExecutionOutcome(
+                "failed",
+                com.nuva.assistant.core.security.SensitiveAppPolicy.SCREEN_READ_GUARD_SPEECH,
+                "blocked: sensitive screen",
+            )
+        }
+        val matches = if (label.isNullOrBlank()) {
+            state.buttons
+        } else {
+            com.nuva.assistant.accessibility.ScreenStateModel.matchButtons(state, label)
+        }
+        return when {
+            matches.isEmpty() ->
+                ExecutionOutcome("failed", "এমন কোনো বাটন স্ক্রিনে দেখছি না।", "button not found")
+
+            matches.size > 1 -> {
+                val names = matches.take(4).joinToString(", ") { it.label }
+                val hint = if (label.isNullOrBlank()) "কয়েকটা বাটন আছে" else "\"$label\" নামে একাধিক বাটন"
+                ExecutionOutcome("failed", "$hint — নির্দিষ্ট করে বলুন: $names", "ambiguous button")
+            }
+
+            else -> {
+                val node = service.findNode(UiSelector(text = matches.first().label))
+                    ?: service.findNode(UiSelector(contentDescription = matches.first().label))
+                if (node != null && service.clickNode(node)) {
+                    ExecutionOutcome("completed", "\"${matches.first().label}\" বাটন চেপে দিয়েছি।")
+                } else {
+                    ExecutionOutcome("failed", "বাটনটি চাপা গেল না — স্ক্রিন বদলেছে।", "click failed")
                 }
             }
         }

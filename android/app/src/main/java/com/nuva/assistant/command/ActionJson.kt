@@ -123,6 +123,15 @@ object ActionJson {
             put("type", "OPEN_CHAT"); put("app", action.app.wireName); put("contact", action.contact)
             action.phoneNumber?.let { put("phone_number", it) }
         }
+        is NuvaAction.Press -> buildJsonObject {
+            put("type", "PRESS"); action.label?.let { put("label", it) }
+        }
+        is NuvaAction.ClearText -> buildJsonObject { put("type", "CLEAR_TEXT") }
+        is NuvaAction.OpenNotificationShade -> buildJsonObject { put("type", "OPEN_NOTIFICATIONS") }
+        is NuvaAction.OpenNotificationApp -> buildJsonObject {
+            put("type", "OPEN_NOTIFICATION_APP"); put("ordinal", action.ordinal)
+        }
+        is NuvaAction.DescribeScreen -> buildJsonObject { put("type", "DESCRIBE_SCREEN") }
     }
 
     private fun selectorJson(selector: UiSelector): JsonObject = buildJsonObject {

@@ -132,6 +132,36 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_CHAT
     }
 
+    /**
+     * App-agnostic press (v1.5, Phase 5): "এটা press করো" / "Send button
+     * chapo". [label] null ⇒ resolve the ONLY clickable on screen; several
+     * matches ⇒ ASK, never guess. Executed against the CURRENT screen with
+     * package + target verification.
+     */
+    data class Press(val label: String?) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.PRESS
+    }
+
+    /** Clears the focused/last input field (universal accessibility action). */
+    data object ClearText : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CLEAR_TEXT
+    }
+
+    /** Opens the notification shade (global accessibility action). */
+    data object OpenNotificationShade : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_NOTIFICATIONS
+    }
+
+    /** Opens the app that posted the Nth (1-based, newest first) notification. */
+    data class OpenNotificationApp(val ordinal: Int = 1) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_NOTIFICATION_APP
+    }
+
+    /** Speaks a UI summary built from the safe ScreenState model. */
+    data object DescribeScreen : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.DESCRIBE_SCREEN
+    }
+
     data class SearchWeb(val query: String) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.SEARCH_WEB
     }
@@ -322,6 +352,9 @@ enum class SettingTarget(val wireName: String) {
     WIFI("wifi"),
     BLUETOOTH("bluetooth"),
     GENERAL_SETTINGS("general_settings"),
+    NOTIFICATION_SETTINGS("notification_settings"),
+    APP_SETTINGS("app_settings"),
+    ACCESSIBILITY_SETTINGS("accessibility_settings"),
     ;
 
     companion object {

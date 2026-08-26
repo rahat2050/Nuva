@@ -150,6 +150,15 @@ class NuvaNotificationListener : NotificationListenerService() {
             false
         }
 
+        /** Newest-safe notifications for OPEN_NOTIFICATION_APP (banking skipped). */
+        fun safeSnapshot(limit: Int = 10): List<NuvaNotification> {
+            if (!isConnected) return emptyList()
+            val items: List<NuvaNotification>
+            synchronized(store) { items = store.toList() }
+            return items.filter { !com.nuva.assistant.core.security.SensitiveAppPolicy.isSensitivePackage(it.packageName) }
+                .take(limit)
+        }
+
         /**
          * The newest active MediaSession token (from the media notification),
          * used by MEDIA_CONTROL. Requires notification access.

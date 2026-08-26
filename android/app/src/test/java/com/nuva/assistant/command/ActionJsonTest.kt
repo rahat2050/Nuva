@@ -24,6 +24,12 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("SEARCH_WEB"))
         assertNull(NuvaIntent.fromWire("SHOW_RECENTS"))
         assertNull(NuvaIntent.fromWire("CREATE_TODO"))
+        assertNull(NuvaIntent.fromWire("OPEN_CHAT"))
+        assertNull(NuvaIntent.fromWire("PRESS"))
+        assertNull(NuvaIntent.fromWire("CLEAR_TEXT"))
+        assertNull(NuvaIntent.fromWire("OPEN_NOTIFICATIONS"))
+        assertNull(NuvaIntent.fromWire("OPEN_NOTIFICATION_APP"))
+        assertNull(NuvaIntent.fromWire("DESCRIBE_SCREEN"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -40,6 +46,13 @@ class ActionJsonTest {
             NuvaAction.SetReminder("medicine", 1_770_000_000_000L, "kal"),
             NuvaAction.CreateNote("buy eggs"),
             NuvaAction.CreateTodo("submit report"),
+            NuvaAction.OpenChat(MessagingApp.WHATSAPP, "Rohim", "01712345678"),
+            NuvaAction.Press("Send"),
+            NuvaAction.Press(null),
+            NuvaAction.ClearText,
+            NuvaAction.OpenNotificationShade,
+            NuvaAction.OpenNotificationApp(2),
+            NuvaAction.DescribeScreen,
         )
         cases.forEach { action ->
             val encoded = ActionJson.encode(action)

@@ -189,3 +189,26 @@ logic 1:1 and asserts the full behaviour offline (~150 checks).
 
 See `docs/v1.1-final-audit.md` for the full SUPPORTED / ANDROID-LIMITED /
 UNSUPPORTED / BLOCKED matrix and the natural-command architecture diagram.
+
+
+---
+
+# v1.5 — Universal Android control & stabilization
+
+* **ScreenStateModel** (Phase 4): safe, bounded screen snapshots (package,
+  title, buttons, inputs, lists, focused) — password nodes never captured,
+  OTP redaction inside the model, financial screens flagged. JVM-tested.
+* **Universal accessibility actions** (Phase 3): + clear-text, focus,
+  notification-shade open, UI summary; package verification retained.
+* **AppCapabilityRegistry** (Phase 2): data-driven capability categories ×
+  any installed package (known or unknown), with honest support levels.
+* **App-agnostic commands** (Phase 5): "এটা press করো" / "X button press" /
+  "লগইন বাটন চাপো" / "লেখাটা মুছো" / "বাটন দেখাও" — resolved from the CURRENT
+  screen; ambiguity lists candidates instead of guessing.
+* **Notifications** (Phase 8): open the source app of the Nth notification;
+  banking skipped, OTP redacted.
+* **Device control** (Phase 9): notification-settings / app-settings /
+  accessibility-settings screens added.
+* Camera/gallery/files honestly ANDROID-LIMITED/UNSUPPORTED (picker flows
+  cannot be completed from the background) — no faked capability.
+* Full honest status matrix: `docs/v1.4-universal-control-audit.md`.

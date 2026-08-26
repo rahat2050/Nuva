@@ -42,6 +42,32 @@ object SettingsOpener {
         SettingTarget.WIFI -> wifi(context)
         SettingTarget.BLUETOOTH -> start(context, Settings.ACTION_BLUETOOTH_SETTINGS, "Bluetooth setting khule dicchi.")
         SettingTarget.GENERAL_SETTINGS -> start(context, Settings.ACTION_SETTINGS, "Settings khule dicchi.")
+        SettingTarget.NOTIFICATION_SETTINGS -> try {
+            val intent = Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            Result.ManualStep("NUVA-র notification settings khulchi.")
+        } catch (err: Exception) {
+            start(context, android.provider.Settings.ACTION_NOTIFICATION_SETTINGS, "Notification settings khulchi.")
+        }
+
+        SettingTarget.APP_SETTINGS -> try {
+            val intent = Intent(
+                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.fromParts("package", context.packageName, null),
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            Result.ManualStep("NUVA-র app settings khulchi.")
+        } catch (err: Exception) {
+            start(context, Settings.ACTION_SETTINGS, null)
+        }
+
+        SettingTarget.ACCESSIBILITY_SETTINGS -> start(
+            context,
+            android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS,
+            "Accessibility settings khulchi.",
+        )
     }
 
     // --- Torch --------------------------------------------------------------------

@@ -119,6 +119,11 @@ object CommandValidator {
             NuvaIntent.VOLUME_CONTROL -> validateVolumeControl(actionJson)
             NuvaIntent.CAMERA -> validateCamera(actionJson)
             NuvaIntent.OPEN_CHAT -> validateOpenChat(actionJson)
+            NuvaIntent.PRESS -> validatePress(actionJson)
+            NuvaIntent.CLEAR_TEXT -> ValidatedAction.Valid(NuvaAction.ClearText)
+            NuvaIntent.OPEN_NOTIFICATIONS -> ValidatedAction.Valid(NuvaAction.OpenNotificationShade)
+            NuvaIntent.OPEN_NOTIFICATION_APP -> validateOpenNotificationApp(actionJson)
+            NuvaIntent.DESCRIBE_SCREEN -> ValidatedAction.Valid(NuvaAction.DescribeScreen)
         }
     }
 
@@ -138,6 +143,16 @@ object CommandValidator {
         val mode = CaptureMode.fromWire(json.str("mode"))
             ?: return ValidatedAction.Invalid(listOf("CAMERA requires a known mode"))
         return ValidatedAction.Valid(NuvaAction.CameraOpen(mode))
+    }
+
+    private fun validatePress(json: JsonObject): ValidatedAction {
+        val label = json.str("label")?.takeIf { it.length <= 120 }
+        return ValidatedAction.Valid(NuvaAction.Press(label))
+    }
+
+    private fun validateOpenNotificationApp(json: JsonObject): ValidatedAction {
+        val ordinal = json.int("ordinal")?.takeIf { it in 1..30 } ?: 1
+        return ValidatedAction.Valid(NuvaAction.OpenNotificationApp(ordinal))
     }
 
     private fun validateOpenChat(json: JsonObject): ValidatedAction {

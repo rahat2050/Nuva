@@ -275,6 +275,61 @@ object CommandParser {
         return null
     }
 
+    // --- 1b. Universal app-agnostic commands (v1.5, Phase 5) ---------------------------
+    // Targets come from the CURRENT SCREEN at execution time; ambiguity is
+    // reported so the user can be specific — never guessed.
+
+    private fun parseUniversal(t: String): CommandDecision? {
+        // Notification shade / source app — before generic open/read rules.
+        if (listOf("notification panel", "notification shade", "নোটিফিকেশন প্যানেল", "notification khulo")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.OpenNotificationShade, "নোটিফিকেশন প্যানেল খুলছি।")
+
+        if (listOf("notification er app", "notification wala app", "notification ta kholo", "prothom notification")
+                .any { t.contains(it) }
+        ) {
+            val ordinal = Regex("""(\d+)\s*(number|no|tomo|তম)""").find(t)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+            return ok(NuvaAction.OpenNotificationApp(ordinal.coerceIn(1, 30)), "নোটিফিকেশনের অ্যাপ খুলছি।")
+        }
+
+        // Press a button by name, or "এটা press করো" for the only one visible.
+        // NOTE: no ASCII \b around Bangla markers (JVM \b is ASCII-only).
+        val barePress = listOf(
+            "eta press", "eta chapo", "এটা press", "এটা চাপো", "এটা ট্যাপ",
+        ).any { t.contains(it) }
+        val pressLabel = when {
+            barePress -> null
+            else -> {
+                // "send button press" → label is group 1; "press koro send" → label is group 2.
+                val byName = Regex("""^(.{2,60}?)\s*(button|btn|ta|বাটন)\s*(press|chapo|chapun|চাপো|ট্যাপ)(?![a-z])""").find(t)
+                byName?.groupValues?.get(1)?.trim()?.ifBlank { null }
+                    ?: Regex("""(?<![a-z])(press|chapo|chapun|চাপো)\s+(.{2,60}?)$""").find(t)
+                        ?.groupValues?.get(2)?.trim()
+            }
+        }
+        val wantsPress = pressLabel != null || barePress ||
+            listOf("press koro", "press korun", "button chapo", "press করো", "বাটন চাপো", "চাপো দাও").any { t.contains(it) }
+        if (wantsPress) {
+            val cleanedLabel = pressLabel?.let { label ->
+                label.replace(Regex("""\b(button|btn|ta|the|eta|koro|korun)\b"""), " ")
+                    .replace(Regex("""\s+"""), " ").trim().ifBlank { null }
+            }
+            return ok(NuvaAction.Press(cleanedLabel), "বাটন চাপছি।")
+        }
+
+        // Clear the current input.
+        if (listOf("muchhe felo", "muchhe dao", "clear koro", "lekhata muchho", "লেখাটা মুছো", "মুছে ফেলো", "মুছে দাও")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.ClearText, "লেখাটা মুছে দিচ্ছি।")
+
+        // UI summary (buttons/inputs), distinct from full text reading.
+        if (listOf("button dekhao", "button gulo", "ki button ache", "ui dekhao", "ui summary", "বাটন দেখাও", "কী বাটন আছে")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DescribeScreen, "স্ক্রিনের বাটনগুলো বলছি।")
+
+        return null
+    }
+
     // --- 2. Screen & notifications ---------------------------------------------------
 
     private fun parseScreenReading(t: String): CommandDecision? {
@@ -414,6 +469,18 @@ object CommandParser {
         if (listOf("bluetooth", "ব্লুটুথ").any { t.contains(it) }) {
             return ok(NuvaAction.OpenSettingScreen(SettingTarget.BLUETOOTH), "Bluetooth setting khulchi.")
         }
+        if (listOf("notification setting", "notification settings", "নোটিফিকেশন সেটিং")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.OpenSettingScreen(SettingTarget.NOTIFICATION_SETTINGS), "Notification settings khulchi.")
+
+        if (listOf("app setting", "app settings", "nuva er setting", "NUVA-র app settings")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.OpenSettingScreen(SettingTarget.APP_SETTINGS), "App settings khulchi.")
+
+        if (listOf("accessibility setting", "accessibility settings", "অ্যাক্সেসিবিলিটি সেটিং")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.OpenSettingScreen(SettingTarget.ACCESSIBILITY_SETTINGS), "Accessibility settings khulchi.")
+
         if (listOf("phone er setting", "phone settings", "system setting", "সেটিংস খোলো", "settings khulo")
                 .any { t.contains(it) }
         ) {

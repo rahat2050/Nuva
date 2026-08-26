@@ -241,6 +241,34 @@ def parse_nav(t):
         return ok({"kind":"ShowRecents"}, "SHOW_RECENTS")
     return None
 
+def parse_universal(t):
+    if any(w in t for w in ["notification panel","notification shade","নোটিফিকেশন প্যানেল","notification khulo"]):
+        return ok({"kind":"shade"},"OPEN_NOTIFICATIONS")
+    if any(w in t for w in ["notification er app","notification wala app","notification ta kholo","prothom notification"]):
+        ordinal = 1
+        m = re.search(r"(\d+)\s*(number|no|tomo|তম)", t)
+        if m: ordinal = max(1, min(30, int(m.group(1))))
+        return ok({"kind":"notifapp","ordinal":ordinal},"OPEN_NOTIFICATION_APP")
+    bare = any(w in t for w in ["eta press","eta chapo","এটা press","এটা চাপো","এটা ট্যাপ"])
+    label = None
+    if not bare:
+        m1 = re.match(r"^(.{2,60}?)\s*(button|btn|ta|বাটন)\s*(press|chapo|chapun|চাপো|ট্যাপ)(?![a-z])", t)
+        m2 = re.search(r"(?<![a-z])(press|chapo|chapun|চাপো)\s+(.{2,60}?)$", t)
+        if m1:
+            label = m1.group(1).strip() or None
+        elif m2:
+            label = m2.group(2).strip() or None
+    wants = label is not None or bare or any(w in t for w in ["press koro","press korun","button chapo","press করো","বাটন চাপো","চাপো দাও"])
+    if wants:
+        if label:
+            label = re.sub(r"\s+"," ",re.sub(r"\b(button|btn|ta|the|eta|koro|korun)\b"," ",label)).strip() or None
+        return ok({"kind":"press","label":label},"PRESS")
+    if any(w in t for w in ["muchhe felo","muchhe dao","clear koro","lekhata muchho","লেখাটা মুছো","মুছে ফেলো","মুছে দাও"]):
+        return ok({"kind":"clear"},"CLEAR_TEXT")
+    if any(w in t for w in ["button dekhao","button gulo","ki button ache","ui dekhao","ui summary","বাটন দেখাও","কী বাটন আছে"]):
+        return ok({"kind":"describe"},"DESCRIBE_SCREEN")
+    return None
+
 def parse_screen(t):
     if any(w in t for w in ["screen poro","screen ta poro","poro screen","ki lekha ache","screen e ki ache",
         "এই স্ক্রিনটা পড়ো","স্ক্রিন পড়ো","কী লেখা আছে","স্ক্রিনে কী আছে"]):
@@ -307,6 +335,12 @@ def parse_settings(t):
         return ok({"kind":"WIFI"}, "OPEN_SETTING")
     if any(w in t for w in ["bluetooth","ব্লুটুথ"]):
         return ok({"kind":"BLUETOOTH"}, "OPEN_SETTING")
+    if any(w in t for w in ["notification setting","notification settings","নোটিফিকেশন সেটিং"]):
+        return ok({"kind":"NOTIF_SETTING"}, "OPEN_SETTING")
+    if any(w in t for w in ["app setting","app settings","nuva er setting"]):
+        return ok({"kind":"APP_SETTING"}, "OPEN_SETTING")
+    if any(w in t for w in ["accessibility setting","accessibility settings","অ্যাক্সেসিবিলিটি সেটিং"]):
+        return ok({"kind":"ACCESS_SETTING"}, "OPEN_SETTING")
     if any(w in t for w in ["phone er setting","phone settings","system setting","সেটিংস খোলো","settings khulo"]):
         return ok({"kind":"GENERAL"}, "OPEN_SETTING")
     return None
@@ -547,7 +581,7 @@ def content_after(t, marker):
 CONNECTORS = [" ar ", " ebong ", " and ", " tarpor ", " আর ", " এবং ", " তারপর ", " then ", "; "]
 
 def rule_table(t):
-    return (parse_nav(t) or parse_screen(t) or parse_status(t) or parse_media_ctl(t)
+    return (parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_status(t) or parse_media_ctl(t)
             or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
@@ -712,6 +746,30 @@ mp3 = parse("rail station kothay")
 check(mp3 and "rail%20station" in mp3["action"]["url"] or (mp3 and "rail" in mp3["action"]["url"]), "kothay map")
 gm = parse("google maps khulo")
 check(gm and gm["intent"]=="OPEN_APP", "google maps app still opens")
+
+# ---- v1.5: universal commands ----
+u1 = parse("nuva send button press koro")
+check(u1 and u1["intent"]=="PRESS" and u1["action"]["label"]=="send", "press named")
+u2 = parse("এটা press করো")
+check(u2 and u2["intent"]=="PRESS" and u2["action"]["label"] is None, "press bare bangla")
+u3 = parse("লগইন বাটন চাপো")
+check(u3 and u3["intent"]=="PRESS" and u3["action"]["label"]=="লগইন", "press bangla label")
+u4 = parse("nuva lekhata muchho")
+check(u4 and u4["intent"]=="CLEAR_TEXT", "clear text")
+u5 = parse("notification panel kholo")
+check(u5 and u5["intent"]=="OPEN_NOTIFICATIONS", "notification shade")
+u6 = parse("ki button ache")
+check(u6 and u6["intent"]=="DESCRIBE_SCREEN", "describe screen")
+u7 = parse("notification poro")
+check(u7 and u7["intent"]=="READ_NOTIFICATIONS", "read notif still works")
+u8 = parse("notification er app khulo")
+check(u8 and u8["intent"]=="OPEN_NOTIFICATION_APP" and u8["action"]["ordinal"]==1, "open notif app")
+u9 = parse("3 number notification er app khulo")
+check(u9 and u9["action"]["ordinal"]==3, "open 3rd notif app")
+u10 = parse("notification setting khulo")
+check(u10 and u10["action"]["kind"]=="NOTIF_SETTING", "notif settings")
+u11 = parse("accessibility settings kholo")
+check(u11 and u11["action"]["kind"]=="ACCESS_SETTING", "accessibility settings")
 
 print()
 print("PASS" if not FAIL else f"{len(FAIL)} FAILURES")

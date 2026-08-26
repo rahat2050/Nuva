@@ -362,6 +362,60 @@ class CommandParserTest {
         assertTrue(decision!!.unsupported)
     }
 
+    // --- v1.5: universal app-agnostic commands (Phase 5) --------------------------------------------
+
+    @Test
+    fun `press by button name and bare press parse`() {
+        val named = CommandParser.parse("nuva send button press koro")
+        assertEquals(NuvaIntent.PRESS, named!!.intent)
+        assertEquals("send", (named.action as NuvaAction.Press).label)
+
+        val bare = CommandParser.parse("এটা press করো")
+        assertEquals(NuvaIntent.PRESS, bare!!.intent)
+        assertNull((bare.action as NuvaAction.Press).label)
+
+        val bangla = CommandParser.parse("লগইন বাটন চাপো")
+        assertEquals(NuvaIntent.PRESS, bangla!!.intent)
+        assertEquals("লগইন", (bangla.action as NuvaAction.Press).label)
+    }
+
+    @Test
+    fun `clear text notification shade and describe screen parse`() {
+        assertEquals(NuvaIntent.CLEAR_TEXT, CommandParser.parse("nuva lekhata muchho")!!.intent)
+        assertEquals(NuvaIntent.CLEAR_TEXT, CommandParser.parse("লেখাটা মুছো")!!.intent)
+        assertEquals(NuvaIntent.OPEN_NOTIFICATIONS, CommandParser.parse("notification panel kholo")!!.intent)
+        assertEquals(NuvaIntent.DESCRIBE_SCREEN, CommandParser.parse("ki button ache")!!.intent)
+        assertEquals(NuvaIntent.DESCRIBE_SCREEN, CommandParser.parse("বাটন দেখাও")!!.intent)
+        // plain notification reading still goes to READ_NOTIFICATIONS
+        assertEquals(NuvaIntent.READ_NOTIFICATIONS, CommandParser.parse("notification poro")!!.intent)
+    }
+
+    @Test
+    fun `open notification source app parses`() {
+        val first = CommandParser.parse("notification er app khulo")
+        assertEquals(NuvaIntent.OPEN_NOTIFICATION_APP, first!!.intent)
+        assertEquals(1, (first.action as NuvaAction.OpenNotificationApp).ordinal)
+
+        val third = CommandParser.parse("3 number notification er app khulo")
+        assertEquals(3, (third!!.action as NuvaAction.OpenNotificationApp).ordinal)
+    }
+
+    @Test
+    fun `new settings screens parse`() {
+        assertEquals(
+            SettingTarget.NOTIFICATION_SETTINGS,
+            (CommandParser.parse("notification setting khulo")!!.action as NuvaAction.OpenSettingScreen).target,
+        )
+        assertEquals(
+            SettingTarget.APP_SETTINGS,
+            (CommandParser.parse("nuva er setting kholo")!!.action as NuvaAction.OpenSettingScreen).target,
+        )
+        assertEquals(
+            SettingTarget.ACCESSIBILITY_SETTINGS,
+            (CommandParser.parse("accessibility settings kholo")!!.action as NuvaAction.OpenSettingScreen).target,
+        )
+    }
+
     // --- v1.4b: maps / LOCATION --------------------------------------------------------------------
 
     @Test
