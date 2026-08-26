@@ -92,6 +92,46 @@ object ActionJson {
         is NuvaAction.ReadScreen -> buildJsonObject {
             put("type", "READ_SCREEN"); action.scope?.let { put("scope", it.wireName) }
         }
+
+        // LOCAL-ONLY (v1.1)
+        is NuvaAction.ShowRecents -> buildJsonObject { put("type", "SHOW_RECENTS") }
+        is NuvaAction.SearchWeb -> buildJsonObject { put("type", "SEARCH_WEB"); put("query", action.query) }
+        is NuvaAction.DeviceStatusQuery -> buildJsonObject {
+            put("type", "DEVICE_STATUS"); put("query", action.query.wireName)
+        }
+        is NuvaAction.OpenSettingScreen -> buildJsonObject {
+            put("type", "OPEN_SETTING"); put("target", action.target.wireName)
+        }
+        is NuvaAction.ReadNotifications -> buildJsonObject { put("type", "READ_NOTIFICATIONS") }
+        is NuvaAction.SetReminder -> buildJsonObject {
+            put("type", "SET_REMINDER"); put("title", action.title)
+            action.whenMillis?.let { put("when_millis", it) }
+            action.humanWhen?.let { put("human_when", it) }
+        }
+        is NuvaAction.CreateNote -> buildJsonObject { put("type", "CREATE_NOTE"); put("content", action.content) }
+        is NuvaAction.CreateTodo -> buildJsonObject { put("type", "CREATE_TODO"); put("content", action.content) }
+        is NuvaAction.MediaControl -> buildJsonObject {
+            put("type", "MEDIA_CONTROL"); put("command", action.command.wireName)
+        }
+        is NuvaAction.VolumeControl -> buildJsonObject {
+            put("type", "VOLUME_CONTROL"); put("command", action.command.wireName)
+        }
+        is NuvaAction.CameraOpen -> buildJsonObject {
+            put("type", "CAMERA"); put("mode", action.mode.wireName)
+        }
+        is NuvaAction.OpenChat -> buildJsonObject {
+            put("type", "OPEN_CHAT"); put("app", action.app.wireName); put("contact", action.contact)
+            action.phoneNumber?.let { put("phone_number", it) }
+        }
+        is NuvaAction.Press -> buildJsonObject {
+            put("type", "PRESS"); action.label?.let { put("label", it) }
+        }
+        is NuvaAction.ClearText -> buildJsonObject { put("type", "CLEAR_TEXT") }
+        is NuvaAction.OpenNotificationShade -> buildJsonObject { put("type", "OPEN_NOTIFICATIONS") }
+        is NuvaAction.OpenNotificationApp -> buildJsonObject {
+            put("type", "OPEN_NOTIFICATION_APP"); put("ordinal", action.ordinal)
+        }
+        is NuvaAction.DescribeScreen -> buildJsonObject { put("type", "DESCRIBE_SCREEN") }
     }
 
     private fun selectorJson(selector: UiSelector): JsonObject = buildJsonObject {

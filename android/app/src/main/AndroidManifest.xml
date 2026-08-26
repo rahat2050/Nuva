@@ -18,6 +18,12 @@
     <!-- CALL_CONTACT: ACTION_DIAL needs no permission; ACTION_CALL is used only
          when the user explicitly enabled direct calling in Settings. -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
+    <!-- Contact-name search for call/message commands (requested in context,
+         never at startup). -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- SMS send ONLY after an explicit confirmation; without it NUVA falls
+         back to the compose screen where the user taps Send. -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
     <!-- SET_ALARM via AlarmClock intents -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
@@ -83,5 +89,17 @@
             android:exported="false"
             android:foregroundServiceType="microphone"
             android:stopWithTask="false" />
+
+        <!-- Notification READER (v1.1): summary only — never replies/dismisses.
+             The user enables "Notification access" manually in system settings. -->
+        <service
+            android:name=".service.NuvaNotificationListener"
+            android:exported="true"
+            android:label="@string/notification_listener_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

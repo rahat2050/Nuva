@@ -30,17 +30,26 @@ com.nuva.assistant/
 ├── MainActivity / NuvaApplication
 ├── core/          NuvaContainer (DI), DeviceId, constants, SecurityPolicy
 ├── ai/            NuvaApi (Retrofit), AIRepository (+SSE), ActionParser, PromptManager
-├── command/       Intent/Action registry mirror, CommandValidator (LOCAL re-validation),
-│                  CommandParser (offline fallback), CommandExecutor, ActionJson
-├── voice/         SpeechRecognizerController, TTSManager, VoiceController
-├── accessibility/ NuvaAccessibilityService, NodeFinder, Tap/Text/Swipe controllers, ScreenReader
-├── automation/    AppLauncher, GenericAutomation, WhatsApp/YouTube/Browser flows
-├── database/      Room: CommandHistory, PendingAction, LocalMemory
+├── command/       Intent/Action registry mirror (15 AI + 8 LOCAL-ONLY intents),
+│                  CommandValidator (LOCAL re-validation), CommandParser v2
+│                  (on-device bn/banglish/en), NuvaDateTimeParser, CommandExecutor, ActionJson
+├── voice/         SpeechRecognizerController, TTSManager, VoiceController (typed fallback hook)
+├── accessibility/ NuvaAccessibilityService (+ sensitive-screen guard), NodeFinder,
+│                  Tap/Text/Swipe controllers, ScreenReader (password/OTP redaction)
+├── automation/    AppLauncher v2 (installed-app lookup + Play Store suggestion),
+│                  GenericAutomation, WhatsApp/YouTube/Browser flows, SMS, SettingsOpener
+│                  (+ torch), DeviceStatusProvider, ReminderOpener, MessagingRegistry
+├── contacts/      ContactResolver (name → number, multi-match)
+├── database/      Room: CommandHistory (+failure reason), PendingAction, LocalMemory, Notes
 ├── memory/        MemoryManager (local-first), UserPreferences (DataStore)
 ├── supabase/      SupabaseRepository (REST + auth), SyncManager
-├── service/       NuvaForegroundService (visible mic session), WakeWordService (opt-in fallback)
+├── service/       NuvaForegroundService (visible mic session), WakeWordService (opt-in),
+│                  NuvaNotificationListener (read-only, OTP-redacting)
 ├── ui/floating/   Small overlay popup with listen/process/confirm/success/error states
-└── ui/            Home (voice + confirm dialog), History, Memory, Settings
+├── ui/            Home (voice + typed fallback + confirm/choice dialogs), History (+retry),
+│                  Memory (notes & to-dos), Settings (health check, TTS test, status)
+├── ui/onboarding/ Bangla permission onboarding (request-in-context, denied→help)
+└── ui/support/    Supported / unsupported feature list (honest, with reasons)
 ```
 
 ## Build & run
@@ -105,3 +114,36 @@ can replace it without changing the command engine.
 | Automation   | open YouTube; WhatsApp send with number; scroll; read screen         |
 | Persistence  | history rows for executed/failed/rejected; pending expiry           |
 | Security     | credential-like memory keys refused; javascript: URL refused        |
+
+
+## v1.1 — practical assistant pass
+
+Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
+
+* **On-device parser v2** — Bangla/Banglish/English with Bangla numerals; runs BEFORE the
+  network AI (privacy, speed, offline) and as a rescue path when the server says unsupported.
+* **8 LOCAL-ONLY intents** (`NuvaIntent.localOnly`): recents, web search, device status,
+  settings/torch, notification summary, reminder, note, to-do. `NuvaIntent.fromWire()` refuses
+  them, so **no server response can ever trigger one** — the AI registry stays frozen at 15.
+* **Three-level financial policy** (`core/security/SensitiveAppPolicy`, v1.2):
+  LEVEL 1 — wallet/bank apps can be launched by voice and navigated (scroll);
+  LEVEL 2 — OTP/PIN/password/card data is never read, stored or typed (password
+  fields skipped, OTP-like codes redacted, screen reading disabled inside
+  financial apps); LEVEL 3 — transaction automation (send money, payment, cash
+  out, transfer, recharge, payment confirmation) is always refused with a fixed
+  Bangla message and never offered a confirmation.
+* **Contacts + calls/messages**: contact-name resolution with an explicit multi-match choice;
+  SMS sends only after confirmation (compose-screen fallback); WhatsApp unchanged; other
+  messaging apps clearly refused with reasons.
+* **Phone utilities**: battery/time/date/network/storage answers, torch toggle, direct
+  volume up/down/mute, media pause/resume/next/previous (active MediaSession), camera
+  photo/video/capture-open, settings screens, calendar-prefilled reminders, local
+  notes & to-dos.
+* **Messaging tiers**: WhatsApp + SMS send after confirmation; Telegram/Messenger/
+  Signal/Viber/IMO open with the message pre-filled (user taps Send).
+* **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
+  confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
+  onboarding in Bangla, supported/unsupported feature screen.
+
+Unit tests cover the parser, date/time parser, validator, denylist, ActionJson round-trip and
+confirmation summaries: `./gradlew :app:testDebugUnitTest`.

@@ -51,6 +51,7 @@ object NuvaContainer {
             history = database.commandHistoryDao(),
             pendingActions = database.pendingActionDao(),
             supabaseRepository = supabaseRepository,
+            notes = database.noteDao(),
         )
     }
 

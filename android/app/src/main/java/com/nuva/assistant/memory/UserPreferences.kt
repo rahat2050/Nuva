@@ -31,6 +31,7 @@ class UserPreferences(private val context: Context) {
         val CONFIRMATION_ALWAYS = booleanPreferencesKey("confirmation_always")
         val DIRECT_CALL = booleanPreferencesKey("direct_call")
         val WAKE_WORD_ENABLED = booleanPreferencesKey("wake_word_enabled")
+        val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val ACCESS_TOKEN = stringPreferencesKey("supabase_access_token")
         val REFRESH_TOKEN = stringPreferencesKey("supabase_refresh_token")
     }
@@ -43,6 +44,7 @@ class UserPreferences(private val context: Context) {
     val confirmationAlways: Flow<Boolean> = context.dataStore.data.map { it[Keys.CONFIRMATION_ALWAYS] ?: false }
     val directCall: Flow<Boolean> = context.dataStore.data.map { it[Keys.DIRECT_CALL] ?: false }
     val wakeWordEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.WAKE_WORD_ENABLED] ?: false }
+    val onboardingDone: Flow<Boolean> = context.dataStore.data.map { it[Keys.ONBOARDING_DONE] ?: false }
     val supabaseUrl: Flow<String> =
         context.dataStore.data.map { it[Keys.SUPABASE_URL] ?: AppConstants.DEFAULT_SUPABASE_URL }
     val supabaseAnonKey: Flow<String> =
@@ -59,6 +61,7 @@ class UserPreferences(private val context: Context) {
     fun directCallBlocking(): Boolean = runBlocking { directCall.first() }
     fun voiceEnabledBlocking(): Boolean = runBlocking { voiceEnabled.first() }
     fun wakeWordEnabledBlocking(): Boolean = runBlocking { wakeWordEnabled.first() }
+    fun onboardingDoneBlocking(): Boolean = runBlocking { onboardingDone.first() }
 
     // --- Writes ----------------------------------------------------------------
 
@@ -86,6 +89,8 @@ class UserPreferences(private val context: Context) {
     suspend fun setDirectCall(direct: Boolean) = context.dataStore.edit { it[Keys.DIRECT_CALL] = direct }
 
     suspend fun setWakeWordEnabled(enabled: Boolean) = context.dataStore.edit { it[Keys.WAKE_WORD_ENABLED] = enabled }
+
+    suspend fun setOnboardingDone(done: Boolean) = context.dataStore.edit { it[Keys.ONBOARDING_DONE] = done }
 
     // --- Auth session (Supabase JWT for the backend) ---------------------------
 

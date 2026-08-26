@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.nuva.assistant.database.entities.CommandHistoryEntity
 import com.nuva.assistant.database.entities.LocalMemoryEntity
+import com.nuva.assistant.database.entities.NoteEntity
 import com.nuva.assistant.database.entities.PendingActionEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -18,6 +19,12 @@ interface CommandHistoryDao {
 
     @Query("UPDATE command_history SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String)
+
+    @Query("UPDATE command_history SET status = :status, error = :error WHERE id = :id")
+    suspend fun updateStatusAndError(id: Long, status: String, error: String?)
+
+    @Query("SELECT * FROM command_history WHERE id = :id LIMIT 1")
+    suspend fun get(id: Long): CommandHistoryEntity?
 
     @Query("SELECT * FROM command_history ORDER BY createdAt DESC LIMIT :limit")
     fun recent(limit: Int = 100): Flow<List<CommandHistoryEntity>>
@@ -48,6 +55,10 @@ interface PendingActionDao {
 
     @Query("UPDATE pending_actions SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String)
+
+    /** Re-parks a pending action after e.g. a contact choice resolves a number. */
+    @Query("UPDATE pending_actions SET actionJson = :actionJson WHERE id = :id")
+    suspend fun updateAction(id: Long, actionJson: String)
 
     @Query("SELECT * FROM pending_actions WHERE status = 'pending' ORDER BY createdAt DESC")
     fun pending(): Flow<List<PendingActionEntity>>
@@ -100,4 +111,23 @@ interface LocalMemoryDao {
 
 suspend fun LocalMemoryDao.put(key: String, value: String) {
     upsert(LocalMemoryEntity(key = key, value = value, updatedAt = System.currentTimeMillis(), syncedAt = null))
+}
+
+@Dao
+interface NoteDao {
+
+    @Insert
+    suspend fun insertRow(row: NoteEntity): Long
+
+    @Query("SELECT * FROM notes WHERE kind = :kind ORDER BY createdAt DESC LIMIT :limit")
+    fun byKind(kind: String, limit: Int = 100): Flow<List<NoteEntity>>
+
+    @Query("UPDATE notes SET done = :done WHERE id = :id")
+    suspend fun setDone(id: Long, done: Boolean)
+
+    @Query("DELETE FROM notes WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("DELETE FROM notes WHERE kind = :kind AND done = 1")
+    suspend fun clearDone(kind: String)
 }

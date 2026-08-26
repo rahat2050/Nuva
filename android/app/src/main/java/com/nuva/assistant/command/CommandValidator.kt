@@ -45,6 +45,9 @@ object CommandValidator {
 
     private fun JsonObject.int(field: String): Int? = this[field]?.jsonPrimitive?.intOrNull
 
+    private fun JsonObject.long(field: String): Long? =
+        (this[field] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull?.toLongOrNull()
+
     private fun JsonObject.bool(field: String): Boolean? = this[field]?.jsonPrimitive?.booleanOrNull
 
     private fun JsonObject.fraction(field: String): Float? =
@@ -71,13 +74,18 @@ object CommandValidator {
     // --- Action validation ----------------------------------------------------
 
     /**
-     * Validates the raw action JSON from the server against the mirrored
-     * registry rules. Unknown types and malformed payloads are refused.
+     * Validates the raw action JSON against the mirrored registry rules.
+     * Unknown types and malformed payloads are refused.
+     *
+     * NOTE: this resolves ALL intents (AI + local-only) because pending
+     * actions round-trip through here. The AI wire path can still never
+     * produce a local-only intent — [NuvaIntent.fromWire] refuses them and
+     * ai/ActionParser checks fromWire() before validateAction is reached.
      */
     fun validateAction(actionJson: JsonObject?): ValidatedAction {
         if (actionJson == null) return ValidatedAction.Invalid(listOf("action is missing"))
         val type = actionJson.str("type")
-        val intent = NuvaIntent.fromWire(type)
+        val intent = NuvaIntent.entries.firstOrNull { it.wireName == type }
             ?: return ValidatedAction.Invalid(listOf("action type $type is not in the NUVA registry"))
 
         return when (intent) {
@@ -95,7 +103,103 @@ object CommandValidator {
             NuvaIntent.OPEN_URL -> validateUrl(actionJson)
             NuvaIntent.PLAY_MEDIA -> validatePlayMedia(actionJson)
             NuvaIntent.READ_SCREEN -> validateReadScreen(actionJson)
+
+            // LOCAL-ONLY (v1.1) — validated here so pending actions round-trip
+            // safely; unreachable from the AI wire path because fromWire()
+            // refuses local-only intents.
+            NuvaIntent.SHOW_RECENTS -> ValidatedAction.Valid(NuvaAction.ShowRecents)
+            NuvaIntent.SEARCH_WEB -> validateSearchWeb(actionJson)
+            NuvaIntent.DEVICE_STATUS -> validateDeviceStatus(actionJson)
+            NuvaIntent.OPEN_SETTING -> validateOpenSetting(actionJson)
+            NuvaIntent.READ_NOTIFICATIONS -> ValidatedAction.Valid(NuvaAction.ReadNotifications)
+            NuvaIntent.SET_REMINDER -> validateReminder(actionJson)
+            NuvaIntent.CREATE_NOTE -> validateNote(actionJson)
+            NuvaIntent.CREATE_TODO -> validateTodo(actionJson)
+            NuvaIntent.MEDIA_CONTROL -> validateMediaControl(actionJson)
+            NuvaIntent.VOLUME_CONTROL -> validateVolumeControl(actionJson)
+            NuvaIntent.CAMERA -> validateCamera(actionJson)
+            NuvaIntent.OPEN_CHAT -> validateOpenChat(actionJson)
+            NuvaIntent.PRESS -> validatePress(actionJson)
+            NuvaIntent.CLEAR_TEXT -> ValidatedAction.Valid(NuvaAction.ClearText)
+            NuvaIntent.OPEN_NOTIFICATIONS -> ValidatedAction.Valid(NuvaAction.OpenNotificationShade)
+            NuvaIntent.OPEN_NOTIFICATION_APP -> validateOpenNotificationApp(actionJson)
+            NuvaIntent.DESCRIBE_SCREEN -> ValidatedAction.Valid(NuvaAction.DescribeScreen)
         }
+    }
+
+    private fun validateMediaControl(json: JsonObject): ValidatedAction {
+        val command = MediaCommand.fromWire(json.str("command"))
+            ?: return ValidatedAction.Invalid(listOf("MEDIA_CONTROL requires a known command"))
+        return ValidatedAction.Valid(NuvaAction.MediaControl(command))
+    }
+
+    private fun validateVolumeControl(json: JsonObject): ValidatedAction {
+        val command = VolumeCommand.fromWire(json.str("command"))
+            ?: return ValidatedAction.Invalid(listOf("VOLUME_CONTROL requires a known command"))
+        return ValidatedAction.Valid(NuvaAction.VolumeControl(command))
+    }
+
+    private fun validateCamera(json: JsonObject): ValidatedAction {
+        val mode = CaptureMode.fromWire(json.str("mode"))
+            ?: return ValidatedAction.Invalid(listOf("CAMERA requires a known mode"))
+        return ValidatedAction.Valid(NuvaAction.CameraOpen(mode))
+    }
+
+    private fun validatePress(json: JsonObject): ValidatedAction {
+        val label = json.str("label")?.takeIf { it.length <= 120 }
+        return ValidatedAction.Valid(NuvaAction.Press(label))
+    }
+
+    private fun validateOpenNotificationApp(json: JsonObject): ValidatedAction {
+        val ordinal = json.int("ordinal")?.takeIf { it in 1..30 } ?: 1
+        return ValidatedAction.Valid(NuvaAction.OpenNotificationApp(ordinal))
+    }
+
+    private fun validateOpenChat(json: JsonObject): ValidatedAction {
+        val app = MessagingApp.fromWire(json.str("app"))
+            ?: return ValidatedAction.Invalid(listOf("OPEN_CHAT requires a supported app"))
+        val contact = json.str("contact")?.takeIf { it.isNotEmpty() && it.length <= 120 }
+            ?: return ValidatedAction.Invalid(listOf("OPEN_CHAT requires contact"))
+        val phone = json.str("phone_number")?.takeIf { PHONE_PATTERN.matches(it) }
+        return ValidatedAction.Valid(NuvaAction.OpenChat(app, contact, phone))
+    }
+
+    private fun validateSearchWeb(json: JsonObject): ValidatedAction {
+        val query = json.str("query")?.takeIf { it.isNotEmpty() && it.length <= 300 }
+            ?: return ValidatedAction.Invalid(listOf("SEARCH_WEB requires query (1..300 chars)"))
+        return ValidatedAction.Valid(NuvaAction.SearchWeb(query))
+    }
+
+    private fun validateDeviceStatus(json: JsonObject): ValidatedAction {
+        val kind = DeviceStatusKind.fromWire(json.str("query"))
+            ?: return ValidatedAction.Invalid(listOf("DEVICE_STATUS requires a known query kind"))
+        return ValidatedAction.Valid(NuvaAction.DeviceStatusQuery(kind))
+    }
+
+    private fun validateOpenSetting(json: JsonObject): ValidatedAction {
+        val target = SettingTarget.fromWire(json.str("target"))
+            ?: return ValidatedAction.Invalid(listOf("OPEN_SETTING requires a known target"))
+        return ValidatedAction.Valid(NuvaAction.OpenSettingScreen(target))
+    }
+
+    private fun validateReminder(json: JsonObject): ValidatedAction {
+        val title = json.str("title")?.takeIf { it.isNotEmpty() && it.length <= 200 }
+            ?: return ValidatedAction.Invalid(listOf("SET_REMINDER requires title (1..200 chars)"))
+        val whenMillis = json.long("when_millis")?.takeIf { it in 0..4_102_444_800_000L }
+        val humanWhen = json.str("human_when")?.takeIf { it.length <= 120 }
+        return ValidatedAction.Valid(NuvaAction.SetReminder(title, whenMillis, humanWhen))
+    }
+
+    private fun validateNote(json: JsonObject): ValidatedAction {
+        val content = json.str("content")?.takeIf { it.isNotEmpty() && it.length <= MAX_MESSAGE }
+            ?: return ValidatedAction.Invalid(listOf("CREATE_NOTE requires content (1..2000 chars)"))
+        return ValidatedAction.Valid(NuvaAction.CreateNote(content))
+    }
+
+    private fun validateTodo(json: JsonObject): ValidatedAction {
+        val content = json.str("content")?.takeIf { it.isNotEmpty() && it.length <= MAX_MESSAGE }
+            ?: return ValidatedAction.Invalid(listOf("CREATE_TODO requires content (1..2000 chars)"))
+        return ValidatedAction.Valid(NuvaAction.CreateTodo(content))
     }
 
     private fun validateAppAction(intent: NuvaIntent, json: JsonObject): ValidatedAction {

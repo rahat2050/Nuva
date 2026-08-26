@@ -68,6 +68,31 @@ class SettingsViewModel : ViewModel() {
         }
     }
 
+    /** Explicit backend health check (requirement §31). */
+    fun checkHealth() {
+        CoroutineScope(Dispatchers.IO).launch {
+            message.value = "Checking backend…"
+            val healthy = NuvaContainer.syncManager.healthOk()
+            message.value = if (healthy) {
+                "Backend reachable ✓ (${preferences.baseUrlBlocking()})"
+            } else {
+                "Backend reachable hoy na — URL thik ache kina dekhun"
+            }
+        }
+    }
+
+    /** Speaks a sample sentence so the user can verify TTS (requirement §31). */
+    fun testTts() {
+        val tts = com.nuva.assistant.voice.TTSManager(NuvaContainer.appContext)
+        val language = NuvaContainer.preferences.languageBlocking()
+        val sample = when (language) {
+            "en" -> "Hello, this is Nuva."
+            else -> "Assalamu alaikum, ami Nuva — apnar voice assistant."
+        }
+        tts.speak(sample, if (language == "en") "en" else "banglish")
+        message.value = "TTS test: \"$sample\""
+    }
+
     fun saveSupabase(url: String, anonKey: String) {
         CoroutineScope(Dispatchers.IO).launch {
             preferences.setSupabase(url, anonKey)
@@ -111,7 +136,12 @@ class SettingsViewModel : ViewModel() {
 }
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel = viewModel(),
+    onOpenSetup: () -> Unit = {},
+    onOpenSupport: () -> Unit = {},
+    onOpenPrivacy: () -> Unit = {},
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var permissionRefresh by remember { mutableIntStateOf(0) }
@@ -191,7 +221,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        Button(onClick = { scope.launch { viewModel.saveBaseUrl(baseUrlDraft) } }) { Text("Save") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { scope.launch { viewModel.saveBaseUrl(baseUrlDraft) } }) { Text("Save") }
+            OutlinedButton(onClick = { viewModel.checkHealth() }) {
+                Text(stringResource(R.string.settings_health_check))
+            }
+        }
 
         HorizontalDivider()
 
@@ -274,6 +309,34 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             checked = directCall,
             onChange = { scope.launch { preferences.setDirectCall(it) } },
         )
+        OutlinedButton(onClick = { viewModel.testTts() }) {
+            Text(stringResource(R.string.settings_tts_test))
+        }
+
+        HorizontalDivider()
+
+        Text(stringResource(R.string.settings_status_title), style = MaterialTheme.typography.titleMedium)
+        val accessibilityRunning = remember(permissionRefresh) {
+            com.nuva.assistant.accessibility.NuvaAccessibilityService.isRunning
+        }
+        val notificationListenerConnected = remember(permissionRefresh) {
+            com.nuva.assistant.service.NuvaNotificationListener.isConnected
+        }
+        val contactsGranted = remember(permissionRefresh) { NuvaPermissions.hasContacts(context) }
+        Text(
+            buildString {
+                append("Accessibility: ").append(if (accessibilityRunning) "✓ on" else "✗ off").append("  ·  ")
+                append("Notification access: ").append(if (notificationListenerConnected) "✓" else "✗").append("  ·  ")
+                append("Contacts: ").append(if (contactsGranted) "✓" else "✗")
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (accessibilityRunning) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onOpenSetup) { Text(stringResource(R.string.settings_open_setup)) }
+            OutlinedButton(onClick = onOpenSupport) { Text(stringResource(R.string.settings_open_support)) }
+            OutlinedButton(onClick = onOpenPrivacy) { Text(stringResource(R.string.settings_open_privacy)) }
+        }
 
         HorizontalDivider()
 

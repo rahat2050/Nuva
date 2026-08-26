@@ -22,3 +22,10 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# Coroutines (R8 safety net; the library ships rules but keep this explicit)
+-dontwarn kotlinx.coroutines.**
+
+# Room generated code
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *

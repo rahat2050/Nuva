@@ -9,6 +9,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.nuva.assistant.command.ScreenPoint
 import com.nuva.assistant.command.SwipeDirection
 import com.nuva.assistant.command.UiSelector
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
@@ -34,18 +35,48 @@ class NuvaAccessibilityService : AccessibilityService() {
         return super.onUnbind(intent)
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // Track the foreground package so the sensitive-screen guard always
+        // knows which app is in front (fail-safe: unknown ⇒ treat as unknown,
+        // package-specific checks then decide).
+        event?.packageName?.let { foregroundPackage = it.toString() }
+    }
 
     override fun onInterrupt() = Unit
+
+    // --- Sensitive-screen guard (policy §32–§36) -------------------------------
+
+    @Volatile
+    var foregroundPackage: String? = null
+        private set
+
+    /**
+     * True when the app in front of the user is on the banking/payment
+     * denylist. EVERY mutating automation call (tap/type/scroll/swipe) and
+     * screen read refuses to run while this is true — NUVA must never become
+     * a keylogger or transfer drone on a money screen.
+     */
+    fun isForegroundSensitive(): Boolean {
+        val pkg = rootInActiveWindow?.packageName?.toString() ?: foregroundPackage ?: return false
+        if (SensitiveAppPolicy.isSensitivePackage(pkg)) return true
+        // Fall back to the launcher label for label-only denylist hits.
+        val label = runCatching {
+            packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+        }.getOrNull()
+        return SensitiveAppPolicy.isSensitiveAppName(label)
+    }
 
     // --- Node operations -------------------------------------------------------
 
     fun findNode(selector: UiSelector): AccessibilityNodeInfo? {
+        // Read-only lookup stays allowed inside financial apps (LEVEL 1
+        // navigation); the mutating operations below enforce LEVEL 3.
         val root = rootInActiveWindow ?: return null
         return NodeFinder.find(root, selector)
     }
 
     fun clickNode(node: AccessibilityNodeInfo): Boolean {
+        if (isForegroundSensitive()) return false // policy §34: no automation on sensitive screens
         var current: AccessibilityNodeInfo? = node
         var depth = 0
         while (current != null && depth < MAX_PARENT_CLIMB) {
@@ -57,6 +88,7 @@ class NuvaAccessibilityService : AccessibilityService() {
     }
 
     fun longClickNode(node: AccessibilityNodeInfo): Boolean {
+        if (isForegroundSensitive()) return false // policy §34: no automation on sensitive screens
         var current: AccessibilityNodeInfo? = node
         var depth = 0
         while (current != null && depth < MAX_PARENT_CLIMB) {
@@ -72,6 +104,7 @@ class NuvaAccessibilityService : AccessibilityService() {
     }
 
     fun setText(node: AccessibilityNodeInfo, text: String): Boolean {
+        if (isForegroundSensitive()) return false // policy §34: no automation on sensitive screens
         var current: AccessibilityNodeInfo? = node
         var depth = 0
         while (current != null && depth < MAX_PARENT_CLIMB) {
@@ -91,7 +124,32 @@ class NuvaAccessibilityService : AccessibilityService() {
         return false
     }
 
+    /** Clears an editable field (universal action, v1.5). */
+    fun clearText(node: AccessibilityNodeInfo): Boolean {
+        var current: AccessibilityNodeInfo? = node
+        var depth = 0
+        while (current != null && depth < MAX_PARENT_CLIMB) {
+            if (current.isEditable) {
+                val arguments = android.os.Bundle()
+                arguments.putCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                    "",
+                )
+                return current.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+            }
+            current = current.parent
+            depth += 1
+        }
+        return false
+    }
+
+    /** Moves input focus to a node (universal action, v1.5). */
+    fun focusNode(node: AccessibilityNodeInfo): Boolean =
+        node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+
     fun scrollNode(node: AccessibilityNodeInfo, direction: SwipeDirection): Boolean {
+        // Scrolling is allowed inside financial apps (LEVEL 1 navigation);
+        // taps/typing that could confirm a transaction stay blocked.
         val action = when (direction) {
             SwipeDirection.UP -> AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
             SwipeDirection.DOWN -> AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
@@ -113,6 +171,11 @@ class NuvaAccessibilityService : AccessibilityService() {
 
     fun goBack(): Boolean = performGlobalAction(GLOBAL_ACTION_BACK)
 
+    fun showRecents(): Boolean = performGlobalAction(GLOBAL_ACTION_RECENTS)
+
+    /** Opens the notification shade (universal accessibility action). */
+    fun openNotificationShade(): Boolean = performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+
     /** The currently focused editable node (search field already open), if any. */
     fun findFocusedEditable(): AccessibilityNodeInfo? {
         val root = rootInActiveWindow ?: return null
@@ -132,6 +195,7 @@ class NuvaAccessibilityService : AccessibilityService() {
      * the gesture to complete. API 26+ compatible.
      */
     suspend fun tapAt(point: ScreenPoint, longClick: Boolean = false, timeoutMs: Long = GESTURE_TIMEOUT_MS): Boolean {
+        if (isForegroundSensitive()) return false // policy §34: no taps on money screens
         val screen = resources.displayMetrics
         val x = (point.x * screen.widthPixels).coerceIn(0f, screen.widthPixels.toFloat())
         val y = (point.y * screen.heightPixels).coerceIn(0f, screen.heightPixels.toFloat())
@@ -147,6 +211,7 @@ class NuvaAccessibilityService : AccessibilityService() {
         durationMs: Long = 250,
         timeoutMs: Long = GESTURE_TIMEOUT_MS,
     ): Boolean {
+        // Swipe stays allowed inside financial apps (LEVEL 1 navigation).
         val screen = resources.displayMetrics
         val path = Path().apply {
             moveTo(from.x * screen.widthPixels, from.y * screen.heightPixels)
@@ -183,19 +248,75 @@ class NuvaAccessibilityService : AccessibilityService() {
     // --- Screen reading --------------------------------------------------------
 
     fun readVisibleScreen(maxChars: Int = 4000): String? {
+        // LEVEL 2 fail-safe: while a financial app is foreground, no screen
+        // reading at all — we cannot reliably tell a public screen from a
+        // PIN/OTP/balance screen inside a wallet.
+        if (isForegroundSensitive()) return null
         val root = rootInActiveWindow ?: return null
         val builder = StringBuilder()
         collectText(root, builder, maxChars)
         val text = builder.toString().trim()
-        return text.ifEmpty { null }
+        if (text.isEmpty()) return null
+        // OTP/PIN-like codes never leave the reader (policy §33).
+        return SensitiveAppPolicy.redactCodes(text)
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder, maxChars: Int) {
         if (out.length >= maxChars) return
+        // Password / PIN fields are NEVER read, in any app.
+        if (node.isPassword) return
         node.text?.let { out.appendLine(it) }
         node.contentDescription?.let { out.appendLine(it) }
         for (i in 0 until node.childCount) {
             node.getChild(i)?.let { collectText(it, out, maxChars) }
+        }
+    }
+
+    /**
+     * Builds a [ScreenStateModel.ScreenState] for the active window (Phase 4):
+     * a BOUNDED, safety-filtered snapshot — password nodes skipped, OTP-like
+     * codes redacted, financial screens flagged and emptied.
+     */
+    fun captureScreenState(maxNodes: Int = 160): ScreenStateModel.ScreenState? {
+        val root = rootInActiveWindow ?: return null
+        val rawNodes = ArrayList<ScreenStateModel.RawNode>(maxNodes)
+        val titleCandidates = ArrayList<String>(4)
+        walkForState(root, rawNodes, titleCandidates, maxNodes, depth = 0)
+        val pkg = root.packageName?.toString()
+        return ScreenStateModel.build(
+            ScreenStateModel.RawScreen(
+                packageName = pkg,
+                titleCandidates = titleCandidates,
+                nodes = rawNodes,
+            ),
+        )
+    }
+
+    private fun walkForState(
+        node: AccessibilityNodeInfo,
+        out: ArrayList<ScreenStateModel.RawNode>,
+        titles: ArrayList<String>,
+        maxNodes: Int,
+        depth: Int,
+    ) {
+        if (out.size >= maxNodes || depth > 40) return
+        out.add(
+            ScreenStateModel.RawNode(
+                text = node.text?.toString(),
+                contentDescription = node.contentDescription?.toString(),
+                isPassword = node.isPassword,
+                isClickable = node.isClickable,
+                isEditable = node.isEditable,
+                isScrollable = node.isScrollable,
+                isFocused = node.isFocused,
+            ),
+        )
+        // Heuristic title: first short text of a shallow toolbar-ish node.
+        if (titles.size < 4 && depth <= 4) {
+            node.text?.toString()?.trim()?.takeIf { it.length in 2..60 }?.let { titles.add(it) }
+        }
+        for (i in 0 until node.childCount) {
+            node.getChild(i)?.let { walkForState(it, out, titles, maxNodes, depth + 1) }
         }
     }
 

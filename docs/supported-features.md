@@ -1,0 +1,61 @@
+# NUVA — Supported features (v1.6)
+
+Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
+**ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
+**BLOCKED** (policy refusal)
+
+## Voice & conversation — SUPPORTED
+Wake "Hey Nuva" (opt-in service, visible session, one wake = command + ≤2 follow-ups),
+Bangla/Banglish/English/mixed parsing, typed fallback, Bangla-first replies, stuck-session
+timeout recovery (15 s), conversational context (5-min TTL, pronoun "ওকে" resolution).
+
+## Apps & navigation — SUPPORTED
+Open any installed app by name (+ Play Store suggestion when missing), close/home/back/recents,
+scroll/swipe anywhere, notification shade open, per-app capability truth via
+AppCapabilityRegistry.
+
+## Communication — SUPPORTED (confirmation mandatory)
+Contacts: dynamic resolution, kinship fallback, multi-match asks, phone numbers incl.
+hyphenated. Calls (dialer or opt-in direct). SMS send-after-confirmation. WhatsApp
+send-after-confirmation with package + recipient verification. Chat open (wa.me).
+Telegram/Messenger/Signal/Viber/IMO — **ANDROID-LIMITED**: message pre-filled, user taps Send.
+
+## Media & camera — SUPPORTED / ANDROID-LIMITED
+YouTube search/play, Spotify fallback, pause/resume/next/previous (active MediaSession —
+ANDROID-LIMITED via notification access), volume up/down/mute. Camera open photo/video +
+explicit-capture flow (shutter always user-controlled). Gallery/media search/share —
+**UNSUPPORTED** (picker flows need an activity result).
+
+## Files — ANDROID-LIMITED
+Files app opens; arbitrary open/read/rename/move/delete — **UNSUPPORTED** from the background
+(SAF requires user-present activity results); delete-with-confirmation therefore not offered
+rather than faked.
+
+## Device utilities — SUPPORTED
+Torch, battery/time/date/network/storage answers, alarms/timers (bn/banglish/en time),
+calendar-prefilled reminders, notes/to-dos, maps search ("dhaka er map dekhao"),
+app-agnostic press/clear/describe commands.
+
+## Settings screens — SUPPORTED (ANDROID-LIMITED by nature)
+Brightness/DND/Wi-Fi/BT/sound/display/notification/app/accessibility settings — Android
+forbids direct toggles for third-party apps, so the exact screen opens (torch & volume are
+direct where permitted).
+
+## Notifications — SUPPORTED (reply UNSUPPORTED)
+Read/summarize (OTP redacted, banking skipped), open source app, shade open. Reply —
+**UNSUPPORTED** until a reliable per-app RemoteInput route exists.
+
+## Screen understanding & automation — SUPPORTED (semantic only)
+Read visible/focused text, UI summary (buttons/inputs/lists), tap/long-press/type/clear/
+focus/scroll/swipe on SEMANTIC targets. Ambiguous or missing target ⇒ STOP and ask.
+Blind automation never happens.
+
+## Financial — BLOCKED by policy (unchanged)
+LEVEL 1: open + navigate financial apps. LEVEL 2: OTP/PIN/password/CVV/card/biometric never
+read/stored/typed; banking screens never read. LEVEL 3: money transfer/payment/cash-out/
+recharge/purchase/financial authorization automation ALWAYS refused with:
+"এই financial transaction NUVA নিজে করতে পারবে না। আপনি চাইলে নিজে manually করতে পারবেন।"
+
+## PARTIAL / pending verification
+Real-device QA (checklist in `v1.6-real-device-qa.md`) and the APK artifact build are pending —
+see `v1.6-production-audit.md` §5. Nothing here claims device-verified status.

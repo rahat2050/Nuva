@@ -96,6 +96,108 @@ sealed interface NuvaAction {
     data class ReadScreen(val scope: ReadScreenScope?) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.READ_SCREEN
     }
+
+    // --- LOCAL-ONLY actions (v1.1) — built by CommandParser, never by the AI --
+
+    data object ShowRecents : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.SHOW_RECENTS
+    }
+
+    /** Media playback control via the active MediaSession (v1.2). */
+    data class MediaControl(val command: MediaCommand) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.MEDIA_CONTROL
+    }
+
+    /** Direct volume changes — permitted by Android, no settings detour (v1.2). */
+    data class VolumeControl(val command: VolumeCommand) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.VOLUME_CONTROL
+    }
+
+    /** Open the camera app in a mode; CAPTURE opens the still-capture flow (v1.2). */
+    data class CameraOpen(val mode: CaptureMode) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CAMERA
+    }
+
+    /**
+     * Open a specific chat in a messaging app WITHOUT sending anything
+     * (v1.4). WhatsApp uses the wa.me deep link when a number is known;
+     * other apps open their chat/search screen honestly. LOW risk — nothing
+     * leaves the device; sending is a separate confirmed SEND_MESSAGE.
+     */
+    data class OpenChat(
+        val app: MessagingApp,
+        val contact: String,
+        val phoneNumber: String?,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_CHAT
+    }
+
+    /**
+     * App-agnostic press (v1.5, Phase 5): "এটা press করো" / "Send button
+     * chapo". [label] null ⇒ resolve the ONLY clickable on screen; several
+     * matches ⇒ ASK, never guess. Executed against the CURRENT screen with
+     * package + target verification.
+     */
+    data class Press(val label: String?) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.PRESS
+    }
+
+    /** Clears the focused/last input field (universal accessibility action). */
+    data object ClearText : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CLEAR_TEXT
+    }
+
+    /** Opens the notification shade (global accessibility action). */
+    data object OpenNotificationShade : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_NOTIFICATIONS
+    }
+
+    /** Opens the app that posted the Nth (1-based, newest first) notification. */
+    data class OpenNotificationApp(val ordinal: Int = 1) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_NOTIFICATION_APP
+    }
+
+    /** Speaks a UI summary built from the safe ScreenState model. */
+    data object DescribeScreen : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.DESCRIBE_SCREEN
+    }
+
+    data class SearchWeb(val query: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.SEARCH_WEB
+    }
+
+    data class DeviceStatusQuery(val query: DeviceStatusKind) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.DEVICE_STATUS
+    }
+
+    data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
+    }
+
+    data object ReadNotifications : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.READ_NOTIFICATIONS
+    }
+
+    /**
+     * Reminder via the Calendar app: NUVA opens a prefilled event — the user
+     * taps Save, so the calendar is never silently edited (policy §37).
+     * [whenMillis] null = let the user pick the time in the calendar app.
+     */
+    data class SetReminder(
+        val title: String,
+        val whenMillis: Long?,
+        val humanWhen: String?,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.SET_REMINDER
+    }
+
+    data class CreateNote(val content: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CREATE_NOTE
+    }
+
+    data class CreateTodo(val content: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CREATE_TODO
+    }
 }
 
 enum class SwipeDirection { UP, DOWN, LEFT, RIGHT;
@@ -174,6 +276,90 @@ enum class RelativeDay(val wireName: String) {
 
     companion object {
         fun fromWire(value: String?): RelativeDay? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/** Media transport commands (LOCAL-ONLY intent payload, v1.2). */
+enum class MediaCommand(val wireName: String) {
+    PLAY("play"),
+    PAUSE("pause"),
+    TOGGLE("toggle"),
+    NEXT("next"),
+    PREVIOUS("previous"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): MediaCommand? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/** Volume commands (LOCAL-ONLY intent payload, v1.2). */
+enum class VolumeCommand(val wireName: String) {
+    UP("up"),
+    DOWN("down"),
+    MUTE("mute"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): VolumeCommand? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/**
+ * Camera modes (LOCAL-ONLY intent payload, v1.2). CAPTURE launches the
+ * still-capture flow on an EXPLICIT user command only — the shutter stays
+ * under the user's control, NUVA never captures secretly.
+ */
+enum class CaptureMode(val wireName: String) {
+    PHOTO("photo"),
+    VIDEO("video"),
+    CAPTURE("capture"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): CaptureMode? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/** Device-status questions answered locally (LOCAL-ONLY intent payload). */
+enum class DeviceStatusKind(val wireName: String) {
+    BATTERY("battery"),
+    TIME("time"),
+    DATE("date"),
+    NETWORK("network"),
+    STORAGE("storage"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): DeviceStatusKind? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/**
+ * System setting targets. Android restricts most direct changes by third-party
+ * apps, so every target except TORCH opens the matching settings screen and
+ * the user flips the switch (policy §27).
+ */
+enum class SettingTarget(val wireName: String) {
+    TORCH("torch"),
+    BRIGHTNESS("brightness"),
+    VOLUME("volume"),
+    DND("dnd"),
+    WIFI("wifi"),
+    BLUETOOTH("bluetooth"),
+    GENERAL_SETTINGS("general_settings"),
+    NOTIFICATION_SETTINGS("notification_settings"),
+    APP_SETTINGS("app_settings"),
+    ACCESSIBILITY_SETTINGS("accessibility_settings"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): SettingTarget? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }
 

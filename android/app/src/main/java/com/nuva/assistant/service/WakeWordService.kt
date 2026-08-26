@@ -51,6 +51,14 @@ class WakeWordService : Service() {
 
     private var wakeJob: Job? = null
     private var commandJob: Job? = null
+
+    /**
+     * Follow-up session (v1.4), modelled by [WakeSessionState]: after the
+     * popup opens from a VERIFIED wake event, a short conversational flow is
+     * allowed (≤ [WakeSessionState.DEFAULT_MAX_FOLLOW_UPS] follow-ups), then
+     * NUVA re-arms pure wake-word listening. The popup NEVER opens by itself.
+     */
+    private val wakeSession = WakeSessionState()
     private var recognizer: SpeechRecognizerController? = null
 
     override fun onCreate() {
@@ -187,6 +195,7 @@ class WakeWordService : Service() {
         wakeJob?.cancel()
         wakeJob = null
         commandJob?.cancel()
+        if (fromWake) wakeSession.onVerifiedWake() else wakeSession.onDismissed()
 
         commandJob = scope.launch {
             overlay.showStatus(
@@ -218,6 +227,9 @@ class WakeWordService : Service() {
         recognizer = SpeechRecognizerController(this)
         val language = NuvaContainer.preferences.languageBlocking()
         try {
+            // v1.6: stuck-listening recovery — a silent recognizer death ends
+            // the session and re-arms wake listening instead of hanging.
+            kotlinx.coroutines.withTimeout(15_000L) {
             recognizer?.listen(language)?.collect { event ->
                 when (event) {
                     SpeechRecognizerController.VoiceEvent.ListeningStarted -> Unit
@@ -234,6 +246,11 @@ class WakeWordService : Service() {
                         speakIfEnabled(event.speech)
                     }
                 }
+            }
+            }
+        } catch (err: kotlinx.coroutines.TimeoutCancellationException) {
+            overlay.showStatus(FloatingAssistantOverlay.PopupState.ERROR, "Timeout", "কিছু শুনতে পাইনি — আবার Hey Nuva বলুন।", autoDismissMs = 4_000) {
+                rearmIfEnabled()
             }
         } finally {
             recognizer = null
@@ -254,6 +271,10 @@ class WakeWordService : Service() {
         overlay.showStatus(FloatingAssistantOverlay.PopupState.PROCESSING, "Processing…", cleanText)
         when (val step = NuvaContainer.commandExecutor.process(cleanText)) {
             is CommandExecutor.Step.AwaitingConfirmation -> showConfirmation(step)
+            is CommandExecutor.Step.AwaitingContactChoice -> showTerminal(
+                success = false,
+                speech = "একাধিক contact পাওয়া গেছে — NUVA app খুলে একজন বেছে নিন।",
+            )
             is CommandExecutor.Step.Done -> showTerminal(success = true, speech = step.speech, detail = step.screenText)
             is CommandExecutor.Step.Failed -> showTerminal(success = false, speech = step.speech)
             is CommandExecutor.Step.Decision -> {
@@ -317,7 +338,15 @@ class WakeWordService : Service() {
         commandJob = null
         scope.launch {
             delay(4_100)
-            rearmIfEnabled()
+            // Conversational follow-up: keep the session briefly open after a
+            // SUCCESS so "Rohim-er chat kholo" → "ওকে বলো …" works without a
+            // new wake word. Failures always return to wake listening.
+            if (wakeSession.onCommandFinished(success)) {
+                overlay.showStatus(FloatingAssistantOverlay.PopupState.LISTENING, "NUVA", "আর কিছু? শুনছি…")
+                listenForCommandOnce()
+            } else {
+                rearmIfEnabled()
+            }
         }
     }
 
