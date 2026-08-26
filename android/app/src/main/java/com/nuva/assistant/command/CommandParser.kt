@@ -85,7 +85,7 @@ object CommandParser {
      */
     fun parse(rawText: String): CommandDecision? {
         val text = prepare(rawText) ?: return null
-        return parsePrepared(text)
+        return parsePreparedWithGrammar(text)
     }
 
     private fun stripWakeWord(text: String): String =
@@ -122,7 +122,10 @@ object CommandParser {
     // parses to a non-message, non-call action — so message content that
     // contains " ar " ("ami ar ashbo") can never be cut in half.
 
-    private val CONNECTORS = listOf(" ar ", " ebong ", " and ", " tarpor ", " আর ", " এবং ", " তারপর ", " then ", "; ")
+    private val CONNECTORS = listOf(
+        " ar ", " ebong ", " and then ", " and ", " tarpor ", " erpor ", " then ", " also ",
+        " আর ", " এবং ", " তারপর ", " এরপর ", " তারপরে ", "; ",
+    )
 
     /**
      * Parses a full utterance into an ordered action plan. Returns a
@@ -132,13 +135,17 @@ object CommandParser {
     fun parseCompound(rawText: String): List<CommandDecision>? {
         val text = prepare(rawText) ?: return null
 
-        // Security first — a refused utterance is refused as a whole.
-        SensitiveAppPolicy.refusalForText(text)?.let { return listOf(refused()) }
-        if (SensitiveAppPolicy.mentionsCredentials(text)) {
-            return listOf(unsupported("OTP, PIN ba password NUVA kochu kore na — egulo nije likhun."))
+        // Security first — check both original and typo/ASR-canonicalized text
+        // so "paymnt"/"pasword" cannot bypass the same fixed boundary.
+        val rewritten = NaturalCommandGrammar.rewrite(text)
+        listOf(text, rewritten).distinct().forEach { candidate ->
+            SensitiveAppPolicy.refusalForText(candidate)?.let { return listOf(refused()) }
+            if (SensitiveAppPolicy.mentionsCredentials(candidate)) {
+                return listOf(unsupported("OTP, PIN ba password NUVA kochu kore na — egulo nije likhun."))
+            }
         }
 
-        val whole = parsePrepared(text)
+        val whole = parsePreparedWithGrammar(text)
         if (whole != null && !whole.unsupported && looksLikeCleanMessage(whole)) {
             // A complete call/message command whose content may contain
             // connector words ("ami ar ashbo") — never split it.
@@ -173,13 +180,36 @@ object CommandParser {
         return ruleTable(text)
     }
 
+    /** Original first for entity/message fidelity; canonical retry on a miss. */
+    private fun parsePreparedWithGrammar(text: String): CommandDecision? {
+        val rewritten = NaturalCommandGrammar.rewrite(text)
+        if (rewritten != text) {
+            SensitiveAppPolicy.refusalForText(rewritten)?.let { return refused() }
+            if (SensitiveAppPolicy.mentionsCredentials(rewritten)) {
+                return unsupported("OTP, PIN ba password NUVA kochu kore na — egulo nije likhun.")
+            }
+        }
+        // Exact static grammar aliases are intentional and should beat a broad
+        // dynamic fallback such as treating "notification app" as an app name.
+        NaturalCommandGrammar.canonicalStatic(text)?.let { canonical ->
+            parsePrepared(canonical)?.let { return it }
+        }
+        val direct = parsePrepared(text)
+        // A successfully extracted message keeps its exact body. Otherwise a
+        // command-word rewrite should beat broad parsers such as dynamic app
+        // names or generic web questions.
+        if (direct?.action is NuvaAction.SendMessage) return direct
+        if (rewritten != text) parsePrepared(rewritten)?.let { return it }
+        return direct
+    }
+
     private fun ruleTable(text: String): CommandDecision? = parseNavigation(text)
         ?: parseUniversal(text)
         ?: parseScreenReading(text)
         ?: parseDailyUtility(text)
+        ?: parseRealtimeInfo(text)
         ?: parseDeviceStatus(text)
         ?: parseAssistantHelp(text)
-        ?: parseRealtimeInfo(text)
         ?: parseMediaControl(text)
         ?: parseVolumeControl(text)
         ?: parseCamera(text)
@@ -235,9 +265,9 @@ object CommandParser {
         ).any { text.contains(it) }
         if (asksCapabilities) {
             val answer = if (text.any { it.code in 0x0980..0x09FF }) {
-                "আমি ফোন কন্ট্রোল, কল-মেসেজ, রিমাইন্ডার, নোট-লিস্ট, উন্নত হিসাব, হাজারের বেশি কনভার্সন এবং মোট ৬০০টি sourced daily skill চালাতে পারি—এর মধ্যে ৫০০টি precise service, সরকারি কাজ, learning ও product-help skill। Features পেজে তালিকা আছে।"
+                "আমি ফোন কন্ট্রোল, কল-মেসেজ, রিমাইন্ডার, নোট-লিস্ট, উন্নত হিসাব, ৬০০টি sourced skill এবং ১২,২৫০টি audited natural command form বুঝতে পারি। Polite, ASR ও Bangla/Banglish/English variant-ও চলে। Features পেজে তালিকা আছে।"
             } else {
-                "Ami phone control, call-message, reminder, note-list, advanced calculation, hajarer beshi conversion, ar mot 600 ta sourced daily skill chalate pari—er moddhe 500 ta precise service, public-work, learning o product-help skill. Features page e list ache."
+                "Ami phone control, call-message, reminder, note-list, advanced calculation, 600 ta sourced skill, ar 12,250 ta audited natural command form bujhte pari. Polite, ASR o Bangla-Banglish-English variant-o chole. Features page e list ache."
             }
             return ok(NuvaAction.LocalAnswer(answer, "assistant_help"), answer)
         }
@@ -255,7 +285,7 @@ object CommandParser {
     }
 
     private fun splitPlan(text: String, depth: Int): List<CommandDecision>? {
-        if (depth > 2 || text.isBlank()) return null
+        if (depth > 5 || text.isBlank()) return null
         for (connector in CONNECTORS) {
             var from = 0
             while (true) {
@@ -265,21 +295,28 @@ object CommandParser {
                 val rightRaw = text.substring(idx + connector.length).trim()
                 from = idx + connector.length
 
-                val left = leftRaw.takeIf { it.isNotBlank() }?.let { parsePrepared(it) } ?: continue
+                val left = leftRaw.takeIf { it.isNotBlank() }?.let { parsePreparedWithGrammar(it) } ?: continue
                 if (left.unsupported) continue
                 // A MESSAGE carries free text and may legally contain the
                 // connector itself ("…bole dao ami ar ashbo") — never accept
                 // it as the left side of a split. Calls carry no content, so
                 // splitting after a call is safe.
                 if (left.action is NuvaAction.SendMessage) continue
-                if (leftRaw.split(" ").size > 8) continue
+                if (leftRaw.split(" ").size > 12) continue
 
-                // The TAIL is parsed whole first — a trailing message keeps
-                // its own inner connectors ("ami ar ashbo") intact.
-                val wholeTail = parsePrepared(rightRaw)
+                // If the tail still contains connectors, recursively try a
+                // longer plan first. Message content remains safe because a
+                // SEND_MESSAGE is never accepted as a split's left side.
+                val nested = if (CONNECTORS.any { rightRaw.contains(it) }) {
+                    splitPlan(rightRaw, depth + 1)
+                } else {
+                    null
+                }
+                val wholeTail = parsePreparedWithGrammar(rightRaw)
                 val rest: List<CommandDecision> = when {
+                    !nested.isNullOrEmpty() -> nested
                     wholeTail != null -> listOf(wholeTail)
-                    else -> splitPlan(rightRaw, depth + 1).orEmpty()
+                    else -> emptyList()
                 }
                 if (rest.isEmpty()) continue
 

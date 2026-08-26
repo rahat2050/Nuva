@@ -1,4 +1,4 @@
-# NUVA — Supported features (v2.0)
+# NUVA — Supported features (v2.1)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -8,6 +8,13 @@ Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting de
 Wake "Hey Nuva" (opt-in service, visible session, one wake = command + ≤2 follow-ups),
 Bangla/Banglish/English/mixed parsing, typed fallback, Bangla-first replies, stuck-session
 timeout recovery (15 s), conversational context (5-min TTL, pronoun "ওকে" resolution).
+
+## Natural command grammar — SUPPORTED
+A data-audited grammar accepts **12,250 concrete static command forms** (50 families × 5 aliases ×
+7 prefixes × 7 suffixes), plus dynamic apps/contacts/messages/queries/times and 600 sourced skills.
+Unknown commands get one conservative ASR/politeness canonicalization retry through the same typed
+parser; security is re-run on canonical text. Multi-step plans support more connectors and up to six
+segments. Details: [`10000-command-grammar.md`](10000-command-grammar.md).
 
 ## Apps & navigation — SUPPORTED
 Open any installed app by name (+ Play Store suggestion when missing), close/home/back/recents,

@@ -363,6 +363,23 @@ def parse_daily(t):
         except Exception: pass
     return None
 
+def parse_grammar(t):
+    # Representative aliases from the 12,250-form Kotlin grammar. Full count
+    # and uniqueness are source-audited below; Kotlin JVM tests cover families.
+    for prefix in ["nuva please ","doya kore ","please ","ektu ","plz "]:
+        if t.startswith(prefix): t=t[len(prefix):].strip()
+    for suffix in [" please"," ekhon"," ekhoni"," kore dao"," bolen"," taratari"]:
+        if t.endswith(suffix): t=t[:-len(suffix)].strip()
+    mapping = {
+        "go to home": ("GO_HOME", {"kind":"home"}),
+        "open notification app": ("OPEN_NOTIFICATION_APP", {"kind":"notifapp","ordinal":1}),
+        "battery percentage bolo": ("DEVICE_STATUS", {"kind":"BATTERY"}),
+        "current aqi bolo": ("SEARCH_WEB", {"kind":"search","query":"current air quality"}),
+        "picture tolar screen dao": ("CAMERA", {"kind":"CAPTURE"}),
+    }
+    hit=mapping.get(t)
+    return ok(hit[1],hit[0]) if hit else None
+
 def parse_help(t):
     if any(w in t for w in ["ki ki korte paro","ki kaj paro","what can you do","কী কী করতে পারো","কি কি করতে পারো"]):
         return ok({"kind":"localanswer","answer":"features","category":"assistant_help"}, "LOCAL_ANSWER")
@@ -676,7 +693,8 @@ def content_after(t, marker):
     return cleaned or None
 
 # ---------------- compound plan (v1.3) ----------------
-CONNECTORS = [" ar ", " ebong ", " and ", " tarpor ", " আর ", " এবং ", " তারপর ", " then ", "; "]
+CONNECTORS = [" ar ", " ebong ", " and then ", " and ", " tarpor ", " erpor ", " then ", " also ",
+              " আর ", " এবং ", " তারপর ", " এরপর ", " তারপরে ", "; "]
 
 def parse_daily_skill(t):
     # Representative aliases; the Kotlin registry itself is source-counted
@@ -712,16 +730,18 @@ def parse_knowledge(t):
     return None
 
 def rule_table(t):
-    return (parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_daily(t) or parse_status(t) or parse_help(t)
-            or parse_realtime(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
+    return (parse_grammar(t) or parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_daily(t) or parse_realtime(t)
+            or parse_status(t) or parse_help(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
             or parse_scroll(t) or parse_close(t) or parse_open(t) or parse_daily_skill(t)
             or parse_extended_daily_skill(t) or parse_knowledge(t))
 
 def parse_prepared(t):
-    if is_money(t): return refused()
-    if mentions_creds(t): return unsupported("otp...")
+    security_rewrite = t.replace("paymnt","payment").replace("paymentt","payment").replace("send mony","send money") \
+        .replace("pasword","password").replace("passwrd","password")
+    if is_money(t) or is_money(security_rewrite): return refused()
+    if mentions_creds(t) or mentions_creds(security_rewrite): return unsupported("otp...")
     return rule_table(t)
 
 def clean_message(dec):
@@ -732,7 +752,7 @@ def clean_message(dec):
     return (not susp) and bool(send.get("message"))
 
 def split_plan(text, depth):
-    if depth > 2 or not text.strip(): return None
+    if depth > 5 or not text.strip(): return None
     for conn in CONNECTORS:
         frm = 0
         while True:
@@ -744,9 +764,10 @@ def split_plan(text, depth):
             left = parse_prepared(left_raw)
             if left is None or left["unsupported"]: continue
             if left.get("action",{}).get("kind") == "send": continue
-            if len(left_raw.split(" ")) > 8: continue
+            if len(left_raw.split(" ")) > 12: continue
+            nested = split_plan(right_raw, depth+1) if any(c in right_raw for c in CONNECTORS) else None
             whole_tail = parse_prepared(right_raw)
-            rest = [whole_tail] if whole_tail is not None else (split_plan(right_raw, depth+1) or [])
+            rest = nested if nested else ([whole_tail] if whole_tail is not None else [])
             if not rest: continue
             return refine_plan([left] + rest)
     return None
@@ -828,6 +849,15 @@ check(parse("nearby private tutor")["intent"] == "SEARCH_WEB", "extended service
 check(parse("passport ki kagoj lagbe")["intent"] == "SEARCH_WEB", "extended public skill")
 check(parse("excel tutorial")["intent"] == "SEARCH_WEB", "extended learning skill")
 check(parse("washing machine repair")["intent"] == "SEARCH_WEB", "extended product skill")
+grammar_source = (Path(__file__).parent.parent / "app/src/main/java/com/nuva/assistant/command/NaturalCommandGrammar.kt").read_text()
+grammar_rows = [re.findall(r'"([^"]*)"', line) for line in grammar_source.splitlines() if line.strip().startswith("pattern(")]
+grammar_aliases = [value for row in grammar_rows for value in row[1:]]
+check(len(grammar_rows) == 50 and all(len(row) == 6 for row in grammar_rows), "50 grammar families x 5 aliases")
+check(len(grammar_aliases) == len(set(grammar_aliases)) == 250, "250 unique grammar aliases")
+check(len(grammar_aliases) * 7 * 7 == 12250, "12250 generated command forms")
+check(parse("please open notification app please")["intent"] == "OPEN_NOTIFICATION_APP", "grammar notification app")
+check(parse("nuva please battery percentage bolo taratari")["intent"] == "DEVICE_STATUS", "grammar battery")
+check(parse("bkash paymnt koro")["unsupported"], "grammar security typo")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

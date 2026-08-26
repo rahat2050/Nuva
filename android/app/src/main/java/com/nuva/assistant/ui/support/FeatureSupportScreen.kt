@@ -33,6 +33,7 @@ import com.nuva.assistant.R
 data class FeatureRow(val name: String, val supported: Boolean, val reason: String? = null)
 
 val SUPPORTED_FEATURES = listOf(
+    "১২,২৫০টি audited natural command form — polite/ASR/Bangla/Banglish/English variant ও ৬-step multi-command plan",
     "অ্যাপ খোলা — ইনস্টল থাকা যেকোনো অ্যাপ (ব্যাংকিং/ওয়ালেটসহ); না থাকলে Play Store সাজেশন",
     "অ্যাপ বন্ধ, হোম, ব্যাক, রিসেন্ট অ্যাপ; ফাইন্যান্সিয়াল অ্যাপেও স্ক্রল/নেভিগেশন",
     "ব্রাউজারে URL খোলা ও ওয়েব সার্চ; আবহাওয়া/খবর/লাইভ স্কোর/ট্রাফিক/রেটের বর্তমান তথ্য লাইভ ওয়েবে খোঁজা",
