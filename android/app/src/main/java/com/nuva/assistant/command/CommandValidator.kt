@@ -124,7 +124,24 @@ object CommandValidator {
             NuvaIntent.OPEN_NOTIFICATIONS -> ValidatedAction.Valid(NuvaAction.OpenNotificationShade)
             NuvaIntent.OPEN_NOTIFICATION_APP -> validateOpenNotificationApp(actionJson)
             NuvaIntent.DESCRIBE_SCREEN -> ValidatedAction.Valid(NuvaAction.DescribeScreen)
+            NuvaIntent.LOCAL_ANSWER -> validateLocalAnswer(actionJson)
+            NuvaIntent.READ_SAVED_ITEMS -> validateReadSavedItems(actionJson)
         }
+    }
+
+    private fun validateReadSavedItems(json: JsonObject): ValidatedAction {
+        val kind = SavedItemKind.fromWire(json.str("kind"))
+            ?: return ValidatedAction.Invalid(listOf("READ_SAVED_ITEMS requires a known kind"))
+        return ValidatedAction.Valid(NuvaAction.ReadSavedItems(kind))
+    }
+
+    private fun validateLocalAnswer(json: JsonObject): ValidatedAction {
+        val answer = json.str("answer")?.takeIf { it.isNotEmpty() && it.length <= 600 }
+            ?: return ValidatedAction.Invalid(listOf("LOCAL_ANSWER requires answer (1..600 chars)"))
+        val category = json.str("category")
+            ?.takeIf { it.matches(Regex("^[a-z0-9_]{1,40}$")) }
+            ?: return ValidatedAction.Invalid(listOf("LOCAL_ANSWER requires a safe category"))
+        return ValidatedAction.Valid(NuvaAction.LocalAnswer(answer, category))
     }
 
     private fun validateMediaControl(json: JsonObject): ValidatedAction {

@@ -162,6 +162,22 @@ const RULES: Rule[] = [
     },
   },
   {
+    // Factual/how-to daily questions are safer as a web result than as a
+    // hallucinated model answer. Android's local parser has already handled
+    // calculations and phone state before requests normally reach this layer.
+    name: 'OPEN_URL_KNOWLEDGE',
+    run: (text) => {
+      const question =
+        /^(what|how|why|who|where|when|which|ki|kivabe|keno|kothay|kokhon|কী|কি|কিভাবে|কীভাবে|কেন|কোথায়|কখন)\b/.test(text) ||
+        /\b(ki|keno|kothay|kokhon|koto|kemon|কী|কি|কেন|কোথায়|কখন|কত|কেমন)[?.।]*$/.test(text);
+      const usefulTopic =
+        /(recipe|রেসিপি|রান্না|meaning|মানে|dictionary|অভিধান|translate|translation|অনুবাদ|near me|nearby|কাছাকাছি|schedule|সময়সূচি|routine|price|দাম কত|bus|train|flight|বাস|ট্রেন|ফ্লাইট|doctor|hospital|medicine|ডাক্তার|হাসপাতাল|ওষুধ|school|college|job|স্কুল|কলেজ|চাকরি|how to)/.test(text);
+      if ((!question && !usefulTopic) || text.length < 3) return null;
+      const query = text.replace(/[.,?!।]+$/g, '').trim();
+      return { type: 'OPEN_URL', url: `https://www.google.com/search?q=${encodeURIComponent(query)}` };
+    },
+  },
+  {
     name: 'PLAY_MEDIA',
     run: (text) => {
       const match = /(?:play|chalao|chalu koro|বাজাও|চালাও)\s+(.{2,120})/.exec(text);

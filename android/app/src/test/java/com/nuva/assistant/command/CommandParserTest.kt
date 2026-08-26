@@ -119,6 +119,50 @@ class CommandParserTest {
         }
     }
 
+    // --- Daily-life utility engine ------------------------------------------------------
+
+    @Test
+    fun `calculations conversions and daily utilities become local answers`() {
+        val probes = listOf(
+            "2 + 3 * 4 koto" to "14",
+            "500 er 20 percent discount" to "400",
+            "5 kilometer mile e koto" to "3.106856",
+            "300 km 20 liter mileage koto" to "15",
+        )
+        probes.forEach { (phrase, expected) ->
+            val decision = CommandParser.parse(phrase)
+            assertEquals(phrase, NuvaIntent.LOCAL_ANSWER, decision!!.intent)
+            assertTrue(phrase, (decision.action as NuvaAction.LocalAnswer).answer.contains(expected))
+            assertFalse(decision.requiresConfirmation)
+        }
+    }
+
+    @Test
+    fun `shopping expense help and factual questions have useful routes`() {
+        val shopping = CommandParser.parse("shopping list e add koro dim dudh")!!.action as NuvaAction.CreateTodo
+        assertTrue(shopping.content.contains("Shopping:"))
+        assertTrue(shopping.content.contains("dim dudh"))
+
+        val expense = CommandParser.parse("expense note lunch 250")!!.action as NuvaAction.CreateNote
+        assertTrue(expense.content.contains("Expense:"))
+
+        val readShopping = CommandParser.parse("shopping list dekhao")!!.action as NuvaAction.ReadSavedItems
+        assertEquals(SavedItemKind.SHOPPING, readShopping.kind)
+        val readExpenses = CommandParser.parse("khoroch gulo poro")!!.action as NuvaAction.ReadSavedItems
+        assertEquals(SavedItemKind.EXPENSE, readExpenses.kind)
+
+        assertEquals(NuvaIntent.LOCAL_ANSWER, CommandParser.parse("tumi ki ki korte paro")!!.intent)
+        assertEquals(NuvaIntent.SEARCH_WEB, CommandParser.parse("chicken biryani recipe")!!.intent)
+        assertEquals(NuvaIntent.SEARCH_WEB, CommandParser.parse("photosynthesis ki")!!.intent)
+    }
+
+    @Test
+    fun `universal parser is connected to the main rule table`() {
+        assertEquals(NuvaIntent.PRESS, CommandParser.parse("Send button press koro")!!.intent)
+        assertEquals(NuvaIntent.CLEAR_TEXT, CommandParser.parse("lekhata muchhe dao")!!.intent)
+        assertEquals(NuvaIntent.DESCRIBE_SCREEN, CommandParser.parse("button gulo dekhao")!!.intent)
+    }
+
     // --- Settings ----------------------------------------------------------------------
 
     @Test

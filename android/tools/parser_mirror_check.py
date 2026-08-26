@@ -318,6 +318,47 @@ def parse_realtime(t):
     if not any(has_word(t,w) if w.isascii() else w in t for w in hints): return None
     return ok({"kind":"search","query":t.strip(" .,?!:")}, "SEARCH_WEB")
 
+def parse_daily(t):
+    # Compact mirror of the Kotlin data-driven utility engine. The Kotlin JVM
+    # suite owns exhaustive converter/math coverage; these probes catch route
+    # ordering regressions in environments without an Android SDK.
+    m = re.search(r"(-?\d+(?:\.\d+)?)\s*(?:er|এর|of)?\s*(-?\d+(?:\.\d+)?)\s*(?:%|percent|shotangsho|পারসেন্ট|শতাংশ)", t)
+    if m:
+        base, pct = float(m.group(1)), float(m.group(2))
+        value = base * pct / 100
+        if any(w in t for w in ["discount","ছাড়","ছাড়","komle","কমলে"]): value = base - value
+        return ok({"kind":"localanswer","answer":str(value),"category":"percentage"}, "LOCAL_ANSWER")
+    m = re.search(r"(\d+(?:\.\d+)?)\s*(km|kilometer|কিলোমিটার).*?(\d+(?:\.\d+)?)\s*(liter|litre|l|লিটার)", t)
+    if m and any(w in t for w in ["mileage","average","km/l","মাইলেজ"]):
+        value = float(m.group(1)) / float(m.group(3))
+        return ok({"kind":"localanswer","answer":str(value),"category":"mileage"}, "LOCAL_ANSWER")
+    units = {"kilometer":1000.0,"km":1000.0,"mile":1609.344,"kg":1.0,"kilogram":1.0,
+             "pound":0.45359237,"gigabyte":1024.0**3,"megabyte":1024.0**2,"cup":0.2365882365,
+             "milliliter":0.001,"liter":1.0}
+    aliases = "|".join(sorted(map(re.escape, units), key=len, reverse=True))
+    m = re.search(r"(-?\d+(?:\.\d+)?)\s*("+aliases+r").*?\b("+aliases+r")\b", t)
+    if m and m.group(2) != m.group(3):
+        value = float(m.group(1))*units[m.group(2)]/units[m.group(3)]
+        return ok({"kind":"localanswer","answer":str(value),"category":"unit"}, "LOCAL_ANSWER")
+    expr = t
+    for word, symbol in [("plus","+"),("jog","+"),("যোগ","+"),("minus","-"),("biyog","-"),("বিয়োগ","-"),
+                         ("times","*"),("gun","*"),("গুণ","*"),("divided by","/"),("vag","/"),("ভাগ","/")]:
+        expr = expr.replace(word, symbol)
+    for filler in ["calculate","hisab koro","hisab","koto","কত","হিসাব","উত্তর"]: expr = expr.replace(filler," ")
+    expr = re.sub(r"\s+", "", expr)
+    if 3 <= len(expr) <= 120 and re.fullmatch(r"[0-9.+\-*/()]+", expr) and any(op in expr for op in "+-*/"):
+        try:
+            value = eval(expr, {"__builtins__": {}}, {})
+            if isinstance(value, (int,float)):
+                return ok({"kind":"localanswer","answer":str(value),"category":"calculation"}, "LOCAL_ANSWER")
+        except Exception: pass
+    return None
+
+def parse_help(t):
+    if any(w in t for w in ["ki ki korte paro","ki kaj paro","what can you do","কী কী করতে পারো","কি কি করতে পারো"]):
+        return ok({"kind":"localanswer","answer":"features","category":"assistant_help"}, "LOCAL_ANSWER")
+    return None
+
 def parse_media_ctl(t):
     media_word = any(w in t for w in ["gaan","গান","music","song","video","ভিডিও","media","player","giti","গীত","track","ট্র্যাক"])
     pause = any(w in t for w in ["pause koro","pause korun","pause","thamo","থামাও","band koro music"]) and (media_word or "pause" in t)
@@ -408,6 +449,28 @@ def reminder_title(t):
     return cleaned if 2 <= len(cleaned) <= 200 else None
 
 def parse_note_todo(t):
+    wants_read = any(w in t for w in ["dekhao","poro","read","show","দেখাও","পড়ো"])
+    if wants_read:
+        if any(w in t for w in ["shopping list","grocery list","bazar list","বাজারের তালিকা"]):
+            return ok({"kind":"readitems","item_kind":"SHOPPING"}, "READ_SAVED_ITEMS")
+        if any(w in t for w in ["expense","khoroch","খরচ"]):
+            return ok({"kind":"readitems","item_kind":"EXPENSE"}, "READ_SAVED_ITEMS")
+        if any(w in t for w in ["todo","kaj list","টুডু"]):
+            return ok({"kind":"readitems","item_kind":"TODO"}, "READ_SAVED_ITEMS")
+        if any(w in t for w in ["note","নোট"]):
+            return ok({"kind":"readitems","item_kind":"NOTE"}, "READ_SAVED_ITEMS")
+    shopping = next((w for w in ["shopping list e","shopping list","grocery list e","bazar list e","বাজারের তালিকায়","বাজারের লিস্টে"] if w in t), None)
+    if shopping:
+        content = content_after(t, shopping)
+        if content:
+            content = re.sub(r"\b(add|koro|korun)\b", " ", content)
+            return ok({"kind":"todo","content":"Shopping: "+re.sub(r"\s+"," ",content).strip()}, "CREATE_TODO")
+        return unsupported("Shopping list e ki add korbo?")
+    expense = next((w for w in ["expense note","expense log","khoroch likhe rakho","খরচ লিখে রাখো"] if w in t), None)
+    if expense:
+        content = content_after(t, expense) or t.replace(expense," ").strip()
+        if content: return ok({"kind":"note","content":"Expense: "+content}, "CREATE_NOTE")
+        return unsupported("Khoroch bolun")
     todo_marker = next((w for w in ["todo te","to do te","todo list e","kaj er list e","kaj list e","টুডু"] if w in t), None)
     if todo_marker:
         content = content_after(t, todo_marker)
@@ -606,12 +669,22 @@ def content_after(t, marker):
 # ---------------- compound plan (v1.3) ----------------
 CONNECTORS = [" ar ", " ebong ", " and ", " tarpor ", " আর ", " এবং ", " তারপর ", " then ", "; "]
 
+def parse_knowledge(t):
+    questions = ["what ","how ","why ","who ","where ","when ","ki ","kivabe","keno","kothay","kokhon",
+                 "কী ","কি ","কিভাবে","কেন","কোথায়","কখন"]
+    endings = [" ki"," keno"," kothay"," koto"," kemon"," কী"," কি"," কেন"," কোথায়"," কত"," কেমন"]
+    topics = ["recipe","রেসিপি","রান্না","meaning","মানে","translate","অনুবাদ","nearby","schedule","price","দাম কত",
+              "bus","train","flight","doctor","hospital","medicine","school","college","job"]
+    if any(t.startswith(w) or (" "+w) in t for w in questions) or any(t.endswith(w) for w in endings) or any(w in t for w in topics):
+        return ok({"kind":"search","query":t}, "SEARCH_WEB")
+    return None
+
 def rule_table(t):
-    return (parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_status(t) or parse_realtime(t) or parse_media_ctl(t)
-            or parse_volume(t) or parse_camera(t) or parse_settings(t)
+    return (parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_status(t) or parse_daily(t) or parse_help(t)
+            or parse_realtime(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
-            or parse_scroll(t) or parse_close(t) or parse_open(t))
+            or parse_scroll(t) or parse_close(t) or parse_open(t) or parse_knowledge(t))
 
 def parse_prepared(t):
     if is_money(t): return refused()
@@ -702,6 +775,14 @@ check(parse("aj koto tarik")["action"]["kind"] == "DATE", "user phrase current d
 check(parse("akn koyta baje")["action"]["kind"] == "TIME", "user phrase current time")
 check(parse("aj koto tarik akn koyta baje")["action"]["kind"] == "DATE_TIME", "combined current date and time")
 check(parse("latest news ki")["intent"] == "SEARCH_WEB", "latest info web search")
+check(parse("2 + 3 * 4 koto")["intent"] == "LOCAL_ANSWER", "offline arithmetic")
+check(parse("500 er 20 percent discount")["intent"] == "LOCAL_ANSWER", "offline percentage")
+check(parse("5 kilometer mile e koto")["intent"] == "LOCAL_ANSWER", "unit conversion")
+check(parse("tumi ki ki korte paro")["intent"] == "LOCAL_ANSWER", "assistant help")
+check(parse("chicken biryani recipe")["intent"] == "SEARCH_WEB", "knowledge search")
+check(parse("Send button press koro")["intent"] == "PRESS", "universal route connected")
+check(parse("shopping list e add koro dim dudh")["intent"] == "CREATE_TODO", "shopping list")
+check(parse("shopping list dekhao")["intent"] == "READ_SAVED_ITEMS", "read shopping list")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

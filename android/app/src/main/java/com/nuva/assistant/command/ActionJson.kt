@@ -99,6 +99,12 @@ object ActionJson {
         is NuvaAction.DeviceStatusQuery -> buildJsonObject {
             put("type", "DEVICE_STATUS"); put("query", action.query.wireName)
         }
+        is NuvaAction.LocalAnswer -> buildJsonObject {
+            put("type", "LOCAL_ANSWER"); put("answer", action.answer); put("category", action.category)
+        }
+        is NuvaAction.ReadSavedItems -> buildJsonObject {
+            put("type", "READ_SAVED_ITEMS"); put("kind", action.kind.wireName)
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

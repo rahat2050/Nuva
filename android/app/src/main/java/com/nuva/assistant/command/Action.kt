@@ -170,6 +170,15 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.DEVICE_STATUS
     }
 
+    /** A bounded answer calculated locally by [DailyUtilityParser]. */
+    data class LocalAnswer(val answer: String, val category: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.LOCAL_ANSWER
+    }
+
+    data class ReadSavedItems(val kind: SavedItemKind) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.READ_SAVED_ITEMS
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -320,6 +329,19 @@ enum class CaptureMode(val wireName: String) {
 
     companion object {
         fun fromWire(value: String?): CaptureMode? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class SavedItemKind(val wireName: String) {
+    TODO("todo"),
+    NOTE("note"),
+    SHOPPING("shopping"),
+    EXPENSE("expense"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): SavedItemKind? =
             entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }

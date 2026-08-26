@@ -8,6 +8,9 @@ you say into a validated action, asks before doing anything risky, and carries i
 "Nuva kal shokal 7 tay alarm dao."   → sets a 07:00 alarm for tomorrow
 "Nuva Rahim ke WhatsApp e message pathao." → asks you to confirm, then sends
 "নুভা এই স্ক্রিনটা পড়ো।"              → reads the screen aloud
+"500 er 20 percent discount koto?"   → answers 400 offline
+"5 kilometer mile e koto?"           → converts locally
+"Shopping list e dim dudh add koro." → saves a local shopping item
 ```
 
 ## Project status
@@ -16,9 +19,9 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v1.6 passes** — practical assistant → universal control → production hardening    | ✅ Implemented (see [`docs/v1.6-production-audit.md`](docs/v1.6-production-audit.md), [`docs/supported-features.md`](docs/supported-features.md), [`docs/privacy.md`](docs/privacy.md)): on-device parser v2 (bn/banglish/en), local-only intents, banking/payment denylist, contacts + SMS/WhatsApp flows, phone utilities, notification reader, permission onboarding, typed fallback, history retry, honest supported/unsupported list |
+| **v1.1–v1.8 passes** — practical assistant → universal control → daily utility engine | ✅ Implemented in code (real-device QA still pending): bn/banglish/en parser, safe phone control, contacts/messaging, live information routing, and 1,000+ offline calculation/conversion command forms; see [`docs/supported-features.md`](docs/supported-features.md) |
 
-`backend/` builds clean under strict TypeScript with **189 passing tests**. `android/` contains the
+`backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
 [`docs/roadmap.md`](docs/roadmap.md) for the exit criteria.
 
@@ -134,7 +137,8 @@ Full detail: [`docs/security.md`](docs/security.md).
 | Document                                   | Contents                                          |
 | ------------------------------------------ | ------------------------------------------------- |
 | [architecture.md](docs/architecture.md)    | Pipeline, modules, data model, AI boundary        |
-| [commands.md](docs/commands.md)            | API contract + all 15 actions (frozen for PHASE 2) |
+| [commands.md](docs/commands.md)            | API contract + all 15 server actions              |
+| [daily-utility-commands.md](docs/daily-utility-commands.md) | v1.8 offline daily calculations, conversions and examples |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |

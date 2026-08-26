@@ -1,4 +1,4 @@
-# NUVA — Supported features (v1.7)
+# NUVA — Supported features (v1.8)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -31,12 +31,24 @@ Files app opens; arbitrary open/read/rename/move/delete — **UNSUPPORTED** from
 (SAF requires user-present activity results); delete-with-confirmation therefore not offered
 rather than faked.
 
+## Daily-life utility engine — SUPPORTED (offline)
+Data-driven local answers cover well over 1,000 command forms rather than 1,000 hard-coded phrases:
+arithmetic with precedence/parentheses/powers, roots/factorials, percentage/discount/VAT/tip,
+bill splitting, BMI (with medical disclaimer), approximate EMI (with fee disclaimer), mileage,
+age/date-difference/days-until/weekday, coin/dice/random choice, and conversions across length,
+weight, cooking volume, area plus Bangladeshi decimal/katha/bigha, speed, time, data size,
+temperature, energy and pressure. Inputs and results stay on-device. Shopping/grocery lists reuse the
+local to-do store; expense logs reuse local notes. `shopping list dekhao`, `todo list poro`,
+`note gulo dekhao` and `khoroch gulo poro` read the matching local items back without a network call.
+
 ## Device utilities & current information — SUPPORTED
 Torch, battery/time/date/network/storage answers read from the phone at execution time (offline;
 Bangla/Banglish/English, including ASR variants such as `aj koto tarik` and `akn koyta baje`),
 alarms/timers, calendar-prefilled reminders, notes/to-dos, maps search (`dhaka er map dekhao`),
-and app-agnostic press/clear/describe commands. Current weather/news/live scores/traffic/rates are
-routed to a live web search rather than answered from stale model memory.
+and app-agnostic press/clear/describe commands. Current weather/news/live scores/traffic/rates,
+prayer times, sunrise/sunset, air quality and transport schedules are routed to a live web search
+rather than answered from stale model memory. Other factual/how-to/recipe/translation questions
+also open a sourced web result instead of returning `UNSUPPORTED`.
 
 ## Settings screens — SUPPORTED (ANDROID-LIMITED by nature)
 Brightness/DND/Wi-Fi/BT/sound/display/notification/app/accessibility settings — Android

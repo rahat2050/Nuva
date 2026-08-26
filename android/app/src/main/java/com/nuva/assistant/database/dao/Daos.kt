@@ -122,6 +122,9 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE kind = :kind ORDER BY createdAt DESC LIMIT :limit")
     fun byKind(kind: String, limit: Int = 100): Flow<List<NoteEntity>>
 
+    @Query("SELECT * FROM notes WHERE kind = :kind ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun byKindOnce(kind: String, limit: Int = 100): List<NoteEntity>
+
     @Query("UPDATE notes SET done = :done WHERE id = :id")
     suspend fun setDone(id: Long, done: Boolean)
 

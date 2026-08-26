@@ -64,6 +64,14 @@ describe('parseFallback', () => {
     }
   });
 
+  it('routes factual and daily how-to questions to web knowledge', () => {
+    for (const phrase of ['photosynthesis ki', 'chicken biryani recipe', 'how to tie a tie']) {
+      const result = parseFallback(phrase);
+      expect(result?.rule, phrase).toBe('OPEN_URL_KNOWLEDGE');
+      expect(result?.action.type, phrase).toBe('OPEN_URL');
+    }
+  });
+
   it('opens explicit URLs', () => {
     const result = parseFallback('open youtube.com/feed');
     expect(result?.action.type).toBe('OPEN_URL');

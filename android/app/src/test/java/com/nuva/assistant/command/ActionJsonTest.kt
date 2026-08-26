@@ -30,6 +30,8 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("OPEN_NOTIFICATIONS"))
         assertNull(NuvaIntent.fromWire("OPEN_NOTIFICATION_APP"))
         assertNull(NuvaIntent.fromWire("DESCRIBE_SCREEN"))
+        assertNull(NuvaIntent.fromWire("LOCAL_ANSWER"))
+        assertNull(NuvaIntent.fromWire("READ_SAVED_ITEMS"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -42,6 +44,8 @@ class ActionJsonTest {
             NuvaAction.SearchWeb("dhaka weather"),
             NuvaAction.DeviceStatusQuery(DeviceStatusKind.BATTERY),
             NuvaAction.DeviceStatusQuery(DeviceStatusKind.DATE_TIME),
+            NuvaAction.LocalAnswer("Uttor: 42.", "calculation"),
+            NuvaAction.ReadSavedItems(SavedItemKind.SHOPPING),
             NuvaAction.OpenSettingScreen(SettingTarget.TORCH),
             NuvaAction.ReadNotifications,
             NuvaAction.SetReminder("medicine", 1_770_000_000_000L, "kal"),
@@ -78,6 +82,15 @@ class ActionJsonTest {
             },
         )
         assertTrue(badTarget is CommandValidator.ValidatedAction.Invalid)
+
+        val unsafeAnswer = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "LOCAL_ANSWER")
+                put("answer", "42")
+                put("category", "../../bad")
+            },
+        )
+        assertTrue(unsafeAnswer is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test

@@ -45,6 +45,9 @@ enum class NuvaIntent(val wireName: String, val localOnly: Boolean = false) {
     OPEN_NOTIFICATIONS("OPEN_NOTIFICATIONS", localOnly = true),
     OPEN_NOTIFICATION_APP("OPEN_NOTIFICATION_APP", localOnly = true),
     DESCRIBE_SCREEN("DESCRIBE_SCREEN", localOnly = true),
+    /** Deterministic calculator/converter/daily-utility result; never accepted from the server. */
+    LOCAL_ANSWER("LOCAL_ANSWER", localOnly = true),
+    READ_SAVED_ITEMS("READ_SAVED_ITEMS", localOnly = true),
     ;
 
     companion object {

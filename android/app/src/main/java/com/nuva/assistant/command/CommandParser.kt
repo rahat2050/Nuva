@@ -174,8 +174,11 @@ object CommandParser {
     }
 
     private fun ruleTable(text: String): CommandDecision? = parseNavigation(text)
+        ?: parseUniversal(text)
         ?: parseScreenReading(text)
         ?: parseDeviceStatus(text)
+        ?: parseDailyUtility(text)
+        ?: parseAssistantHelp(text)
         ?: parseRealtimeInfo(text)
         ?: parseMediaControl(text)
         ?: parseVolumeControl(text)
@@ -194,6 +197,39 @@ object CommandParser {
         ?: parseScrollSwipe(text)
         ?: parseCloseApp(text)
         ?: parseOpenApp(text)
+        ?: parseKnowledgeSearch(text)
+
+    private fun parseDailyUtility(text: String): CommandDecision? {
+        val result = DailyUtilityParser.parse(text) ?: return null
+        return ok(NuvaAction.LocalAnswer(result.answer, result.category), result.answer)
+    }
+
+    private fun parseAssistantHelp(text: String): CommandDecision? {
+        val asksCapabilities = listOf(
+            "ki ki korte paro", "ki kaj paro", "tumi ki paro", "what can you do", "show commands",
+            "help me", "feature dekhao", "command dekhao", "কী কী করতে পারো", "কি কি করতে পারো",
+            "কী কাজ পারো", "সাহায্য করো", "ফিচার দেখাও",
+        ).any { text.contains(it) }
+        if (asksCapabilities) {
+            val answer = if (text.any { it.code in 0x0980..0x09FF }) {
+                "আমি ফোন কন্ট্রোল, কল-মেসেজ, রিমাইন্ডার, নোট-লিস্ট, হিসাব, শতাংশ, বিল ভাগ, BMI, EMI, তারিখ, এবং হাজারের বেশি ইউনিট কনভার্সন ও তথ্য খোঁজ করতে পারি। নিচের Features পেজে পুরো তালিকা আছে।"
+            } else {
+                "Ami phone control, call-message, reminder, note-list, calculation, percentage, bill split, BMI, EMI, date, ar hajarer beshi unit conversion o information search korte pari. Features page e full list ache."
+            }
+            return ok(NuvaAction.LocalAnswer(answer, "assistant_help"), answer)
+        }
+
+        val greeting = when {
+            listOf("assalamu alaikum", "salam", "আসসালামু আলাইকুম", "সালাম").any { text == it || text.startsWith("$it ") } ->
+                if (text.any { it.code in 0x0980..0x09FF }) "ওয়ালাইকুম আসসালাম। কীভাবে সাহায্য করতে পারি?" else "Walaikum assalam. Kivabe help korte pari?"
+            listOf("thank you", "thanks", "dhonnobad", "ধন্যবাদ").any { text == it || text.startsWith("$it ") } ->
+                if (text.any { it.code in 0x0980..0x09FF }) "স্বাগতম।" else "Welcome."
+            listOf("tumi ke", "who are you", "তুমি কে").any { text.contains(it) } ->
+                if (text.any { it.code in 0x0980..0x09FF }) "আমি NUVA—আপনার নিরাপদ Android সহকারী।" else "Ami NUVA—apnar safe Android assistant."
+            else -> null
+        } ?: return null
+        return ok(NuvaAction.LocalAnswer(greeting, "small_talk"), greeting)
+    }
 
     private fun splitPlan(text: String, depth: Int): List<CommandDecision>? {
         if (depth > 2 || text.isBlank()) return null
@@ -427,7 +463,11 @@ object CommandParser {
             "latest news", "today news", "news today", "ajker news", "ajker khobor", "খবর", "সংবাদ",
             "live score", "score koto", "current score", "cricket score", "football score", "লাইভ স্কোর", "স্কোর কত",
             "traffic", "jam kemon", "rastar obostha", "ট্রাফিক", "যানজট", "রাস্তার অবস্থা",
-            "dollar rate", "exchange rate", "gold price", "sonar dam", "fuel price", "ডলারের রেট", "সোনার দাম",
+            "dollar rate", "exchange rate", "gold price", "sonar dam", "fuel price", "market price", "product price",
+            "ডলারের রেট", "সোনার দাম", "বাজার দর", "দাম কত",
+            "prayer time", "namazer shomoy", "namajer somoy", "নামাজের সময়", "নামাজের সময়",
+            "sunrise", "sunset", "সূর্যোদয়", "সূর্যাস্ত", "air quality", "aqi", "বায়ুর মান", "বায়ুর মান",
+            "bus schedule", "train schedule", "flight status", "বাসের সময়", "ট্রেনের সময়", "ফ্লাইট স্ট্যাটাস",
         ).any { t.contains(it) }
         if (!topic) return null
 
@@ -649,6 +689,47 @@ object CommandParser {
     // --- 7. Notes & to-dos ----------------------------------------------------------------
 
     private fun parseNoteTodo(t: String): CommandDecision? {
+        val wantsRead = listOf("dekhao", "dekhan", "poro", "read", "show", "দেখাও", "দেখান", "পড়ো", "পড়ো")
+            .any { t.contains(it) }
+        if (wantsRead) {
+            val savedKind = when {
+                listOf("shopping list", "grocery list", "bazar list", "বাজারের তালিকা", "বাজারের লিস্ট", "শপিং লিস্ট")
+                    .any { t.contains(it) } -> SavedItemKind.SHOPPING
+                listOf("expense", "khoroch", "খরচ").any { t.contains(it) } -> SavedItemKind.EXPENSE
+                listOf("todo", "to do", "kaj list", "কাজের তালিকা", "টুডু").any { t.contains(it) } -> SavedItemKind.TODO
+                listOf("note", "নোট").any { t.contains(it) } -> SavedItemKind.NOTE
+                else -> null
+            }
+            if (savedKind != null) {
+                return ok(NuvaAction.ReadSavedItems(savedKind), "${savedKind.wireName} list porchi.")
+            }
+        }
+
+        // Shopping/grocery list reuses the local to-do store, with a visible
+        // prefix so it remains useful without adding another database/table.
+        val shoppingMarker = listOf(
+            "shopping list e", "shopping list", "grocery list e", "grocery list", "bazar list e", "bazarer list e",
+            "বাজারের তালিকায়", "বাজারের তালিকায়", "বাজারের লিস্টে", "শপিং লিস্টে",
+        ).firstOrNull { t.contains(it) }
+        if (shoppingMarker != null) {
+            val raw = contentAfter(t, shoppingMarker)
+            val content = raw?.let { cleanListContent(it) }
+            if (content.isNullOrBlank()) return unsupported("Shopping list e ki add korbo?")
+            return ok(NuvaAction.CreateTodo("Shopping: $content"), "Shopping list e add korlam.")
+        }
+
+        // Expense logging is a local note only; it never opens or automates a
+        // financial app and therefore does not cross the transaction boundary.
+        val expenseMarker = listOf(
+            "expense note", "expense log", "khoroch likhe rakho", "khoroch note koro", "খরচ লিখে রাখো", "খরচ নোট করো",
+        ).firstOrNull { t.contains(it) }
+        if (expenseMarker != null) {
+            val content = contentAfter(t, expenseMarker)?.let { cleanListContent(it) }
+                ?: t.replace(expenseMarker, " ").let { cleanListContent(it) }
+            if (content.isBlank()) return unsupported("Khoroch er poriman o karon bolun.")
+            return ok(NuvaAction.CreateNote("Expense: $content"), "Expense note kore nilam.")
+        }
+
         // To-do: "todo te add koro X" / "kaj list e X"
         val todoMarker = listOf(
             "todo te", "to do te", "todo list e", "kaj er list e", "kaj list e", "টুডু",
@@ -896,6 +977,40 @@ object CommandParser {
         return null
     }
 
+    /**
+     * Safe catch-all for factual/how-to daily questions. Instead of returning
+     * UNSUPPORTED or letting an LLM invent an answer, NUVA opens a web search
+     * containing the user's full query. Action/phone commands have already had
+     * first refusal above, so this cannot steal executable intents.
+     */
+    private fun parseKnowledgeSearch(t: String): CommandDecision? {
+        val question = listOf(
+            "what ", "how ", "why ", "who ", "where ", "when ", "which ", "meaning of", "define ",
+            "ki ", "kivabe", "keno", "kothay", "kokhon", "kar ", "mane ki", "konti", "kon ",
+            "কী ", "কি ", "কিভাবে", "কীভাবে", "কেন", "কোথায়", "কোথায়", "কখন", "কে ", "মানে কী",
+        ).any { t.startsWith(it) || t.contains(" $it") } ||
+            listOf(
+                " ki", " keno", " kothay", " kokhon", " koto", " kemon",
+                " কী", " কি", " কেন", " কোথায়", " কোথায়", " কখন", " কত", " কেমন",
+            ).any { t.endsWith(it) }
+        val usefulTopic = listOf(
+            "recipe", "রেসিপি", "রান্না", "meaning", "মানে", "dictionary", "অভিধান", "translate", "translation",
+            "অনুবাদ", "near me", "nearby", "কাছাকাছি", "schedule", "সময়সূচি", "সময়সূচি", "routine", "রুটিন",
+            "price", "dam koto", "দাম কত", "bus", "train", "flight", "বাস", "ট্রেন", "ফ্লাইট", "doctor",
+            "hospital", "medicine", "ডাক্তার", "হাসপাতাল", "ওষুধ", "school", "college", "job", "স্কুল", "কলেজ", "চাকরি",
+            "how to", "upay ki", "উপায়", "উপায়",
+        ).any { t.contains(it) }
+        if (!question && !usefulTopic) return null
+        if (t.length !in 3..300) return null
+
+        val speech = if (t.any { it.code in 0x0980..0x09FF }) {
+            "নির্ভরযোগ্য ও হালনাগাদ তথ্য ওয়েবে খুঁজছি।"
+        } else {
+            "Reliable updated information web e khujchi."
+        }
+        return ok(NuvaAction.SearchWeb(t), speech)
+    }
+
     // --- 12. Gestures ------------------------------------------------------------------------
 
     private fun parseScrollSwipe(t: String): CommandDecision? {
@@ -1008,6 +1123,16 @@ object CommandParser {
         TAIL_VERBS.forEach { rest = swapWord(rest, it) }
         val cleaned = rest.replace(Regex("""\s+"""), " ").trim(' ', '-', '.', ',', '!', '?')
         return cleaned.ifBlank { null }
+    }
+
+    private fun cleanListContent(raw: String): String {
+        var content = raw
+        listOf(
+            "add", "add koro", "add korun", "jog koro", "likhe rakho", "note koro",
+            "যোগ করো", "অ্যাড করো", "লিখে রাখো", "নোট করো", "দাও", "দিন",
+        ).forEach { content = content.replace(it, " ") }
+        TAIL_VERBS.forEach { content = swapWord(content, it) }
+        return content.replace(Regex("""\s+"""), " ").trim(' ', '-', '.', ',', '!', '?', ':')
     }
 
     private fun extractLabel(t: String): String? {

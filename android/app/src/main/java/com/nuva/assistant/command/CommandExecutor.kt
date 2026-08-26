@@ -614,6 +614,11 @@ class CommandExecutor(
                     deviceStatus.answer(action.query, preferences.languageBlocking()),
                 )
 
+            is NuvaAction.LocalAnswer ->
+                ExecutionOutcome("completed", action.answer, screenText = action.answer)
+
+            is NuvaAction.ReadSavedItems -> readSavedItems(action.kind)
+
             is NuvaAction.OpenSettingScreen -> when (val r = SettingsOpener.open(context, action.target)) {
                 is SettingsOpener.Result.Done -> ExecutionOutcome("completed", "Kore dilam.")
                 is SettingsOpener.Result.ManualStep -> ExecutionOutcome("completed", r.speech)
@@ -813,6 +818,34 @@ class CommandExecutor(
                 }
             }
         }
+    }
+
+    private suspend fun readSavedItems(kind: SavedItemKind): ExecutionOutcome {
+        val dao = notes ?: return ExecutionOutcome("failed", "Saved list porte parini.", "notes storage unavailable")
+        val roomKind = if (kind == SavedItemKind.TODO || kind == SavedItemKind.SHOPPING) "todo" else "note"
+        val rows = dao.byKindOnce(roomKind, 50).filter { row ->
+            when (kind) {
+                SavedItemKind.SHOPPING -> row.content.startsWith("Shopping:", ignoreCase = true)
+                SavedItemKind.EXPENSE -> row.content.startsWith("Expense:", ignoreCase = true)
+                SavedItemKind.TODO -> !row.content.startsWith("Shopping:", ignoreCase = true)
+                SavedItemKind.NOTE -> !row.content.startsWith("Expense:", ignoreCase = true)
+            }
+        }
+        if (rows.isEmpty()) {
+            val label = kind.wireName.replaceFirstChar { it.uppercase() }
+            return ExecutionOutcome("completed", "$label list ekhon khali.", screenText = "$label list: empty")
+        }
+        val display = rows.take(20).mapIndexed { index, row ->
+            val content = row.content.substringAfter(':', row.content).trim()
+            val done = if (roomKind == "todo" && row.done) "✓ " else ""
+            "${index + 1}. $done$content"
+        }.joinToString("\n")
+        val label = kind.wireName.replaceFirstChar { it.uppercase() }
+        val spoken = rows.take(8).mapIndexed { index, row ->
+            "${index + 1}, ${row.content.substringAfter(':', row.content).trim()}"
+        }.joinToString("; ")
+        val more = if (rows.size > 8) "; aro ${rows.size - 8} ta screen e dekhacchi" else ""
+        return ExecutionOutcome("completed", "$label list: $spoken$more.", screenText = "$label list\n$display")
     }
 
     /**
