@@ -41,6 +41,7 @@ class ActionJsonTest {
             NuvaAction.ShowRecents,
             NuvaAction.SearchWeb("dhaka weather"),
             NuvaAction.DeviceStatusQuery(DeviceStatusKind.BATTERY),
+            NuvaAction.DeviceStatusQuery(DeviceStatusKind.DATE_TIME),
             NuvaAction.OpenSettingScreen(SettingTarget.TORCH),
             NuvaAction.ReadNotifications,
             NuvaAction.SetReminder("medicine", 1_770_000_000_000L, "kal"),

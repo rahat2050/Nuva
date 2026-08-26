@@ -279,18 +279,44 @@ def parse_screen(t):
     return None
 
 def parse_status(t):
-    if any(w in t for w in ["battery","battary","charge koto","কত চার্জ","ব্যাটারি","চার্জ কত"]):
+    if any(w in t for w in ["battery","battary","bettery","charge koto","charge koy","কত চার্জ","ব্যাটারি","চার্জ কত"]):
         return ok({"kind":"BATTERY"}, "DEVICE_STATUS")
-    if any(w in t for w in ["কটা বাজে","কয়টা বাজে","somoy koto","time koto","koto bajche","সময় কত","এখন কটা"]):
-        return ok({"kind":"TIME"}, "DEVICE_STATUS")
-    if any(w in t for w in ["aj kibar","আজ কি বার","আজ কী বার","আজ কত তারিখ","tarikh koto","date koto","আজকের তারিখ"]):
-        return ok({"kind":"DATE"}, "DEVICE_STATUS")
-    if any(w in t for w in ["internet ache","internet on ache","network kothay","net ache","wifi e connected",
-        "নেটওয়ার্ক","ইন্টারনেট আছে","নেট আছে","network status"]):
+    now_words = ["ekhon","akhon","akon","akn","ekhn","now","current","এখন","বর্তমান"]
+    time_phrases = ["koyta baje","koita baje","koi ta baje","koy ta baje","kota baje","koto baje",
+        "koyta bajche","koita bajche","koto bajche","somoy koto","shomoy koto","time koto",
+        "what time is it","what's the time","current time","time now","tell me the time",
+        "কটা বাজে","কয়টা বাজে","কয়টা বাজে","কতটা বাজে","সময় কত","সময় কত","এখন কটা","এখন কয়টা","এখন কয়টা"]
+    asks_time = any(w in t for w in time_phrases) or (
+        any(has_word(t,w) for w in now_words) and any(w in t for w in ["time","somoy","shomoy","baje","bajche","সময়","সময়","বাজে"]))
+    today_words = ["aj","aaj","ajke","today","আজ","আজকে","আজকের"]
+    date_phrases = ["aj koto tarik","aj koto tarikh","aaj koto tarik","ajke koto tarik","ajke koto tarikh",
+        "aj tarikh koto","aj tarik koto","ajker tarik","ajker tarikh","aj ki tarik","aj ki tarikh",
+        "tarikh koto","tarik koto","date koto","today's date","todays date","date today","what is the date",
+        "what's the date","what day is it","aj kibar","aj ki bar","ajke ki bar","আজ কি বার","আজ কী বার",
+        "আজকে কি বার","আজকে কী বার","আজ কত তারিখ","আজকে কত তারিখ","আজ কী তারিখ","আজ কি তারিখ","আজকের তারিখ"]
+    asks_date = any(w in t for w in date_phrases) or (
+        any(has_word(t,w) for w in today_words) and any(w in t for w in ["tarik","tarikh","date","kibar","ki bar","তারিখ","কি বার","কী বার"]))
+    if asks_time and asks_date: return ok({"kind":"DATE_TIME"}, "DEVICE_STATUS")
+    if asks_time: return ok({"kind":"TIME"}, "DEVICE_STATUS")
+    if asks_date: return ok({"kind":"DATE"}, "DEVICE_STATUS")
+    if any(w in t for w in ["internet ache","internet ase","internet on ache","network kothay","net ache","net ase","wifi e connected",
+        "নেটওয়ার্ক","ইন্টারনেট আছে","নেট আছে","network status","connection ache"]):
         return ok({"kind":"NETWORK"}, "DEVICE_STATUS")
-    if any(w in t for w in ["storage","koto jayga","কত জায়গা","স্টোরেজ","memory koto","space koto"]):
+    if any(w in t for w in ["storage","koto jayga","koto jaiga","কত জায়গা","কত জায়গা","স্টোরেজ","memory koto","space koto","free space","jayga khali","jaiga khali"]):
         return ok({"kind":"STORAGE"}, "DEVICE_STATUS")
     return None
+
+def parse_realtime(t):
+    topics = ["weather","abohawa","আবহাওয়া","আবহাওয়া","temperature","তাপমাত্রা","brishti","বৃষ্টি",
+        "latest news","today news","news today","ajker news","ajker khobor","খবর","সংবাদ",
+        "live score","score koto","current score","cricket score","football score","লাইভ স্কোর","স্কোর কত",
+        "traffic","jam kemon","rastar obostha","ট্রাফিক","যানজট","রাস্তার অবস্থা",
+        "dollar rate","exchange rate","gold price","sonar dam","fuel price","ডলারের রেট","সোনার দাম"]
+    if not any(w in t for w in topics): return None
+    hints = ["ekhon","akhon","akon","akn","ekhn","current","latest","live","today","aj","ajke","ajker",
+        "koto","kemon","ki","hobe","now","এখন","আজ","আজকে","আজকের","বর্তমান","সর্বশেষ","লাইভ","কত","কেমন","কি","কী","হবে"]
+    if not any(has_word(t,w) if w.isascii() else w in t for w in hints): return None
+    return ok({"kind":"search","query":t.strip(" .,?!:")}, "SEARCH_WEB")
 
 def parse_media_ctl(t):
     media_word = any(w in t for w in ["gaan","গান","music","song","video","ভিডিও","media","player","giti","গীত","track","ট্র্যাক"])
@@ -581,7 +607,7 @@ def content_after(t, marker):
 CONNECTORS = [" ar ", " ebong ", " and ", " tarpor ", " আর ", " এবং ", " তারপর ", " then ", "; "]
 
 def rule_table(t):
-    return (parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_status(t) or parse_media_ctl(t)
+    return (parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_status(t) or parse_realtime(t) or parse_media_ctl(t)
             or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
@@ -672,6 +698,10 @@ check(parse("nuva music pause koro")["intent"] == "MEDIA_CONTROL", "pause")
 check(parse("nuva chobi tolo")["action"]["kind"] == "CAPTURE", "chobi tolo")
 check(parse("nuva torch jalo")["action"]["kind"] == "TORCH", "torch")
 check(parse("nuva google e dhaka weather khujho")["action"]["query"] == "dhaka weather", "web search")
+check(parse("aj koto tarik")["action"]["kind"] == "DATE", "user phrase current date")
+check(parse("akn koyta baje")["action"]["kind"] == "TIME", "user phrase current time")
+check(parse("aj koto tarik akn koyta baje")["action"]["kind"] == "DATE_TIME", "combined current date and time")
+check(parse("latest news ki")["intent"] == "SEARCH_WEB", "latest info web search")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

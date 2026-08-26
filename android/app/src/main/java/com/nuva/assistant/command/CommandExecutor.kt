@@ -609,7 +609,10 @@ class CommandExecutor(
             }
 
             is NuvaAction.DeviceStatusQuery ->
-                ExecutionOutcome("completed", deviceStatus.answer(action.query))
+                ExecutionOutcome(
+                    "completed",
+                    deviceStatus.answer(action.query, preferences.languageBlocking()),
+                )
 
             is NuvaAction.OpenSettingScreen -> when (val r = SettingsOpener.open(context, action.target)) {
                 is SettingsOpener.Result.Done -> ExecutionOutcome("completed", "Kore dilam.")

@@ -85,6 +85,40 @@ class CommandParserTest {
         )
     }
 
+    @Test
+    fun `common banglish spellings get local realtime date and time`() {
+        val date = CommandParser.parse("aj koto tarik")!!.action as NuvaAction.DeviceStatusQuery
+        assertEquals(DeviceStatusKind.DATE, date.query)
+
+        val time = CommandParser.parse("akn koyta baje")!!.action as NuvaAction.DeviceStatusQuery
+        assertEquals(DeviceStatusKind.TIME, time.query)
+
+        val combined = CommandParser.parse("aj koto tarik akn koyta baje")!!.action as NuvaAction.DeviceStatusQuery
+        assertEquals(DeviceStatusKind.DATE_TIME, combined.query)
+    }
+
+    @Test
+    fun `date and time questions tolerate bangla english and asr variants`() {
+        listOf("এখন কয়টা বাজে", "akhon koita baje", "what time is it").forEach { phrase ->
+            val query = CommandParser.parse(phrase)!!.action as NuvaAction.DeviceStatusQuery
+            assertEquals(phrase, DeviceStatusKind.TIME, query.query)
+        }
+        listOf("আজকে কত তারিখ", "ajke koto tarikh", "what is the date today").forEach { phrase ->
+            val query = CommandParser.parse(phrase)!!.action as NuvaAction.DeviceStatusQuery
+            assertEquals(phrase, DeviceStatusKind.DATE, query.query)
+        }
+    }
+
+    @Test
+    fun `fresh external information opens a live web search`() {
+        listOf("ajker weather kemon", "latest news ki", "cricket live score koto").forEach { phrase ->
+            val decision = CommandParser.parse(phrase)
+            assertNotNull(phrase, decision)
+            assertEquals(phrase, NuvaIntent.SEARCH_WEB, decision!!.intent)
+            assertTrue((decision.action as NuvaAction.SearchWeb).query.isNotBlank())
+        }
+    }
+
     // --- Settings ----------------------------------------------------------------------
 
     @Test

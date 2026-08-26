@@ -53,6 +53,17 @@ describe('parseFallback', () => {
     }
   });
 
+  it('routes current information questions to a live web source', () => {
+    for (const phrase of ['ajker weather kemon', 'latest news ki', 'cricket live score koto']) {
+      const result = parseFallback(phrase);
+      expect(result?.rule, phrase).toBe('OPEN_URL_LIVE_INFO');
+      expect(result?.action.type, phrase).toBe('OPEN_URL');
+      if (result?.action.type === 'OPEN_URL') {
+        expect(result.action.url).toContain('https://www.google.com/search?q=');
+      }
+    }
+  });
+
   it('opens explicit URLs', () => {
     const result = parseFallback('open youtube.com/feed');
     expect(result?.action.type).toBe('OPEN_URL');

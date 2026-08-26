@@ -133,6 +133,23 @@ const RULES: Rule[] = [
     },
   },
   {
+    // Live information must come from a live source, never from model memory.
+    // The Android client handles phone date/time itself; external topics open
+    // a current web result even when the user naturally asks instead of saying
+    // the literal word "search".
+    name: 'OPEN_URL_LIVE_INFO',
+    run: (text) => {
+      const topic =
+        /(weather|abohawa|আবহাওয়া|আবহাওয়া|temperature|তাপমাত্রা|brishti|বৃষ্টি|latest news|today news|news today|ajker news|ajker khobor|খবর|সংবাদ|live score|current score|cricket score|football score|লাইভ স্কোর|স্কোর কত|traffic|jam kemon|rastar obostha|ট্রাফিক|যানজট|রাস্তার অবস্থা|dollar rate|exchange rate|gold price|sonar dam|fuel price|ডলারের রেট|সোনার দাম)/.test(text);
+      const current =
+        /\b(ekhon|akhon|akon|akn|ekhn|current|latest|live|today|aj|ajke|ajker|koto|kemon|ki|hobe|now)\b/.test(text) ||
+        /(এখন|আজ|আজকে|আজকের|বর্তমান|সর্বশেষ|লাইভ|কত|কেমন|কি|কী|হবে)/.test(text);
+      if (!topic || !current) return null;
+      const query = text.replace(/[.,?!।]+$/g, '').trim();
+      return query ? { type: 'OPEN_URL', url: `https://www.google.com/search?q=${encodeURIComponent(query)}` } : null;
+    },
+  },
+  {
     name: 'OPEN_URL_SEARCH',
     run: (text) => {
       if (!/(search|সার্চ|খোঁজ|khojo|khoj)/.test(text)) return null;

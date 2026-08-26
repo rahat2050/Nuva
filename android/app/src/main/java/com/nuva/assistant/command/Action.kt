@@ -329,6 +329,8 @@ enum class DeviceStatusKind(val wireName: String) {
     BATTERY("battery"),
     TIME("time"),
     DATE("date"),
+    /** One clock read answers combined questions without timestamps drifting. */
+    DATE_TIME("date_time"),
     NETWORK("network"),
     STORAGE("storage"),
     ;

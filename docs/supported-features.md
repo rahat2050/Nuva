@@ -1,4 +1,4 @@
-# NUVA — Supported features (v1.6)
+# NUVA — Supported features (v1.7)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -31,10 +31,12 @@ Files app opens; arbitrary open/read/rename/move/delete — **UNSUPPORTED** from
 (SAF requires user-present activity results); delete-with-confirmation therefore not offered
 rather than faked.
 
-## Device utilities — SUPPORTED
-Torch, battery/time/date/network/storage answers, alarms/timers (bn/banglish/en time),
-calendar-prefilled reminders, notes/to-dos, maps search ("dhaka er map dekhao"),
-app-agnostic press/clear/describe commands.
+## Device utilities & current information — SUPPORTED
+Torch, battery/time/date/network/storage answers read from the phone at execution time (offline;
+Bangla/Banglish/English, including ASR variants such as `aj koto tarik` and `akn koyta baje`),
+alarms/timers, calendar-prefilled reminders, notes/to-dos, maps search (`dhaka er map dekhao`),
+and app-agnostic press/clear/describe commands. Current weather/news/live scores/traffic/rates are
+routed to a live web search rather than answered from stale model memory.
 
 ## Settings screens — SUPPORTED (ANDROID-LIMITED by nature)
 Brightness/DND/Wi-Fi/BT/sound/display/notification/app/accessibility settings — Android

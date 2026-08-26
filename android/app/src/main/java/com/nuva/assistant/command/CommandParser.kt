@@ -176,6 +176,7 @@ object CommandParser {
     private fun ruleTable(text: String): CommandDecision? = parseNavigation(text)
         ?: parseScreenReading(text)
         ?: parseDeviceStatus(text)
+        ?: parseRealtimeInfo(text)
         ?: parseMediaControl(text)
         ?: parseVolumeControl(text)
         ?: parseCamera(text)
@@ -351,28 +352,100 @@ object CommandParser {
     // --- 3. Device status ---------------------------------------------------------------
 
     private fun parseDeviceStatus(t: String): CommandDecision? {
-        val battery = listOf("battery", "battary", "charge koto", "কত চার্জ", "ব্যাটারি", "চার্জ কত")
-            .any { t.contains(it) }
+        val battery = listOf(
+            "battery", "battary", "bettery", "charge koto", "charge koy", "চার্জ কত",
+            "কত চার্জ", "ব্যাটারি", "battery percentage", "battery percent",
+        ).any { t.contains(it) }
         if (battery) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.BATTERY), "Battery dekhe nicchi.")
 
-        val time = listOf("কটা বাজে", "কয়টা বাজে", "somoy koto", "time koto", "koto bajche", "সময় কত", "এখন কটা")
-            .any { t.contains(it) }
-        if (time) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.TIME), "Somoy dekhe nicchi.")
+        // Speech recognition writes the same Banglish sentence many ways. In
+        // particular, users commonly say/type "akn koyta baje" rather than
+        // the canonical "ekhon koto bajche". Keep these reads local so the
+        // answer always comes from the phone's clock, not an AI guess.
+        val nowWords = listOf(
+            "ekhon", "akhon", "akon", "akn", "ekhn", "now", "current",
+            "এখন", "বর্তমান",
+        )
+        val timePhrases = listOf(
+            "koyta baje", "koita baje", "koi ta baje", "koy ta baje", "kota baje", "koto baje",
+            "koyta bajche", "koita bajche", "koto bajche", "somoy koto", "shomoy koto", "time koto",
+            "what time is it", "what's the time", "current time", "time now", "tell me the time",
+            "কটা বাজে", "কয়টা বাজে", "কয়টা বাজে", "কতটা বাজে", "সময় কত", "সময় কত",
+            "এখন কটা", "এখন কয়টা", "এখন কয়টা", "বর্তমান সময়", "বর্তমান সময়",
+        )
+        val asksTime = timePhrases.any { t.contains(it) } ||
+            (nowWords.any { NuvaDateTimeParser.hasWord(t, it) } &&
+                listOf("time", "somoy", "shomoy", "baje", "bajche", "সময়", "সময়", "বাজে")
+                    .any { t.contains(it) })
 
-        val date = listOf("aj kibar", "আজ কি বার", "আজ কী বার", "আজ কত তারিখ", "tarikh koto", "date koto", "আজকের তারিখ")
-            .any { t.contains(it) }
-        if (date) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.DATE), "Tarikh dekhe nicchi.")
+        val todayWords = listOf("aj", "aaj", "ajke", "today", "আজ", "আজকে", "আজকের")
+        val datePhrases = listOf(
+            "aj koto tarik", "aj koto tarikh", "aaj koto tarik", "ajke koto tarik", "ajke koto tarikh",
+            "aj tarikh koto", "aj tarik koto", "ajker tarik", "ajker tarikh", "aj ki tarik", "aj ki tarikh",
+            "tarikh koto", "tarik koto", "date koto", "today's date", "todays date", "date today",
+            "what is the date", "what's the date", "what day is it", "aj kibar", "aj ki bar", "ajke ki bar",
+            "আজ কি বার", "আজ কী বার", "আজকে কি বার", "আজকে কী বার", "আজ কত তারিখ", "আজকে কত তারিখ",
+            "আজ কী তারিখ", "আজ কি তারিখ", "আজকের তারিখ", "আজকের দিন", "আজ কী দিন",
+        )
+        val asksDate = datePhrases.any { t.contains(it) } ||
+            (todayWords.any { NuvaDateTimeParser.hasWord(t, it) } &&
+                listOf("tarik", "tarikh", "date", "kibar", "ki bar", "তারিখ", "কি বার", "কী বার")
+                    .any { t.contains(it) })
 
-        val network = listOf("internet ache", "internet on ache", "network kothay", "net ache",
-            "wifi e connected", "নেটওয়ার্ক", "ইন্টারনেট আছে", "নেট আছে", "network status")
-            .any { t.contains(it) }
+        if (asksTime && asksDate) {
+            return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.DATE_TIME), "Tarikh o somoy dekhe nicchi.")
+        }
+        if (asksTime) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.TIME), "Somoy dekhe nicchi.")
+        if (asksDate) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.DATE), "Tarikh dekhe nicchi.")
+
+        val network = listOf(
+            "internet ache", "internet ase", "internet on ache", "network kothay", "net ache", "net ase",
+            "wifi e connected", "নেটওয়ার্ক", "ইন্টারনেট আছে", "নেট আছে", "network status", "connection ache",
+        ).any { t.contains(it) }
         if (network) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.NETWORK), "Network dekhe nicchi.")
 
-        val storage = listOf("storage", "koto jayga", "কত জায়গা", "স্টোরেজ", "memory koto", "space koto")
-            .any { t.contains(it) }
+        val storage = listOf(
+            "storage", "koto jayga", "koto jaiga", "কত জায়গা", "কত জায়গা", "স্টোরেজ",
+            "memory koto", "space koto", "free space", "jayga khali", "jaiga khali",
+        ).any { t.contains(it) }
         if (storage) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.STORAGE), "Storage dekhe nicchi.")
 
         return null
+    }
+
+    // --- 3a. Current information from the live web --------------------------------------
+
+    /**
+     * Fresh data such as weather/news/scores must never be invented by the
+     * language model. Date/time/device state are answered directly above;
+     * internet-backed topics are sent to a browser search so the result is
+     * genuinely current. This is intentionally read-only and LOW risk.
+     */
+    private fun parseRealtimeInfo(t: String): CommandDecision? {
+        val topic = listOf(
+            "weather", "abohawa", "আবহাওয়া", "আবহাওয়া", "temperature", "তাপমাত্রা", "brishti", "বৃষ্টি",
+            "latest news", "today news", "news today", "ajker news", "ajker khobor", "খবর", "সংবাদ",
+            "live score", "score koto", "current score", "cricket score", "football score", "লাইভ স্কোর", "স্কোর কত",
+            "traffic", "jam kemon", "rastar obostha", "ট্রাফিক", "যানজট", "রাস্তার অবস্থা",
+            "dollar rate", "exchange rate", "gold price", "sonar dam", "fuel price", "ডলারের রেট", "সোনার দাম",
+        ).any { t.contains(it) }
+        if (!topic) return null
+
+        val asksCurrent = listOf(
+            "ekhon", "akhon", "akon", "akn", "ekhn", "current", "latest", "live", "today", "aj", "ajke", "ajker",
+            "koto", "kemon", "ki", "hobe", "now", "এখন", "আজ", "আজকে", "আজকের", "বর্তমান", "সর্বশেষ",
+            "লাইভ", "কত", "কেমন", "কি", "কী", "হবে",
+        ).any { if (it.all { ch -> ch.code in 32..127 }) NuvaDateTimeParser.hasWord(t, it) else t.contains(it) }
+        if (!asksCurrent) return null
+
+        val query = t.trim(' ', '.', ',', '?', '!', ':').take(300)
+        if (query.isBlank()) return null
+        val speech = if (query.any { it.code in 0x0980..0x09FF }) {
+            "সর্বশেষ তথ্য ওয়েবে খুঁজছি।"
+        } else {
+            "Latest information web e khujchi."
+        }
+        return ok(NuvaAction.SearchWeb(query), speech)
     }
 
     // --- 3b. Media transport (v1.2) -------------------------------------------------------

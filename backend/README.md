@@ -8,7 +8,7 @@ risk-classified action** out. It never executes anything on a device.
 ```bash
 npm install
 npm run build     # tsc --noEmit (strict)
-npm test          # vitest run — 188 tests
+npm test          # vitest run — 189 tests
 npm run verify    # build + test
 npm run dev       # local server on :3000, manual test console at /
 npm run eval      # model evaluation harness (needs GROQ_API_KEY)

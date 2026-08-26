@@ -6,7 +6,7 @@
 cd backend
 npm install
 npm run build     # tsc --noEmit  (the PHASE 1 "TypeScript builds" gate)
-npm test          # vitest run    (188 tests)
+npm test          # vitest run    (189 tests)
 npm run verify    # build + test
 npm run dev       # local server on :3000 with a manual test console at /
 ```
