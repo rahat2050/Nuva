@@ -147,6 +147,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [100-daily-skills.md](docs/100-daily-skills.md) | Numbered registry of 100 broad sourced lookups |
 | [500-extended-skills.md](docs/500-extended-skills.md) | Entity×task matrices for exactly 500 precise skills |
 | [10000-command-grammar.md](docs/10000-command-grammar.md) | v2.1 audit of 12,250 natural command forms |
+| [1000-unsupported-skills.md](docs/1000-unsupported-skills.md) | Exact list of 1,000 blocked/unsupported direct automations |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |

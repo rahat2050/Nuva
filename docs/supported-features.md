@@ -88,6 +88,10 @@ read/stored/typed; banking screens never read. LEVEL 3: money transfer/payment/c
 recharge/purchase/financial authorization automation ALWAYS refused with:
 "এই financial transaction NUVA নিজে করতে পারবে না। আপনি চাইলে নিজে manually করতে পারবেন।"
 
+Financial, credential, file/gallery, social-account mutation, restricted Android settings,
+communications, IoT, booking/submission and autonomous-surveillance limitations-এর exact
+1,000-item list: [`1000-unsupported-skills.md`](1000-unsupported-skills.md).
+
 ## PARTIAL / pending verification
 Real-device QA (checklist in `v1.6-real-device-qa.md`) and the APK artifact build are pending —
 see `v1.6-production-audit.md` §5. Nothing here claims device-verified status.
