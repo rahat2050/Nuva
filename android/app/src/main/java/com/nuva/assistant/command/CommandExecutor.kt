@@ -284,9 +284,6 @@ class CommandExecutor(
         return MessagingApp.fromWire(last.lowercase()) ?: default
     }
 
-    private fun pronounWithoutContext(action: NuvaAction): Boolean =
-        ContextMemory.isContactPronoun(action.contact) && contextMemory.lastContact == null
-
     private sealed interface ContactStep {
         data class Resolved(val number: String, val name: String?) : ContactStep
         data class Choice(val step: Step.AwaitingContactChoice) : ContactStep
