@@ -588,6 +588,30 @@ class CommandExecutor(
                 }
             }
 
+            is NuvaAction.ComposeEmail -> when (val result = com.nuva.assistant.automation.EmailComposer.compose(context, action)) {
+                com.nuva.assistant.automation.EmailComposer.Result.Opened ->
+                    ExecutionOutcome("completed", "Email composer khulechi — review kore Send apni chapun.")
+                is com.nuva.assistant.automation.EmailComposer.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ReplyNotification -> when (val result = NuvaNotificationListener.reply(action.ordinal, action.message)) {
+                is NuvaNotificationListener.ReplyResult.Sent ->
+                    ExecutionOutcome("completed", "${result.appLabel} notification e reply pathano hoyeche.")
+                NuvaNotificationListener.ReplyResult.NeedsAccess -> {
+                    NuvaNotificationListener.openAccessSettings(context)
+                    ExecutionOutcome("failed", "Notification access lagbe — setting khulchi.", "notification access missing")
+                }
+                NuvaNotificationListener.ReplyResult.NotificationMissing ->
+                    ExecutionOutcome("failed", "Oi notification ta ar paini.", "notification missing")
+                NuvaNotificationListener.ReplyResult.ReplyUnavailable ->
+                    ExecutionOutcome("failed", "Ei notification app official Reply action dey nai.", "RemoteInput unavailable")
+                NuvaNotificationListener.ReplyResult.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive app ba credential notification e reply korbo na.", "sensitive reply blocked")
+                is NuvaNotificationListener.ReplyResult.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.ReadNotifications -> when (val s = NuvaNotificationListener.summary()) {
                 is NuvaNotificationListener.Summary.Ready ->
                     ExecutionOutcome("completed", screenSpeech(s.text), null, s.text)

@@ -1,4 +1,4 @@
-# NUVA — Supported features (v2.2)
+# NUVA — Supported features (v2.3)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -26,6 +26,7 @@ Contacts: dynamic resolution, kinship fallback, multi-match asks, phone numbers 
 hyphenated. Calls (dialer or opt-in direct). SMS send-after-confirmation. WhatsApp
 send-after-confirmation with package + recipient verification. Chat open (wa.me).
 Telegram/Messenger/Signal/Viber/IMO — **ANDROID-LIMITED**: message pre-filled, user taps Send.
+Email recipient/subject/body compose is **SUPPORTED user-reviewed**: email app opens and user taps Send.
 
 ## Media & camera — SUPPORTED / ANDROID-LIMITED
 YouTube search/play, Spotify fallback, pause/resume/next/previous (active MediaSession —
@@ -75,9 +76,11 @@ Brightness/DND/Wi-Fi/BT/sound/display/notification/app/accessibility settings �
 forbids direct toggles for third-party apps, so the exact screen opens (torch & volume are
 direct where permitted).
 
-## Notifications — SUPPORTED (reply UNSUPPORTED)
-Read/summarize (OTP redacted, banking skipped), open source app, shade open. Reply —
-**UNSUPPORTED** until a reliable per-app RemoteInput route exists.
+## Notifications — SUPPORTED / APP-LIMITED
+Read/summarize (OTP redacted, banking skipped), open source app and shade open. v2.3 uses an app's
+official free-form RemoteInput action for a reply only after blocking confirmation. Banking apps,
+credential-bearing replies, missing/expired actions and apps with no RemoteInput are refused; NUVA
+never guesses a reply button through accessibility.
 
 ## Screen understanding & automation — SUPPORTED (semantic only)
 Read visible/focused text, UI summary (buttons/inputs/lists), tap/long-press/type/clear/

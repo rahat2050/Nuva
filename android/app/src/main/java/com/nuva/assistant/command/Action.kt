@@ -184,6 +184,20 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.USER_FILE
     }
 
+    /** Opens an email composer; the user reviews and taps Send. */
+    data class ComposeEmail(
+        val recipient: String?,
+        val subject: String?,
+        val body: String?,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.COMPOSE_EMAIL
+    }
+
+    /** Sends through a notification's official RemoteInput action after confirmation. */
+    data class ReplyNotification(val ordinal: Int, val message: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.REPLY_NOTIFICATION
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }

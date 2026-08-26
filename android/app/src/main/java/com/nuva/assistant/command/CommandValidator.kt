@@ -24,6 +24,7 @@ object CommandValidator {
 
     private val PACKAGE_PATTERN = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$")
     private val PHONE_PATTERN = Regex("^\\+?[0-9][0-9 \\-()]{3,23}$")
+    private val EMAIL_PATTERN = Regex("""\A[A-Za-z0-9.!#\x24%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+\z""")
     private const val MAX_TEXT = 1000
     private const val MAX_MESSAGE = 2000
 
@@ -127,7 +128,26 @@ object CommandValidator {
             NuvaIntent.LOCAL_ANSWER -> validateLocalAnswer(actionJson)
             NuvaIntent.READ_SAVED_ITEMS -> validateReadSavedItems(actionJson)
             NuvaIntent.USER_FILE -> validateUserFile(actionJson)
+            NuvaIntent.COMPOSE_EMAIL -> validateComposeEmail(actionJson)
+            NuvaIntent.REPLY_NOTIFICATION -> validateReplyNotification(actionJson)
         }
+    }
+
+    private fun validateComposeEmail(json: JsonObject): ValidatedAction {
+        val recipient = json.str("recipient")?.takeIf { EMAIL_PATTERN.matches(it) }
+        if (json.str("recipient") != null && recipient == null) {
+            return ValidatedAction.Invalid(listOf("COMPOSE_EMAIL recipient is invalid"))
+        }
+        val subject = json.str("subject")?.takeIf { it.isNotEmpty() && it.length <= 200 }
+        val body = json.str("body")?.takeIf { it.isNotEmpty() && it.length <= 5_000 }
+        return ValidatedAction.Valid(NuvaAction.ComposeEmail(recipient, subject, body))
+    }
+
+    private fun validateReplyNotification(json: JsonObject): ValidatedAction {
+        val ordinal = json.int("ordinal")?.takeIf { it in 1..30 } ?: 1
+        val message = json.str("message")?.takeIf { it.isNotEmpty() && it.length <= 1_000 }
+            ?: return ValidatedAction.Invalid(listOf("REPLY_NOTIFICATION requires message"))
+        return ValidatedAction.Valid(NuvaAction.ReplyNotification(ordinal, message))
     }
 
     private fun validateUserFile(json: JsonObject): ValidatedAction {

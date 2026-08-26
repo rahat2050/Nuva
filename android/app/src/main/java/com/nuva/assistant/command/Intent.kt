@@ -50,6 +50,8 @@ enum class NuvaIntent(val wireName: String, val localOnly: Boolean = false) {
     READ_SAVED_ITEMS("READ_SAVED_ITEMS", localOnly = true),
     /** User-present Android picker workflow; never accepted from server/AI. */
     USER_FILE("USER_FILE", localOnly = true),
+    COMPOSE_EMAIL("COMPOSE_EMAIL", localOnly = true),
+    REPLY_NOTIFICATION("REPLY_NOTIFICATION", localOnly = true),
     ;
 
     companion object {
@@ -79,6 +81,8 @@ enum class NuvaRisk { LOW, MEDIUM, HIGH;
 fun baselineRisk(intent: NuvaIntent): NuvaRisk = when (intent) {
     NuvaIntent.CALL_CONTACT,
     NuvaIntent.SEND_MESSAGE,
+    NuvaIntent.COMPOSE_EMAIL,
+    NuvaIntent.REPLY_NOTIFICATION,
     // Policy §37: calendar edits always confirm (we prefill, the user saves).
     NuvaIntent.SET_REMINDER,
     -> NuvaRisk.MEDIUM

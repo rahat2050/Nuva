@@ -108,6 +108,15 @@ object ActionJson {
         is NuvaAction.UserFile -> buildJsonObject {
             put("type", "USER_FILE"); put("operation", action.operation.wireName)
         }
+        is NuvaAction.ComposeEmail -> buildJsonObject {
+            put("type", "COMPOSE_EMAIL")
+            action.recipient?.let { put("recipient", it) }
+            action.subject?.let { put("subject", it) }
+            action.body?.let { put("body", it) }
+        }
+        is NuvaAction.ReplyNotification -> buildJsonObject {
+            put("type", "REPLY_NOTIFICATION"); put("ordinal", action.ordinal); put("message", action.message)
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

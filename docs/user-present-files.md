@@ -33,5 +33,5 @@ the user explicitly selects is handled.
 - Copy/move to a user-selected destination folder.
 - URI-specific delete with a second target-aware confirmation.
 - Gallery edit/crop workflows.
-- Notification RemoteInput reply where an app exposes a safe reply action.
-- Email compose and document-upload handoff.
+- Notification RemoteInput reply and email compose are implemented in v2.3.
+- Email document-attachment handoff remains pending.

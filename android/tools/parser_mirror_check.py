@@ -305,6 +305,27 @@ def parse_user_file(t):
         return ok({"kind":"userfile","operation":"OPEN_FILE"}, "USER_FILE")
     return None
 
+def parse_communication(t):
+    reply_marker=next((w for w in ["notification e reply dao","notification reply dao","notification reply koro",
+        "reply to notification","নোটিফিকেশনে রিপ্লাই দাও","reply dao","reply koro"] if w in t),None)
+    if reply_marker and ("notification" in t or "নোটিফিকেশন" in t):
+        m=re.search(r"(\d+)\s*(number|no|tomo|তম)",t)
+        ordinal=max(1,min(30,int(m.group(1)))) if m else 1
+        quoted=re.search(r'["\'“”](.+?)["\'“”]',t)
+        message=quoted.group(1).strip() if quoted else content_after(t,reply_marker)
+        if message:
+            message=re.sub(r"^(je|যে)\s+","",message).strip()
+        if not message: return unsupported("Notification e ki reply dibo?")
+        return ok({"kind":"replynotif","ordinal":ordinal,"message":message},"REPLY_NOTIFICATION",risk="MEDIUM",base="MEDIUM")
+    email_marker=next((w for w in ["email compose koro","compose email","email likho","email koro","email pathao",
+        "mail compose koro","mail likho","mail pathao","ইমেইল লেখো","ইমেইল পাঠাও"] if w in t),None)
+    if not email_marker: return None
+    m=re.search(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+",t)
+    recipient=m.group(0) if m else None
+    body_marker=next((w for w in [" body "," message "," je "," যে "] if w in t),None)
+    body=t.split(body_marker,1)[1].strip(" ,.:") if body_marker else None
+    return ok({"kind":"email","recipient":recipient,"body":body},"COMPOSE_EMAIL",risk="MEDIUM",base="MEDIUM")
+
 def parse_status(t):
     if any(w in t for w in ["battery","battary","bettery","charge koto","charge koy","কত চার্জ","ব্যাটারি","চার্জ কত"]):
         return ok({"kind":"BATTERY"}, "DEVICE_STATUS")
@@ -757,7 +778,7 @@ def parse_knowledge(t):
 
 def rule_table(t):
     return (parse_grammar(t) or parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_user_file(t)
-            or parse_daily(t) or parse_realtime(t)
+            or parse_communication(t) or parse_daily(t) or parse_realtime(t)
             or parse_status(t) or parse_help(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
@@ -889,6 +910,9 @@ check(parse("file open koro")["action"]["operation"] == "OPEN_FILE", "user file 
 check(parse("file share koro")["confirm"], "file sharing confirms")
 check(parse("gallery theke photo select koro")["action"]["operation"] == "PICK_PHOTO", "photo picker")
 check(parse("video share koro")["action"]["operation"] == "SHARE_VIDEO", "video share picker")
+check(parse("user@example.com ke email koro je ami ashchi")["intent"] == "COMPOSE_EMAIL", "email compose")
+reply_probe=parse("2 number notification e reply dao je ami ashchi")
+check(reply_probe["intent"] == "REPLY_NOTIFICATION" and reply_probe["confirm"], "notification RemoteInput reply")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

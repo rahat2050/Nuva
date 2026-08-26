@@ -69,6 +69,7 @@ object CommandParser {
 
     // Bangladeshi/Intl numbers, tolerant of spaces/hyphens inside ("01712-345678").
     private val PHONE_NUMBER = Regex("""(\+?88)?01[3-9](?:[\s-]?\d){8}|\+\d{8,15}""")
+    private val EMAIL_ADDRESS = Regex("""[A-Za-z0-9.!#\x24%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+""")
 
     /** "rohim-ke" → "rohim ke", "whatsapp-e" → "whatsapp e" (keeps URLs intact). */
     private val HYPHEN_SUFFIX = Regex("""-(ke|kei|keu|kar|e|te|er|r)\b""")
@@ -207,6 +208,7 @@ object CommandParser {
         ?: parseUniversal(text)
         ?: parseScreenReading(text)
         ?: parseUserPresentFile(text)
+        ?: parseCommunicationCompose(text)
         ?: parseDailyUtility(text)
         ?: parseRealtimeInfo(text)
         ?: parseDeviceStatus(text)
@@ -502,6 +504,50 @@ object CommandParser {
             return decision(UserFileOperation.OPEN_FILE, "System file picker khulchi — file apni select korun.")
         }
         return null
+    }
+
+    // --- 2c. User-reviewed email + official notification reply (v2.3) ------------------
+
+    private fun parseCommunicationCompose(t: String): CommandDecision? {
+        val replyMarker = listOf(
+            "notification e reply dao", "notification reply dao", "notification reply koro",
+            "reply to notification", "নোটিফিকেশনে রিপ্লাই দাও", "নোটিফিকেশনের উত্তর দাও",
+            "রিপ্লাই দাও", "reply dao", "reply koro",
+        ).firstOrNull { t.contains(it) }
+        if (replyMarker != null && (t.contains("notification") || t.contains("নোটিফিকেশন"))) {
+            val ordinal = Regex("""(\d+)\s*(number|no|tomo|তম)""").find(t)
+                ?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(1, 30) ?: 1
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            var message = quoted ?: contentAfter(t, replyMarker)
+            message = message?.removePrefix("je ")?.removePrefix("যে ")?.trim()
+            if (message.isNullOrBlank()) return unsupported("Notification e ki reply dibo? Message ta bolun.")
+            return ok(
+                NuvaAction.ReplyNotification(ordinal, message.take(1_000)),
+                "$ordinal number notification e \"${message.take(120)}\" reply pathabo — nishchit korun.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val emailMarker = listOf(
+            "email compose koro", "compose email", "email likho", "email koro", "email pathao",
+            "mail compose koro", "mail likho", "mail pathao", "ইমেইল লেখো", "ইমেইল পাঠাও", "মেইল লেখো",
+        ).firstOrNull { t.contains(it) } ?: return null
+        val recipient = EMAIL_ADDRESS.find(t)?.value
+        val subject = Regex("""(?:subject|বিষয়|বিষয়)\s*[:=-]?\s*(.{1,200}?)(?=\s+(?:body|message|je|যে)\s|$)""")
+            .find(t)?.groupValues?.get(1)?.trim(' ', ',', '.', ':')
+        val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+        val bodyMarker = listOf(" body ", " message ", " je ", " যে ").firstOrNull { t.contains(it) }
+        var body = quoted ?: bodyMarker?.let { marker -> t.substringAfter(marker).trim(' ', ',', '.', ':') }
+        if (body.isNullOrBlank()) {
+            body = contentAfter(t, emailMarker)?.replace(recipient.orEmpty(), " ")
+                ?.replace(Regex("""\b(subject|বিষয়|বিষয়)\b.*$"""), " ")
+                ?.replace(Regex("""\s+"""), " ")?.trim()?.ifBlank { null }
+        }
+        return ok(
+            NuvaAction.ComposeEmail(recipient, subject, body?.take(5_000)),
+            "Email composer khulbo${recipient?.let { " — recipient $it" } ?: ""}; Send apni chapben.",
+            NuvaRisk.MEDIUM,
+        )
     }
 
     // --- 3. Device status ---------------------------------------------------------------

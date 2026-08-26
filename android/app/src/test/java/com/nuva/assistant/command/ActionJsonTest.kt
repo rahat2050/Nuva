@@ -33,6 +33,8 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("LOCAL_ANSWER"))
         assertNull(NuvaIntent.fromWire("READ_SAVED_ITEMS"))
         assertNull(NuvaIntent.fromWire("USER_FILE"))
+        assertNull(NuvaIntent.fromWire("COMPOSE_EMAIL"))
+        assertNull(NuvaIntent.fromWire("REPLY_NOTIFICATION"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -49,6 +51,9 @@ class ActionJsonTest {
             NuvaAction.ReadSavedItems(SavedItemKind.SHOPPING),
             NuvaAction.UserFile(UserFileOperation.OPEN_FILE),
             NuvaAction.UserFile(UserFileOperation.SHARE_PHOTO),
+            NuvaAction.ComposeEmail("user@example.com", "meeting", "kal 9 tay"),
+            NuvaAction.ComposeEmail(null, null, null),
+            NuvaAction.ReplyNotification(2, "ami ashchi"),
             NuvaAction.OpenSettingScreen(SettingTarget.TORCH),
             NuvaAction.ReadNotifications,
             NuvaAction.SetReminder("medicine", 1_770_000_000_000L, "kal"),
@@ -102,6 +107,22 @@ class ActionJsonTest {
             },
         )
         assertTrue(unsafeFileOperation is CommandValidator.ValidatedAction.Invalid)
+
+        val badEmail = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "COMPOSE_EMAIL")
+                put("recipient", "not-an-email")
+            },
+        )
+        assertTrue(badEmail is CommandValidator.ValidatedAction.Invalid)
+
+        val emptyReply = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "REPLY_NOTIFICATION")
+                put("message", "")
+            },
+        )
+        assertTrue(emptyReply is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test
@@ -109,6 +130,8 @@ class ActionJsonTest {
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SET_REMINDER))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CALL_CONTACT))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SEND_MESSAGE))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.COMPOSE_EMAIL))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.REPLY_NOTIFICATION))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.DEVICE_STATUS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CREATE_NOTE))
     }

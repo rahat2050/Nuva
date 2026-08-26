@@ -18,6 +18,8 @@ you say into a validated action, asks before doing anything risky, and carries i
 "Nuva please go to home taratari."  → polite/ASR grammar routes to Home
 "Gallery theke photo share koro."   → user picker, then Android share sheet
 "Text file pore shonao."            → reads only the file the user selects
+"user@example.com ke email koro je ami ashchi" → opens reviewed email draft
+"notification reply dao je 10 minute pore ashbo" → confirmed official RemoteInput reply
 ```
 
 ## Project status
@@ -26,7 +28,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v2.2 passes** — practical assistant → universal control → user-present files/media | ✅ Implemented in code (real-device QA still pending): safe phone control, offline utilities, 600 sourced skills, 12,250 command forms, and Android picker-based file/photo/video workflows; see [`docs/supported-features.md`](docs/supported-features.md) |
+| **v1.1–v2.3 passes** — practical assistant → user-present files → reviewed communication | ✅ Implemented in code (real-device QA still pending): safe phone control, offline utilities, 600 sourced skills, 12,250 command forms, picker-based files/media, email compose and confirmed official notification replies; see [`docs/supported-features.md`](docs/supported-features.md) |
 
 `backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
@@ -151,6 +153,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [10000-command-grammar.md](docs/10000-command-grammar.md) | v2.1 audit of 12,250 natural command forms |
 | [1000-unsupported-skills.md](docs/1000-unsupported-skills.md) | Exact list of 1,000 blocked/unsupported direct automations |
 | [user-present-files.md](docs/user-present-files.md) | v2.2 picker-based file/gallery workflows and remaining phases |
+| [user-reviewed-communication.md](docs/user-reviewed-communication.md) | v2.3 email compose and official notification reply rules |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |

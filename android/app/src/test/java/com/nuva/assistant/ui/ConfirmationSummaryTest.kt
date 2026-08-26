@@ -57,6 +57,23 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `email and notification reply summaries show exact outbound content`() {
+        val email = ConfirmationSummary.build(
+            NuvaAction.ComposeEmail("user@example.com", "meeting", "kal 9 tay"),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(email.lines.any { it.value == "user@example.com" })
+        assertTrue(email.detail.contains("Send"))
+
+        val reply = ConfirmationSummary.build(
+            NuvaAction.ReplyNotification(2, "ami ashchi"),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(reply.lines.any { it.value.contains("ami ashchi") })
+        assertEquals("SEND REPLY", reply.confirmLabel)
+    }
+
+    @Test
     fun `file share summary keeps picker and final recipient user controlled`() {
         val summary = ConfirmationSummary.build(
             NuvaAction.UserFile(UserFileOperation.SHARE_FILE),

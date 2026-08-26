@@ -1,7 +1,10 @@
 package com.nuva.assistant.service
 
+import android.app.PendingIntent
+import android.app.RemoteInput
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -10,10 +13,10 @@ import com.nuva.assistant.core.security.SensitiveAppPolicy
 /**
  * Notification reader (v1.1).
  *
- * READ-ONLY: NUVA summarizes the active notifications when asked. It never
- * replies, dismisses or acts on them — a reliable RemoteInput reply needs
- * per-app integration, so that flow is explicitly unsupported (the UI says
- * so) instead of pretending.
+ * NUVA summarizes active notifications and, from v2.3, can use an app's
+ * official free-form RemoteInput reply action after a blocking confirmation.
+ * It never fabricates a reply route, never replies to financial apps and never
+ * dismisses notifications. Apps that expose no RemoteInput remain unsupported.
  *
  * Safety built in:
  *  * OTP/PIN-like codes are redacted from every summary (policy §33).
@@ -64,6 +67,12 @@ class NuvaNotificationListener : NotificationListenerService() {
         }
     }
 
+    data class ReplyHandle(
+        val title: String,
+        val pendingIntent: PendingIntent,
+        val remoteInputs: Array<RemoteInput>,
+    )
+
     data class NuvaNotification(
         val key: String,
         val packageName: String,
@@ -72,6 +81,7 @@ class NuvaNotificationListener : NotificationListenerService() {
         val text: String?,
         val postedAt: Long,
         val mediaSessionToken: android.media.session.MediaSession.Token? = null,
+        val replyHandle: ReplyHandle? = null,
     )
 
     private fun parse(sbn: StatusBarNotification): NuvaNotification? {
@@ -81,6 +91,7 @@ class NuvaNotificationListener : NotificationListenerService() {
         val text = extras.getCharSequence("android.text")?.toString()
         if (title.isNullOrBlank() && text.isNullOrBlank()) return null
         val token = mediaToken(extras)
+        val replyHandle = findReplyHandle(sbn.notification?.actions)
         val label = runCatching {
             packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName, 0)).toString()
         }.getOrDefault(sbn.packageName.substringAfterLast('.'))
@@ -92,7 +103,19 @@ class NuvaNotificationListener : NotificationListenerService() {
             text = text,
             postedAt = sbn.postTime,
             mediaSessionToken = token,
+            replyHandle = replyHandle,
         )
+    }
+
+    private fun findReplyHandle(actions: Array<android.app.Notification.Action>?): ReplyHandle? {
+        val candidates = actions.orEmpty().mapNotNull { action ->
+            val inputs = action.remoteInputs.orEmpty().filter { it.allowFreeFormInput }.toTypedArray()
+            val pending = action.actionIntent
+            if (inputs.isEmpty() || pending == null) null
+            else ReplyHandle(action.title?.toString().orEmpty(), pending, inputs)
+        }
+        val preferred = preferredReplyIndex(candidates.map { it.title }) ?: return null
+        return candidates[preferred]
     }
 
     /** MediaSession token of the current media notification, for MEDIA_CONTROL. */
@@ -104,6 +127,15 @@ class NuvaNotificationListener : NotificationListenerService() {
             extras.getParcelable("android.mediaSession")
         }
     }.getOrNull()
+
+    sealed interface ReplyResult {
+        data class Sent(val appLabel: String) : ReplyResult
+        data object NeedsAccess : ReplyResult
+        data object NotificationMissing : ReplyResult
+        data object ReplyUnavailable : ReplyResult
+        data object SensitiveBlocked : ReplyResult
+        data class Failed(val reason: String) : ReplyResult
+    }
 
     companion object {
         private const val MAX_STORED = 30
@@ -158,6 +190,42 @@ class NuvaNotificationListener : NotificationListenerService() {
             return items.filter { !com.nuva.assistant.core.security.SensitiveAppPolicy.isSensitivePackage(it.packageName) }
                 .take(limit)
         }
+
+        /** Selects an already-valid free-form action, preferring an explicit Reply label. */
+        fun preferredReplyIndex(titles: List<String>): Int? {
+            if (titles.isEmpty()) return null
+            val explicit = titles.indexOfFirst { title ->
+                listOf("reply", "respond", "উত্তর", "রিপ্লাই").any { marker ->
+                    title.contains(marker, ignoreCase = true)
+                }
+            }
+            return if (explicit >= 0) explicit else 0
+        }
+
+        /** Official RemoteInput only; blocking confirmation happens in CommandExecutor. */
+        fun reply(ordinal: Int, message: String): ReplyResult {
+            val service = companionInstance ?: return ReplyResult.NeedsAccess
+            if (SensitiveAppPolicy.mentionsCredentials(message)) return ReplyResult.SensitiveBlocked
+            val notification = safeSnapshot(limit = 30).getOrNull(ordinal.coerceIn(1, 30) - 1)
+                ?: return ReplyResult.NotificationMissing
+            if (SensitiveAppPolicy.isSensitivePackage(notification.packageName)) return ReplyResult.SensitiveBlocked
+            val handle = notification.replyHandle ?: return ReplyResult.ReplyUnavailable
+            return try {
+                val fillIn = Intent()
+                val results = Bundle()
+                handle.remoteInputs.forEach { input -> results.putCharSequence(input.resultKey, message.take(1_000)) }
+                RemoteInput.addResultsToIntent(handle.remoteInputs, fillIn, results)
+                handle.pendingIntent.send(service, 0, fillIn)
+                ReplyResult.Sent(notification.appLabel)
+            } catch (error: PendingIntent.CanceledException) {
+                ReplyResult.Failed("Reply action expire hoye geche.")
+            } catch (error: Exception) {
+                ReplyResult.Failed(error.message ?: "RemoteInput failed")
+            }
+        }
+
+        fun canReply(ordinal: Int = 1): Boolean =
+            safeSnapshot(limit = 30).getOrNull(ordinal.coerceIn(1, 30) - 1)?.replyHandle != null
 
         /**
          * The newest active MediaSession token (from the media notification),

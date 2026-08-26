@@ -96,6 +96,23 @@ object ConfirmationSummary {
                 detail = "কাজটি শুধু আপনার ফোনেই থাকবে।"
             }
 
+            is NuvaAction.ComposeEmail -> {
+                title = "Email composer খুলবে"
+                action.recipient?.let { lines += Line("প্রাপক", it) }
+                action.subject?.let { lines += Line("বিষয়", it) }
+                action.body?.let { lines += Line("লেখা", "“${it.take(500)}”") }
+                detail = "Email app-এ draft খুলবে; final Send আপনি চাপবেন।"
+                confirmLabelOverride = "CONTINUE"
+            }
+
+            is NuvaAction.ReplyNotification -> {
+                title = "Notification reply পাঠানো হবে"
+                lines += Line("নোটিফিকেশন", "${action.ordinal} নম্বর")
+                lines += Line("রিপ্লাই", "“${action.message}”")
+                detail = "শুধু app-এর official RemoteInput Reply action ব্যবহার হবে।"
+                confirmLabelOverride = "SEND REPLY"
+            }
+
             is NuvaAction.UserFile -> {
                 title = "Android picker খুলবে"
                 lines += Line("কাজ", action.operation.wireName)

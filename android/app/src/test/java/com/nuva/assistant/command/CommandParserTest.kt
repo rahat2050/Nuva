@@ -227,6 +227,40 @@ class CommandParserTest {
         assertFalse(CommandParser.parse("text file poro")!!.requiresConfirmation)
     }
 
+    // --- Email compose & notification RemoteInput -------------------------------------
+
+    @Test
+    fun `email commands create user reviewed compose drafts`() {
+        val decision = CommandParser.parse(
+            "user@example.com ke email koro subject meeting je kal 9 tay asben",
+        )!!
+        val email = decision.action as NuvaAction.ComposeEmail
+        assertEquals("user@example.com", email.recipient)
+        assertEquals("meeting", email.subject)
+        assertEquals("kal 9 tay asben", email.body)
+        assertTrue(decision.requiresConfirmation)
+
+        val blank = CommandParser.parse("email compose koro")!!.action as NuvaAction.ComposeEmail
+        assertNull(blank.recipient)
+        assertNull(blank.body)
+    }
+
+    @Test
+    fun `notification reply extracts ordinal and exact message`() {
+        val decision = CommandParser.parse("2 number notification e reply dao je ami 10 minute e ashchi")!!
+        val reply = decision.action as NuvaAction.ReplyNotification
+        assertEquals(2, reply.ordinal)
+        assertEquals("ami 10 minute e ashchi", reply.message)
+        assertTrue(decision.requiresConfirmation)
+
+        val missing = CommandParser.parse("notification reply koro")
+        assertTrue(missing!!.unsupported)
+
+        val credential = CommandParser.parse("notification reply dao je otp 1234")
+        assertTrue(credential!!.unsupported)
+        assertNull(credential.action)
+    }
+
     // --- Settings ----------------------------------------------------------------------
 
     @Test
