@@ -189,6 +189,7 @@ sealed interface NuvaAction {
         val recipient: String?,
         val subject: String?,
         val body: String?,
+        val attachmentRequested: Boolean = false,
     ) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.COMPOSE_EMAIL
     }
@@ -196,6 +197,20 @@ sealed interface NuvaAction {
     /** Sends through a notification's official RemoteInput action after confirmation. */
     data class ReplyNotification(val ordinal: Int, val message: String) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.REPLY_NOTIFICATION
+    }
+
+    data class PrepareForm(val kind: FormKind, val details: String?) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.PREPARE_FORM
+    }
+
+    data class ScheduleCompose(
+        val channel: ComposeChannel,
+        val recipient: String?,
+        val subject: String?,
+        val body: String,
+        val triggerAt: Long,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.SCHEDULE_COMPOSE
     }
 
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
@@ -352,6 +367,35 @@ enum class CaptureMode(val wireName: String) {
     }
 }
 
+enum class ComposeChannel(val wireName: String) {
+    EMAIL("email"),
+    SMS("sms"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): ComposeChannel? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class FormKind(val wireName: String, val searchLabel: String) {
+    PASSPORT("passport", "Bangladesh official passport application"),
+    NID("nid", "Bangladesh official NID service"),
+    BIRTH_REGISTRATION("birth_registration", "Bangladesh official birth registration"),
+    DRIVING_LICENSE("driving_license", "Bangladesh official driving license application"),
+    VISA("visa", "official visa application"),
+    ADMISSION("admission", "official admission application"),
+    JOB("job", "official job application portal"),
+    DOCTOR("doctor", "doctor appointment booking"),
+    HOTEL("hotel", "hotel booking form"),
+    FLIGHT("flight", "flight booking form"),
+    COURIER("courier", "courier pickup booking form"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): FormKind? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
 enum class SavedItemKind(val wireName: String) {
     TODO("todo"),
     NOTE("note"),
@@ -375,10 +419,11 @@ enum class UserFileOperation(val wireName: String, val mimeType: String, val use
     SHARE_PHOTO("share_photo", "image/*"),
     PICK_VIDEO("pick_video", "video/*"),
     SHARE_VIDEO("share_video", "video/*"),
+    EMAIL_ATTACHMENT("email_attachment", "*/*"),
     ;
 
     val sharesOutsideDevice: Boolean
-        get() = this == SHARE_FILE || this == SHARE_PHOTO || this == SHARE_VIDEO
+        get() = this == SHARE_FILE || this == SHARE_PHOTO || this == SHARE_VIDEO || this == EMAIL_ATTACHMENT
 
     companion object {
         fun fromWire(value: String?): UserFileOperation? =

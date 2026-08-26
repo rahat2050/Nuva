@@ -101,8 +101,27 @@ object ConfirmationSummary {
                 action.recipient?.let { lines += Line("প্রাপক", it) }
                 action.subject?.let { lines += Line("বিষয়", it) }
                 action.body?.let { lines += Line("লেখা", "“${it.take(500)}”") }
+                if (action.attachmentRequested) lines += Line("সংযুক্তি", "Android picker থেকে আপনি বেছে নেবেন")
                 detail = "Email app-এ draft খুলবে; final Send আপনি চাপবেন।"
                 confirmLabelOverride = "CONTINUE"
+            }
+
+            is NuvaAction.PrepareForm -> {
+                title = "Form/booking handoff প্রস্তুত হবে"
+                lines += Line("ধরন", action.kind.wireName)
+                action.details?.let { lines += Line("Local draft", it.take(500)) }
+                detail = "Details শুধু local note-এ থাকবে; official portal search খুলবে, final Submit আপনি করবেন।"
+                confirmLabelOverride = "PREPARE"
+            }
+
+            is NuvaAction.ScheduleCompose -> {
+                title = "Compose reminder schedule হবে"
+                lines += Line("Channel", action.channel.wireName.uppercase())
+                action.recipient?.let { lines += Line("প্রাপক", it) }
+                action.subject?.let { lines += Line("বিষয়", it) }
+                lines += Line("Draft", action.body.take(500))
+                detail = "সময় হলে notification আসবে; tap করলে draft খুলবে, automatic Send হবে না।"
+                confirmLabelOverride = "SCHEDULE"
             }
 
             is NuvaAction.ReplyNotification -> {

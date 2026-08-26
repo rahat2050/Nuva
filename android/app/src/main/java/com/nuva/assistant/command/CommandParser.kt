@@ -208,6 +208,7 @@ object CommandParser {
         ?: parseUniversal(text)
         ?: parseScreenReading(text)
         ?: parseUserPresentFile(text)
+        ?: parseProductivityHandoff(text)
         ?: parseCommunicationCompose(text)
         ?: parseDailyUtility(text)
         ?: parseRealtimeInfo(text)
@@ -506,7 +507,65 @@ object CommandParser {
         return null
     }
 
-    // --- 2c. User-reviewed email + official notification reply (v2.3) ------------------
+    // --- 2c. Forms/productivity handoff + scheduled compose reminder (v2.4) ------------
+
+    private fun parseProductivityHandoff(t: String): CommandDecision? {
+        val scheduled = listOf(
+            "schedule email", "scheduled email", "email reminder", "schedule sms", "scheduled sms",
+            "message compose reminder", "ইমেইল রিমাইন্ডার", "এসএমএস রিমাইন্ডার",
+        ).any { t.contains(it) }
+        if (scheduled) {
+            val channel = if (t.contains("sms") || t.contains("এসএমএস")) ComposeChannel.SMS else ComposeChannel.EMAIL
+            val parsedTime = NuvaDateTimeParser.parseTime(t)
+                ?: return unsupported("Koto tay compose reminder dibo? Somoy ta bolun.")
+            val triggerAt = com.nuva.assistant.automation.ScheduledComposeScheduler.nextTrigger(t, parsedTime.hour, parsedTime.minute)
+            val recipient = when (channel) {
+                ComposeChannel.EMAIL -> EMAIL_ADDRESS.find(t)?.value
+                ComposeChannel.SMS -> PHONE_NUMBER.find(t)?.value?.let { digitsOnly(it) }
+            }
+            val subject = Regex("""(?:subject|বিষয়|বিষয়)\s*[:=-]?\s*(.{1,200}?)(?=\s+(?:body|message|je|যে)\s|$)""")
+                .find(t)?.groupValues?.get(1)?.trim(' ', ',', '.', ':')
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            val bodyMarker = listOf(" body ", " message ", " je ", " যে ").firstOrNull { t.contains(it) }
+            val body = quoted ?: bodyMarker?.let { t.substringAfter(it).trim(' ', ',', '.', ':') }
+            if (body.isNullOrBlank()) return unsupported("Reminder-er compose body/message ta bolun.")
+            return ok(
+                NuvaAction.ScheduleCompose(channel, recipient, subject, body.take(2_000), triggerAt),
+                "Compose reminder schedule korbo — notification tap korle draft khulbe; Send apni chapben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val formRequested = listOf(
+            "form prepare", "application prepare", "application form kholo", "booking prepare", "form draft",
+            "ফর্ম প্রস্তুত", "আবেদন ফর্ম", "বুকিং ফর্ম",
+        ).any { t.contains(it) }
+        if (!formRequested) return null
+        val kind = when {
+            t.contains("passport") || t.contains("পাসপোর্ট") -> FormKind.PASSPORT
+            t.contains("nid") || t.contains("এনআইডি") -> FormKind.NID
+            t.contains("birth") || t.contains("জন্ম") -> FormKind.BIRTH_REGISTRATION
+            t.contains("driving") || t.contains("ড্রাইভিং") -> FormKind.DRIVING_LICENSE
+            t.contains("visa") || t.contains("ভিসা") -> FormKind.VISA
+            t.contains("admission") || t.contains("ভর্তি") -> FormKind.ADMISSION
+            t.contains("job") || t.contains("চাকরি") -> FormKind.JOB
+            t.contains("doctor") || t.contains("ডাক্তার") -> FormKind.DOCTOR
+            t.contains("hotel") || t.contains("হোটেল") -> FormKind.HOTEL
+            t.contains("flight") || t.contains("ফ্লাইট") -> FormKind.FLIGHT
+            t.contains("courier") || t.contains("কুরিয়ার") -> FormKind.COURIER
+            else -> return unsupported("Kon form/booking prepare korbo? Type ta bolun.")
+        }
+        val details = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            ?: listOf(" details ", " তথ্য ").firstOrNull { t.contains(it) }
+                ?.let { t.substringAfter(it).trim(' ', ',', '.', ':').take(1_000) }
+        return ok(
+            NuvaAction.PrepareForm(kind, details),
+            "${kind.wireName} form draft locally rakhbo, tarpor official portal search khulbo — final Submit apni korben.",
+            NuvaRisk.MEDIUM,
+        )
+    }
+
+    // --- 2d. User-reviewed email + official notification reply (v2.3) ------------------
 
     private fun parseCommunicationCompose(t: String): CommandDecision? {
         val replyMarker = listOf(
@@ -543,9 +602,17 @@ object CommandParser {
                 ?.replace(Regex("""\b(subject|বিষয়|বিষয়)\b.*$"""), " ")
                 ?.replace(Regex("""\s+"""), " ")?.trim()?.ifBlank { null }
         }
+        val attachmentWords = listOf(
+            "attachment", "attach file", "file attach", "document attach", "সংযুক্তি", "ফাইল অ্যাটাচ",
+        )
+        val attachmentRequested = attachmentWords.any { t.contains(it) }
+        if (attachmentRequested && quoted == null && bodyMarker == null) {
+            attachmentWords.forEach { word -> body = body?.replace(word, " ") }
+            body = body?.replace(Regex("""\s+"""), " ")?.trim()?.ifBlank { null }
+        }
         return ok(
-            NuvaAction.ComposeEmail(recipient, subject, body?.take(5_000)),
-            "Email composer khulbo${recipient?.let { " — recipient $it" } ?: ""}; Send apni chapben.",
+            NuvaAction.ComposeEmail(recipient, subject, body?.take(5_000), attachmentRequested),
+            "Email composer khulbo${recipient?.let { " — recipient $it" } ?: ""}${if (attachmentRequested) "; age attachment beche nin" else ""}; Send apni chapben.",
             NuvaRisk.MEDIUM,
         )
     }

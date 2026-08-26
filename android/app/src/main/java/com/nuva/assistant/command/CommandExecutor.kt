@@ -588,10 +588,57 @@ class CommandExecutor(
                 }
             }
 
-            is NuvaAction.ComposeEmail -> when (val result = com.nuva.assistant.automation.EmailComposer.compose(context, action)) {
-                com.nuva.assistant.automation.EmailComposer.Result.Opened ->
-                    ExecutionOutcome("completed", "Email composer khulechi — review kore Send apni chapun.")
-                is com.nuva.assistant.automation.EmailComposer.Result.Failed ->
+            is NuvaAction.ComposeEmail -> if (action.attachmentRequested) {
+                com.nuva.assistant.automation.UserPresentFileWorkflow.requestEmailAttachment(action)
+                val activity = Intent(context, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                if (runCatching { context.startActivity(activity); true }.getOrDefault(false)) {
+                    ExecutionOutcome("completed", "Attachment picker khulchi — file apni select korun.")
+                } else {
+                    com.nuva.assistant.automation.UserPresentFileWorkflow.cancel()
+                    ExecutionOutcome("failed", "Attachment picker khulte parini.", "activity launch failed")
+                }
+            } else {
+                when (val result = com.nuva.assistant.automation.EmailComposer.compose(context, action)) {
+                    com.nuva.assistant.automation.EmailComposer.Result.Opened ->
+                        ExecutionOutcome("completed", "Email composer khulechi — review kore Send apni chapun.")
+                    is com.nuva.assistant.automation.EmailComposer.Result.Failed ->
+                        ExecutionOutcome("failed", result.reason, result.reason)
+                }
+            }
+
+            is NuvaAction.PrepareForm -> {
+                if (action.details?.let {
+                        com.nuva.assistant.core.security.SensitiveAppPolicy.mentionsCredentials(it) ||
+                            com.nuva.assistant.core.security.SensitiveAppPolicy.refusalForText(it) != null
+                    } == true
+                ) {
+                    return ExecutionOutcome("failed", "Sensitive ba financial details form draft-e rakhbo na.", "sensitive form details blocked")
+                }
+                val dao = notes ?: return ExecutionOutcome("failed", "Form draft save korte parini.", "notes storage unavailable")
+                val localDraft = buildString {
+                    append("Form draft [${action.kind.wireName}]")
+                    action.details?.let { append(": ").append(it) }
+                }
+                val saved = dao.insertRow(NoteEntity(content = localDraft, kind = "note")) > 0
+                when (val web = BrowserAutomation.searchWeb(context, action.kind.searchLabel)) {
+                    is BrowserAutomation.Result.Opened -> ExecutionOutcome(
+                        "completed",
+                        if (saved) "Form details locally save kore official portal search khulechi — final Submit apni korben."
+                        else "Official portal search khulechi — final Submit apni korben.",
+                    )
+                    is BrowserAutomation.Result.Failed -> ExecutionOutcome("failed", web.userReason, web.userReason)
+                }
+            }
+
+            is NuvaAction.ScheduleCompose -> when (
+                val result = com.nuva.assistant.automation.ScheduledComposeScheduler.schedule(context, action)
+            ) {
+                is com.nuva.assistant.automation.ScheduledComposeScheduler.Result.Scheduled ->
+                    ExecutionOutcome("completed", "Compose reminder schedule hoyeche — notification tap korle draft khulbe.")
+                com.nuva.assistant.automation.ScheduledComposeScheduler.Result.NotificationPermissionMissing ->
+                    ExecutionOutcome("failed", "Scheduled draft-er jonno notification permission lagbe.", "notification permission missing")
+                is com.nuva.assistant.automation.ScheduledComposeScheduler.Result.Failed ->
                     ExecutionOutcome("failed", result.reason, result.reason)
             }
 
@@ -863,6 +910,7 @@ class CommandExecutor(
                 UserFileOperation.SHARE_PHOTO -> "share korar photo"
                 UserFileOperation.PICK_VIDEO -> "video"
                 UserFileOperation.SHARE_VIDEO -> "share korar video"
+                UserFileOperation.EMAIL_ATTACHMENT -> "email attachment"
             }
             ExecutionOutcome("completed", "$what picker khulchi — target apni select korun.")
         } else {

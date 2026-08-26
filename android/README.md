@@ -154,6 +154,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   sheet. No broad storage permission or guessed path.
 * **v2.3 user-reviewed communication**: validated email draft compose (`ACTION_SENDTO`, user taps
   Send) and confirmed notification replies only through an app-provided free-form RemoteInput action.
+* **v2.4 forms/productivity**: one picker-selected email attachment, local-only form/booking drafts
+  with sourced portal handoff, and one-shot email/SMS compose reminders that open drafts on tap.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

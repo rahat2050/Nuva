@@ -130,7 +130,35 @@ object CommandValidator {
             NuvaIntent.USER_FILE -> validateUserFile(actionJson)
             NuvaIntent.COMPOSE_EMAIL -> validateComposeEmail(actionJson)
             NuvaIntent.REPLY_NOTIFICATION -> validateReplyNotification(actionJson)
+            NuvaIntent.PREPARE_FORM -> validatePrepareForm(actionJson)
+            NuvaIntent.SCHEDULE_COMPOSE -> validateScheduleCompose(actionJson)
         }
+    }
+
+    private fun validatePrepareForm(json: JsonObject): ValidatedAction {
+        val kind = FormKind.fromWire(json.str("kind"))
+            ?: return ValidatedAction.Invalid(listOf("PREPARE_FORM requires a known kind"))
+        val details = json.str("details")?.takeIf { it.isNotEmpty() && it.length <= 1_000 }
+        return ValidatedAction.Valid(NuvaAction.PrepareForm(kind, details))
+    }
+
+    private fun validateScheduleCompose(json: JsonObject): ValidatedAction {
+        val channel = ComposeChannel.fromWire(json.str("channel"))
+            ?: return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE requires channel"))
+        val rawRecipient = json.str("recipient")
+        val recipient = when (channel) {
+            ComposeChannel.EMAIL -> rawRecipient?.takeIf { EMAIL_PATTERN.matches(it) }
+            ComposeChannel.SMS -> rawRecipient?.takeIf { PHONE_PATTERN.matches(it) }
+        }
+        if (rawRecipient != null && recipient == null) {
+            return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE recipient is invalid"))
+        }
+        val subject = json.str("subject")?.takeIf { it.isNotEmpty() && it.length <= 200 }
+        val body = json.str("body")?.takeIf { it.isNotEmpty() && it.length <= 2_000 }
+            ?: return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE requires body"))
+        val triggerAt = json.long("trigger_at")?.takeIf { it in 1..4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE requires valid trigger_at"))
+        return ValidatedAction.Valid(NuvaAction.ScheduleCompose(channel, recipient, subject, body, triggerAt))
     }
 
     private fun validateComposeEmail(json: JsonObject): ValidatedAction {
@@ -140,7 +168,8 @@ object CommandValidator {
         }
         val subject = json.str("subject")?.takeIf { it.isNotEmpty() && it.length <= 200 }
         val body = json.str("body")?.takeIf { it.isNotEmpty() && it.length <= 5_000 }
-        return ValidatedAction.Valid(NuvaAction.ComposeEmail(recipient, subject, body))
+        val attachmentRequested = json.bool("attachment_requested") ?: false
+        return ValidatedAction.Valid(NuvaAction.ComposeEmail(recipient, subject, body, attachmentRequested))
     }
 
     private fun validateReplyNotification(json: JsonObject): ValidatedAction {
@@ -152,7 +181,8 @@ object CommandValidator {
 
     private fun validateUserFile(json: JsonObject): ValidatedAction {
         val operation = UserFileOperation.fromWire(json.str("operation"))
-            ?: return ValidatedAction.Invalid(listOf("USER_FILE requires a known operation"))
+            ?.takeIf { it != UserFileOperation.EMAIL_ATTACHMENT }
+            ?: return ValidatedAction.Invalid(listOf("USER_FILE requires a public picker operation"))
         return ValidatedAction.Valid(NuvaAction.UserFile(operation))
     }
 

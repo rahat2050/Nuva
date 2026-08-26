@@ -305,6 +305,26 @@ def parse_user_file(t):
         return ok({"kind":"userfile","operation":"OPEN_FILE"}, "USER_FILE")
     return None
 
+def parse_productivity(t):
+    scheduled=any(w in t for w in ["schedule email","scheduled email","email reminder","schedule sms","scheduled sms","message compose reminder"])
+    if scheduled:
+        tm=parse_time(t)
+        if not tm: return unsupported("Koto tay compose reminder dibo?")
+        body_marker=next((w for w in [" body "," message "," je "," যে "] if w in t),None)
+        body=t.split(body_marker,1)[1].strip(" ,.:") if body_marker else None
+        if not body: return unsupported("Compose body bolun")
+        channel="SMS" if "sms" in t else "EMAIL"
+        return ok({"kind":"schedulecompose","channel":channel,"body":body,"time":tm},"SCHEDULE_COMPOSE",risk="MEDIUM",base="MEDIUM")
+    form_requested=any(w in t for w in ["form prepare","application prepare","application form kholo","booking prepare","form draft"])
+    if not form_requested: return None
+    kinds=[("passport","PASSPORT"),("nid","NID"),("birth","BIRTH_REGISTRATION"),("driving","DRIVING_LICENSE"),
+           ("visa","VISA"),("admission","ADMISSION"),("job","JOB"),("doctor","DOCTOR"),("hotel","HOTEL"),
+           ("flight","FLIGHT"),("courier","COURIER")]
+    kind=next((value for marker,value in kinds if marker in t),None)
+    if not kind: return unsupported("Kon form?")
+    details=t.split(" details ",1)[1].strip() if " details " in t else None
+    return ok({"kind":"prepareform","form_kind":kind,"details":details},"PREPARE_FORM",risk="MEDIUM",base="MEDIUM")
+
 def parse_communication(t):
     reply_marker=next((w for w in ["notification e reply dao","notification reply dao","notification reply koro",
         "reply to notification","নোটিফিকেশনে রিপ্লাই দাও","reply dao","reply koro"] if w in t),None)
@@ -324,7 +344,8 @@ def parse_communication(t):
     recipient=m.group(0) if m else None
     body_marker=next((w for w in [" body "," message "," je "," যে "] if w in t),None)
     body=t.split(body_marker,1)[1].strip(" ,.:") if body_marker else None
-    return ok({"kind":"email","recipient":recipient,"body":body},"COMPOSE_EMAIL",risk="MEDIUM",base="MEDIUM")
+    attachment=any(w in t for w in ["attachment","attach file","file attach","document attach"])
+    return ok({"kind":"email","recipient":recipient,"body":body,"attachment":attachment},"COMPOSE_EMAIL",risk="MEDIUM",base="MEDIUM")
 
 def parse_status(t):
     if any(w in t for w in ["battery","battary","bettery","charge koto","charge koy","কত চার্জ","ব্যাটারি","চার্জ কত"]):
@@ -778,7 +799,7 @@ def parse_knowledge(t):
 
 def rule_table(t):
     return (parse_grammar(t) or parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_user_file(t)
-            or parse_communication(t) or parse_daily(t) or parse_realtime(t)
+            or parse_productivity(t) or parse_communication(t) or parse_daily(t) or parse_realtime(t)
             or parse_status(t) or parse_help(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
@@ -913,6 +934,9 @@ check(parse("video share koro")["action"]["operation"] == "SHARE_VIDEO", "video 
 check(parse("user@example.com ke email koro je ami ashchi")["intent"] == "COMPOSE_EMAIL", "email compose")
 reply_probe=parse("2 number notification e reply dao je ami ashchi")
 check(reply_probe["intent"] == "REPLY_NOTIFICATION" and reply_probe["confirm"], "notification RemoteInput reply")
+check(parse("email compose koro attachment")["action"]["attachment"], "email attachment picker handoff")
+check(parse("passport application form kholo details local draft")["intent"] == "PREPARE_FORM", "form handoff")
+check(parse("kal 9 tay schedule email je ami ashchi")["intent"] == "SCHEDULE_COMPOSE", "scheduled compose reminder")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

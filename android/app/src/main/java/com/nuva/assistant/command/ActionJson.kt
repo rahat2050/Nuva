@@ -113,9 +113,20 @@ object ActionJson {
             action.recipient?.let { put("recipient", it) }
             action.subject?.let { put("subject", it) }
             action.body?.let { put("body", it) }
+            if (action.attachmentRequested) put("attachment_requested", true)
         }
         is NuvaAction.ReplyNotification -> buildJsonObject {
             put("type", "REPLY_NOTIFICATION"); put("ordinal", action.ordinal); put("message", action.message)
+        }
+        is NuvaAction.PrepareForm -> buildJsonObject {
+            put("type", "PREPARE_FORM"); put("kind", action.kind.wireName)
+            action.details?.let { put("details", it) }
+        }
+        is NuvaAction.ScheduleCompose -> buildJsonObject {
+            put("type", "SCHEDULE_COMPOSE"); put("channel", action.channel.wireName)
+            action.recipient?.let { put("recipient", it) }
+            action.subject?.let { put("subject", it) }
+            put("body", action.body); put("trigger_at", action.triggerAt)
         }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)

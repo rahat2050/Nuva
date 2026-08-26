@@ -31,8 +31,7 @@ Rules:
 6. The stored `PendingIntent` and RemoteInput result keys are used; accessibility never guesses a Reply button.
 7. Missing, expired or unsupported reply actions fail honestly.
 
-## Still pending
+## v2.4 follow-up
 
-- File attachment handoff into email composer.
-- Local scheduled compose reminders (never automatic send).
+- One picker-selected file attachment and local email/SMS compose reminders are now implemented; see [`forms-productivity.md`](forms-productivity.md).
 - Bulk messages, auto-replies and background sends remain unsupported.

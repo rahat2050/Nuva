@@ -243,6 +243,11 @@ class CommandParserTest {
         val blank = CommandParser.parse("email compose koro")!!.action as NuvaAction.ComposeEmail
         assertNull(blank.recipient)
         assertNull(blank.body)
+
+        val attachment = CommandParser.parse("user@example.com ke email compose koro attachment")!!
+            .action as NuvaAction.ComposeEmail
+        assertTrue(attachment.attachmentRequested)
+        assertNull(attachment.body)
     }
 
     @Test
@@ -259,6 +264,38 @@ class CommandParserTest {
         val credential = CommandParser.parse("notification reply dao je otp 1234")
         assertTrue(credential!!.unsupported)
         assertNull(credential.action)
+    }
+
+    // --- Forms & scheduled compose -----------------------------------------------------
+
+    @Test
+    fun `form handoff stores only explicit local details and requires confirmation`() {
+        val decision = CommandParser.parse("passport application form kholo details name address draft")!!
+        val form = decision.action as NuvaAction.PrepareForm
+        assertEquals(FormKind.PASSPORT, form.kind)
+        assertEquals("name address draft", form.details)
+        assertTrue(decision.requiresConfirmation)
+    }
+
+    @Test
+    fun `scheduled email and sms become reminders not automatic sends`() {
+        val emailDecision = CommandParser.parse(
+            "kal shokal 9 tay schedule email user@example.com subject meeting je ami ashchi",
+        )!!
+        val email = emailDecision.action as NuvaAction.ScheduleCompose
+        assertEquals(ComposeChannel.EMAIL, email.channel)
+        assertEquals("user@example.com", email.recipient)
+        assertEquals("meeting", email.subject)
+        assertEquals("ami ashchi", email.body)
+        assertTrue(emailDecision.requiresConfirmation)
+        assertTrue(email.triggerAt > System.currentTimeMillis())
+
+        val sms = CommandParser.parse("kal 8 tay schedule sms 01712345678 message ami ashchi")!!
+            .action as NuvaAction.ScheduleCompose
+        assertEquals(ComposeChannel.SMS, sms.channel)
+        assertEquals("01712345678", sms.recipient)
+
+        assertTrue(CommandParser.parse("schedule email kal 9 tay")!!.unsupported)
     }
 
     // --- Settings ----------------------------------------------------------------------

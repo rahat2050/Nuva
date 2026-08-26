@@ -74,6 +74,29 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `form and schedule summaries keep final submit or send user controlled`() {
+        val form = ConfirmationSummary.build(
+            NuvaAction.PrepareForm(com.nuva.assistant.command.FormKind.PASSPORT, "local details"),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(form.detail.contains("local note"))
+        assertTrue(form.detail.contains("Submit"))
+
+        val schedule = ConfirmationSummary.build(
+            NuvaAction.ScheduleCompose(
+                com.nuva.assistant.command.ComposeChannel.EMAIL,
+                "user@example.com",
+                "meeting",
+                "kal ashben",
+                1_800_000_000_000L,
+            ),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(schedule.detail.contains("automatic Send"))
+        assertEquals("SCHEDULE", schedule.confirmLabel)
+    }
+
+    @Test
     fun `file share summary keeps picker and final recipient user controlled`() {
         val summary = ConfirmationSummary.build(
             NuvaAction.UserFile(UserFileOperation.SHARE_FILE),

@@ -35,6 +35,8 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("USER_FILE"))
         assertNull(NuvaIntent.fromWire("COMPOSE_EMAIL"))
         assertNull(NuvaIntent.fromWire("REPLY_NOTIFICATION"))
+        assertNull(NuvaIntent.fromWire("PREPARE_FORM"))
+        assertNull(NuvaIntent.fromWire("SCHEDULE_COMPOSE"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -52,8 +54,10 @@ class ActionJsonTest {
             NuvaAction.UserFile(UserFileOperation.OPEN_FILE),
             NuvaAction.UserFile(UserFileOperation.SHARE_PHOTO),
             NuvaAction.ComposeEmail("user@example.com", "meeting", "kal 9 tay"),
-            NuvaAction.ComposeEmail(null, null, null),
+            NuvaAction.ComposeEmail(null, null, null, attachmentRequested = true),
             NuvaAction.ReplyNotification(2, "ami ashchi"),
+            NuvaAction.PrepareForm(FormKind.PASSPORT, "name and address draft"),
+            NuvaAction.ScheduleCompose(ComposeChannel.EMAIL, "user@example.com", "meeting", "kal ashben", 1_800_000_000_000L),
             NuvaAction.OpenSettingScreen(SettingTarget.TORCH),
             NuvaAction.ReadNotifications,
             NuvaAction.SetReminder("medicine", 1_770_000_000_000L, "kal"),
@@ -123,6 +127,24 @@ class ActionJsonTest {
             },
         )
         assertTrue(emptyReply is CommandValidator.ValidatedAction.Invalid)
+
+        val badForm = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "PREPARE_FORM")
+                put("kind", "loan")
+            },
+        )
+        assertTrue(badForm is CommandValidator.ValidatedAction.Invalid)
+
+        val badSchedule = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "SCHEDULE_COMPOSE")
+                put("channel", "email")
+                put("body", "")
+                put("trigger_at", 1_800_000_000_000L)
+            },
+        )
+        assertTrue(badSchedule is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test
@@ -132,6 +154,8 @@ class ActionJsonTest {
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SEND_MESSAGE))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.COMPOSE_EMAIL))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.REPLY_NOTIFICATION))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.PREPARE_FORM))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SCHEDULE_COMPOSE))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.DEVICE_STATUS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CREATE_NOTE))
     }

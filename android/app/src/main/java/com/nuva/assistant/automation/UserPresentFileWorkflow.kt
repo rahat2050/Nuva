@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.nuva.assistant.command.NuvaAction
 import com.nuva.assistant.command.UserFileOperation
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,7 @@ object UserPresentFileWorkflow {
     data class Request(
         val id: Long,
         val operation: UserFileOperation,
+        val emailDraft: NuvaAction.ComposeEmail? = null,
     )
 
     private val _state = MutableStateFlow<State>(State.Idle)
@@ -40,6 +42,13 @@ object UserPresentFileWorkflow {
     @Synchronized
     fun request(operation: UserFileOperation): Request {
         val request = Request(System.nanoTime(), operation)
+        _state.value = State.Pending(request)
+        return request
+    }
+
+    @Synchronized
+    fun requestEmailAttachment(email: NuvaAction.ComposeEmail): Request {
+        val request = Request(System.nanoTime(), UserFileOperation.EMAIL_ATTACHMENT, email.copy(attachmentRequested = false))
         _state.value = State.Pending(request)
         return request
     }
@@ -112,6 +121,13 @@ object UserPresentFileWorkflow {
                     UserFileOperation.SHARE_VIDEO -> {
                         shareUri(context, uri, "video/*")
                         complete("Selected video share sheet e diyechi — final recipient apni beche nin.")
+                    }
+                    UserFileOperation.EMAIL_ATTACHMENT -> {
+                        val draft = request.emailDraft ?: error("email draft missing")
+                        when (val result = EmailComposer.composeWithAttachment(context, draft, uri)) {
+                            EmailComposer.Result.Opened -> complete("Attachment-shoho email composer khulechi — final Send apni chapun.")
+                            is EmailComposer.Result.Failed -> error(result.reason)
+                        }
                     }
                 }
             }.getOrElse { error ->

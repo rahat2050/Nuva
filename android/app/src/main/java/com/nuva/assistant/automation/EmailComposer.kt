@@ -1,5 +1,6 @@
 package com.nuva.assistant.automation
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -25,6 +26,27 @@ object EmailComposer {
             Result.Opened
         } catch (_: Exception) {
             Result.Failed("Email app khulte parini.")
+        }
+    }
+
+    fun composeWithAttachment(context: Context, action: NuvaAction.ComposeEmail, attachment: Uri): Result {
+        val mime = context.contentResolver.getType(attachment) ?: "application/octet-stream"
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            action.recipient?.let { putExtra(Intent.EXTRA_EMAIL, arrayOf(it)) }
+            action.subject?.let { putExtra(Intent.EXTRA_SUBJECT, it.take(200)) }
+            action.body?.let { putExtra(Intent.EXTRA_TEXT, it.take(5_000)) }
+            putExtra(Intent.EXTRA_STREAM, attachment)
+            clipData = ClipData.newUri(context.contentResolver, "NUVA email attachment", attachment)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        return try {
+            context.startActivity(
+                Intent.createChooser(intent, "Email with attachment").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+            Result.Opened
+        } catch (_: Exception) {
+            Result.Failed("Attachment-shoho email app khulte parini.")
         }
     }
 

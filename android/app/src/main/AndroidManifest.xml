@@ -92,6 +92,10 @@
 
         <!-- Notification READER (v1.1): summary only — never replies/dismisses.
              The user enables "Notification access" manually in system settings. -->
+        <receiver
+            android:name=".automation.ScheduledComposeReceiver"
+            android:exported="false" />
+
         <service
             android:name=".service.NuvaNotificationListener"
             android:exported="true"
