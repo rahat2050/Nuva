@@ -140,6 +140,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(),
     onOpenSetup: () -> Unit = {},
     onOpenSupport: () -> Unit = {},
+    onOpenPrivacy: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -334,6 +335,7 @@ fun SettingsScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onOpenSetup) { Text(stringResource(R.string.settings_open_setup)) }
             OutlinedButton(onClick = onOpenSupport) { Text(stringResource(R.string.settings_open_support)) }
+            OutlinedButton(onClick = onOpenPrivacy) { Text(stringResource(R.string.settings_open_privacy)) }
         }
 
         HorizontalDivider()

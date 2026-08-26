@@ -112,7 +112,9 @@ class CommandExecutor(
             )
             return handleDecision(text, decision)
         } catch (err: AIRepository.ApiCallException) {
-            return Step.Failed(err.speech)
+            return Step.Failed(
+                "ইন্টারনেট লাগবে এই command-এর জন্য। লোকাল কাজ (app open, torch, alarm, timer, volume, battery) অফলাইনেই চলে।",
+            )
         } catch (err: Exception) {
             return Step.Failed("Command ta process korte parini — abar try korun.")
         } finally {

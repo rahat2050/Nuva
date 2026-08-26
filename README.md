@@ -16,7 +16,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1 pass** — practical assistant    | ✅ Implemented (see [`docs/roadmap-v1.1.md`](docs/roadmap-v1.1.md)): on-device parser v2 (bn/banglish/en), local-only intents, banking/payment denylist, contacts + SMS/WhatsApp flows, phone utilities, notification reader, permission onboarding, typed fallback, history retry, honest supported/unsupported list |
+| **v1.1–v1.6 passes** — practical assistant → universal control → production hardening    | ✅ Implemented (see [`docs/v1.6-production-audit.md`](docs/v1.6-production-audit.md), [`docs/supported-features.md`](docs/supported-features.md), [`docs/privacy.md`](docs/privacy.md)): on-device parser v2 (bn/banglish/en), local-only intents, banking/payment denylist, contacts + SMS/WhatsApp flows, phone utilities, notification reader, permission onboarding, typed fallback, history retry, honest supported/unsupported list |
 
 `backend/` builds clean under strict TypeScript with **188 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See

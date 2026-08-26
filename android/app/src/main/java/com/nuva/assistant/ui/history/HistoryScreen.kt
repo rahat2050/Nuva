@@ -165,14 +165,14 @@ fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
 }
 
 @Composable
-private fun statusLabel(status: String): String = when (status) {
-    "completed" -> stringResource(R.string.status_completed)
-    "failed" -> stringResource(R.string.status_failed)
-    "rejected" -> stringResource(R.string.status_rejected)
-    "blocked" -> stringResource(R.string.status_blocked)
-    "unsupported" -> stringResource(R.string.status_unsupported)
-    "executing" -> stringResource(R.string.status_executing)
-    "pending_confirmation" -> stringResource(R.string.status_pending)
-    "pending_choice" -> stringResource(R.string.status_choice)
-    else -> status
+private fun statusLabel(status: String): String {
+    // Canonical display set (Phase 20); internal Room statuses stay unchanged.
+    return when (com.nuva.assistant.command.HistoryStatus.display(status)) {
+        "SUCCESS" -> stringResource(R.string.status_completed)
+        "FAILED" -> stringResource(R.string.status_failed)
+        "CANCELLED" -> stringResource(R.string.status_rejected)
+        "UNSUPPORTED" -> stringResource(R.string.status_unsupported)
+        "BLOCKED" -> stringResource(R.string.status_blocked)
+        else -> stringResource(R.string.status_pending)
+    }
 }

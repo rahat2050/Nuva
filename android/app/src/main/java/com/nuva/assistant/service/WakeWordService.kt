@@ -227,6 +227,9 @@ class WakeWordService : Service() {
         recognizer = SpeechRecognizerController(this)
         val language = NuvaContainer.preferences.languageBlocking()
         try {
+            // v1.6: stuck-listening recovery — a silent recognizer death ends
+            // the session and re-arms wake listening instead of hanging.
+            kotlinx.coroutines.withTimeout(15_000L) {
             recognizer?.listen(language)?.collect { event ->
                 when (event) {
                     SpeechRecognizerController.VoiceEvent.ListeningStarted -> Unit
@@ -243,6 +246,11 @@ class WakeWordService : Service() {
                         speakIfEnabled(event.speech)
                     }
                 }
+            }
+            }
+        } catch (err: kotlinx.coroutines.TimeoutCancellationException) {
+            overlay.showStatus(FloatingAssistantOverlay.PopupState.ERROR, "Timeout", "কিছু শুনতে পাইনি — আবার Hey Nuva বলুন।", autoDismissMs = 4_000) {
+                rearmIfEnabled()
             }
         } finally {
             recognizer = null

@@ -109,4 +109,18 @@
     <string name="delete">Delete</string>
 
     <string name="notification_listener_label">NUVA Notification Reader</string>
+
+    <!-- v1.6: privacy screen -->
+    <string name="privacy_title">Where your data goes</string>
+    <string name="privacy_local_title">📱 Stays on your phone</string>
+    <string name="privacy_local_body">Voice audio is never uploaded — only the text transcript is used. Command history, notes, to-dos, memories and settings live only in this phone\'s Room/DataStore.</string>
+    <string name="privacy_groq_title">🤖 Goes to Groq (only when needed)</string>
+    <string name="privacy_groq_body">Only when the local parser does not understand a command is the TEXT sent (via Vercel) to Groq to pick an action. Never audio.</string>
+    <string name="privacy_vercel_title">🔗 Vercel (backend)</string>
+    <string name="privacy_vercel_body">Vercel receives the command text, validates it and returns the action. With sign-in enabled, command records may sync to Supabase (optional).</string>
+    <string name="privacy_localdb_title">💾 Local database</string>
+    <string name="privacy_localdb_body">Room stores: command text, intent, status, failure reason. Credentials are never stored — OTP/PIN/password memory keys are rejected.</string>
+    <string name="privacy_never_title">⛔ Never</string>
+    <string name="privacy_never_body">OTP/PIN/password/CVV/card numbers are never read, stored or typed. Banking screens are never read. Financial transaction automation is fully blocked. No hidden recording — the mic runs only in visible sessions.</string>
+    <string name="settings_open_privacy">Privacy</string>
 </resources>

@@ -109,4 +109,18 @@
     <string name="delete">মুছুন</string>
 
     <string name="notification_listener_label">নুভা নোটিফিকেশন রিডার</string>
+
+    <!-- v1.6: privacy screen -->
+    <string name="privacy_title">আপনার ডেটা কোথায় যায়</string>
+    <string name="privacy_local_title">📱 ফোনেই থাকে</string>
+    <string name="privacy_local_body">ভয়েস কমান্ডের অডিও কোথাও পাঠানো হয় না — শুধু লেখা (transcript) ব্যবহার হয়। কমান্ড হিস্ট্রি, নোট, টু-ডু, স্মৃতি ও সেটিংস শুধু এই ফোনের Room/DataStore-এ থাকে।</string>
+    <string name="privacy_groq_title">🤖 Groq-এ যায় (শুধু দরকার হলে)</string>
+    <string name="privacy_groq_body">লোকাল পার্সার যখন কমান্ড বোঝে না, তখনই শুধু লেখাটা Vercel হয়ে Groq-কে যায় — অ্যাকশন বেছে নেওয়ার জন্য। অডিও কখনো নয়।</string>
+    <string name="privacy_vercel_title">🔗 Vercel (ব্যাকএন্ড)</string>
+    <string name="privacy_vercel_body">Vercel শুধু কমান্ড টেক্সট গ্রহণ করে, ভ্যালিডেট করে এবং ফলাফল ফেরত দেয়। সেশন চালু থাকলে কমান্ড রেকর্ড Supabase-এ যেতে পারে (ঐচ্ছিক)।</string>
+    <string name="privacy_localdb_title">💾 লোকাল ডেটাবেজ</string>
+    <string name="privacy_localdb_body">Room-এ থাকে: কমান্ড টেক্সট, intent, status, failure reason। Credentials কখনো রাখা হয় না — মেমোরি-লেয়ার OTP/PIN/password key ফেক করে দেয়।</string>
+    <string name="privacy_never_title">⛔ কখনোই নয়</string>
+    <string name="privacy_never_body">OTP/PIN/পাসওয়ার্ড/CVV/কার্ড নম্বর পড়া, সেভ বা টাইপ করা হয় না। ব্যাংকিং স্ক্রিন পড়া হয় না। ফাইন্যান্সিয়াল ট্রানজেকশন অটোমেশন সম্পূর্ণ ব্লকড। লুকানো রেকর্ডিং নেই — মাইক শুধু দৃশ্যমান সেশনে চলে।</string>
+    <string name="settings_open_privacy">প্রাইভেসি</string>
 </resources>

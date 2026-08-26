@@ -99,9 +99,11 @@ fun NuvaApp() {
                 SettingsScreen(
                     onOpenSetup = { navController.navigate("onboarding") },
                     onOpenSupport = { navController.navigate("support") },
+                    onOpenPrivacy = { navController.navigate("privacy") },
                 )
             }
             composable("support") { FeatureSupportScreen() }
+            composable("privacy") { com.nuva.assistant.ui.privacy.PrivacyScreen() }
         }
     }
 }

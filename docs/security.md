@@ -112,3 +112,20 @@ NUVA's memory into a password store.
 ## 9. Reporting
 
 Do not open a public issue for a vulnerability. Contact the repository owner directly.
+
+
+---
+
+## v1.6 addendum — local enforcement chain (re-verified)
+
+AI (Groq) → JSON schema validation → action whitelist (frozen 15; local-only
+intents unreachable from any server payload) → parameter validation →
+SensitiveAppPolicy (LEVEL 1/2/3) → risk classification (client-side floor) →
+blocking confirmation → execution. Unknown action ⇒ STOP. Invalid parameters ⇒
+STOP. Sensitive action ⇒ BLOCK (transactions) or CONFIRM (calls/messages/etc.).
+
+Re-verified on every code path this pass: transaction phrase coverage
+("taka send", "money send", "cash in", …), password-node exclusion in both
+readers (ScreenReader + ScreenStateModel), OTP redaction in notifications,
+screen reads and confirmations, tap/type block inside financial apps, and the
+principle that neither server nor AI can lower risk or skip confirmation.

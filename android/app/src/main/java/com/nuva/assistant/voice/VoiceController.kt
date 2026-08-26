@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 /**
  * Voice-first orchestration (§ golden rule): mic → transcript → executor →
@@ -50,6 +51,11 @@ class VoiceController(
     private val tts = TTSManager(NuvaContainer.appContext)
     private val mainScope = CoroutineScope(Dispatchers.Main)
 
+    private companion object {
+        /** Hard ceiling for one listening session (stuck-recovery). */
+        const val LISTEN_TIMEOUT_MS = 15_000L
+    }
+
     fun startListening() {
         if (_state.value is State.Listening) return
         val context = NuvaContainer.appContext
@@ -68,6 +74,10 @@ class VoiceController(
 
         recognitionJob = mainScope.launch {
             try {
+                // v1.6 hardening: a recognizer that never reports back (OEM
+                // quirks, engine crash) must not leave NUVA "listening"
+                // forever — timeout recovers into the typed-fallback state.
+                withTimeout(LISTEN_TIMEOUT_MS) {
                 recognizer?.listen(language)?.collect { event ->
                     when (event) {
                         is SpeechRecognizerController.VoiceEvent.ListeningStarted -> Unit
@@ -86,6 +96,10 @@ class VoiceController(
                         }
                     }
                 }
+                }
+            } catch (err: kotlinx.coroutines.TimeoutCancellationException) {
+                _state.value = State.Failed("Kichu shunlam na — abar bolen ba likhe din.", fromVoice = true)
+                speakIfEnabled("Kichu shunlam na.")
             } finally {
                 recognizer = null
                 NuvaForegroundService.stop(context)
