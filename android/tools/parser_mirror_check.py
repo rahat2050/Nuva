@@ -7,6 +7,7 @@ in ../app/src/main/java/com/nuva/assistant/command/.
 Usage: python3 parser_mirror_check.py   (exit 0 = all checks pass)
 """
 import re, sys
+from pathlib import Path
 
 BN_DIGITS = dict(zip("০১২৩৪৫৬৭৮৯", "0123456789"))
 
@@ -332,6 +333,14 @@ def parse_daily(t):
     if m and any(w in t for w in ["mileage","average","km/l","মাইলেজ"]):
         value = float(m.group(1)) / float(m.group(3))
         return ok({"kind":"localanswer","answer":str(value),"category":"mileage"}, "LOCAL_ANSWER")
+    if any(w in t for w in ["average","mean","গড়","গড়"]):
+        values = [float(v) for v in re.findall(r"-?\d+(?:\.\d+)?", t)]
+        if len(values) >= 2:
+            return ok({"kind":"localanswer","answer":str(sum(values)/len(values)),"category":"average"}, "LOCAL_ANSWER")
+    eta = re.search(r"(\d+(?:\.\d+)?)\s*(?:km|kilometer).*?(\d+(?:\.\d+)?)\s*(?:kmph|km/h|kph)", t)
+    if eta and any(w in t for w in ["travel time","eta koto","koto somoy lagbe","কত সময় লাগবে"]):
+        minutes = round(float(eta.group(1))/float(eta.group(2))*60)
+        return ok({"kind":"localanswer","answer":str(minutes),"category":"travel_eta"}, "LOCAL_ANSWER")
     units = {"kilometer":1000.0,"km":1000.0,"mile":1609.344,"kg":1.0,"kilogram":1.0,
              "pound":0.45359237,"gigabyte":1024.0**3,"megabyte":1024.0**2,"cup":0.2365882365,
              "milliliter":0.001,"liter":1.0}
@@ -669,6 +678,16 @@ def content_after(t, marker):
 # ---------------- compound plan (v1.3) ----------------
 CONNECTORS = [" ar ", " ebong ", " and ", " tarpor ", " আর ", " এবং ", " তারপর ", " then ", "; "]
 
+def parse_daily_skill(t):
+    # Representative aliases; the Kotlin registry itself is source-counted
+    # below to guarantee exactly 100 unique skill definitions.
+    aliases = ["kacher pharmacy","কাছের ফার্মেসি","parcel tracking","passport application",
+               "current job circular","internet speed test","গাছের যত্ন","fact check","qibla direction",
+               "nearby hospital","blood bank","public holiday","cybercrime report"]
+    if any(alias in t for alias in aliases):
+        return ok({"kind":"search","query":t}, "SEARCH_WEB")
+    return None
+
 def parse_knowledge(t):
     questions = ["what ","how ","why ","who ","where ","when ","ki ","kivabe","keno","kothay","kokhon",
                  "কী ","কি ","কিভাবে","কেন","কোথায়","কখন"]
@@ -680,11 +699,11 @@ def parse_knowledge(t):
     return None
 
 def rule_table(t):
-    return (parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_status(t) or parse_daily(t) or parse_help(t)
+    return (parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_daily(t) or parse_status(t) or parse_help(t)
             or parse_realtime(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
-            or parse_scroll(t) or parse_close(t) or parse_open(t) or parse_knowledge(t))
+            or parse_scroll(t) or parse_close(t) or parse_open(t) or parse_daily_skill(t) or parse_knowledge(t))
 
 def parse_prepared(t):
     if is_money(t): return refused()
@@ -783,6 +802,12 @@ check(parse("chicken biryani recipe")["intent"] == "SEARCH_WEB", "knowledge sear
 check(parse("Send button press koro")["intent"] == "PRESS", "universal route connected")
 check(parse("shopping list e add koro dim dudh")["intent"] == "CREATE_TODO", "shopping list")
 check(parse("shopping list dekhao")["intent"] == "READ_SAVED_ITEMS", "read shopping list")
+check(parse("average of 10 20 30")["intent"] == "LOCAL_ANSWER", "advanced average")
+check(parse("120 km 60 kmph travel time koto")["intent"] == "LOCAL_ANSWER", "travel eta")
+check(parse("parcel tracking ZX123")["intent"] == "SEARCH_WEB", "daily sourced skill")
+registry_source = (Path(__file__).parent.parent / "app/src/main/java/com/nuva/assistant/command/DailySkillRegistry.kt").read_text()
+registry_ids = re.findall(r'^\s*skill\("([^"]+)"', registry_source, re.MULTILINE)
+check(len(registry_ids) == 100 and len(set(registry_ids)) == 100, "exact 100 unique daily skills")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

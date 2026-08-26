@@ -28,8 +28,17 @@ catalogue count is over 1,000 supported command forms, with the result calculate
 - `difference between 2026-08-01 and 2026-08-16`
 - `2026-08-26 ki bar`
 - `coin toss`, `roll dice`, `random number 10 theke 20`
+- `average of 10 20 30`, `median 9 1 5 3`, `ratio 20 30`
+- `10000 simple interest 10 percent 2 year`
+- `buying price 500 selling price 650 profit`
+- `savings goal 12000 in 6 months monthly save`
+- `120 km 60 kmph travel time koto`
+- `trip fuel cost 300 km 15 km/l 130 taka per liter`
+- `rectangle area 10 5`, `circle area radius 7`
+- `male 70 kg 175 cm 30 year BMR`, `70 kg daily water intake`
+- `1 GB 100 Mbps download time`
 
-BMI is a screening calculation, not medical advice. EMI is approximate and excludes bank fees.
+BMI/BMR/water are screening estimates, not medical advice. EMI is approximate and excludes bank fees.
 Expense logging only saves a local note; it never enters or automates a financial transaction.
 
 ## Conversion dimensions

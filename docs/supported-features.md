@@ -1,4 +1,4 @@
-# NUVA — Supported features (v1.8)
+# NUVA — Supported features (v1.9)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -34,12 +34,20 @@ rather than faked.
 ## Daily-life utility engine — SUPPORTED (offline)
 Data-driven local answers cover well over 1,000 command forms rather than 1,000 hard-coded phrases:
 arithmetic with precedence/parentheses/powers, roots/factorials, percentage/discount/VAT/tip,
-bill splitting, BMI (with medical disclaimer), approximate EMI (with fee disclaimer), mileage,
-age/date-difference/days-until/weekday, coin/dice/random choice, and conversions across length,
-weight, cooking volume, area plus Bangladeshi decimal/katha/bigha, speed, time, data size,
-temperature, energy and pressure. Inputs and results stay on-device. Shopping/grocery lists reuse the
-local to-do store; expense logs reuse local notes. `shopping list dekhao`, `todo list poro`,
-`note gulo dekhao` and `khoroch gulo poro` read the matching local items back without a network call.
+bill splitting, BMI/BMR/water estimates (with medical disclaimers), EMI/simple+compound interest,
+profit/loss, unit price, savings goals, mileage/trip fuel cost/travel ETA, average/median/ratio/grade,
+rectangle/circle/triangle/cuboid geometry, download-time estimates, age/date-difference/days-until/
+weekday, coin/dice/random choice, and conversions across length, weight, cooking volume, area plus
+Bangladeshi decimal/katha/bigha, speed, time, data size, temperature, energy and pressure. Inputs and
+results stay on-device. Shopping/grocery lists reuse the local to-do store; expense logs reuse local
+notes. `shopping list dekhao`, `todo list poro`, `note gulo dekhao` and `khoroch gulo poro` read the
+matching local items back without a network call.
+
+## 100 sourced daily skills — SUPPORTED
+An exact 100-entry, data-validated registry covers health/emergency, travel/nearby, household/
+shopping, education/work, financial information, civic/faith, digital safety and lifestyle lookups.
+Details such as a parcel code are preserved in the query. All skills are read-only live searches;
+transaction and credential policies run first. Full numbered list: [`100-daily-skills.md`](100-daily-skills.md).
 
 ## Device utilities & current information — SUPPORTED
 Torch, battery/time/date/network/storage answers read from the phone at execution time (offline;

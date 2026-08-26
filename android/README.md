@@ -122,9 +122,10 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
 
 * **On-device parser v2** — Bangla/Banglish/English with Bangla numerals; runs BEFORE the
   network AI (privacy, speed, offline) and as a rescue path when the server says unsupported.
-* **8 LOCAL-ONLY intents** (`NuvaIntent.localOnly`): recents, web search, device status,
-  settings/torch, notification summary, reminder, note, to-do. `NuvaIntent.fromWire()` refuses
-  them, so **no server response can ever trigger one** — the AI registry stays frozen at 15.
+* **LOCAL-ONLY intents** (`NuvaIntent.localOnly`): recents, web search, device status,
+  settings/torch, notification summary, reminder, note/to-do/list reads, media/device control and
+  deterministic calculated answers. `NuvaIntent.fromWire()` refuses them, so **no server response
+  can ever trigger one** — the executable AI registry stays frozen at 15.
 * **Three-level financial policy** (`core/security/SensitiveAppPolicy`, v1.2):
   LEVEL 1 — wallet/bank apps can be launched by voice and navigated (scroll);
   LEVEL 2 — OTP/PIN/password/card data is never read, stored or typed (password
@@ -141,6 +142,10 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   notes & to-dos.
 * **Messaging tiers**: WhatsApp + SMS send after confirmation; Telegram/Messenger/
   Signal/Viber/IMO open with the message pre-filled (user taps Send).
+* **v1.8–v1.9 daily utility packs**: 1,000+ offline calculation/conversion command forms,
+  advanced study/travel/health/budget formulas, shopping/expense list read-back, and an exact
+  100-entry read-only registry for sourced health, travel, household, education, civic, safety and
+  lifestyle lookups.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

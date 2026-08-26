@@ -128,6 +128,9 @@ class CommandParserTest {
             "500 er 20 percent discount" to "400",
             "5 kilometer mile e koto" to "3.106856",
             "300 km 20 liter mileage koto" to "15",
+            "average of 10 20 30" to "20",
+            "10000 simple interest 10 percent 2 year" to "2000",
+            "120 km 60 kmph travel time koto" to "2 hour",
         )
         probes.forEach { (phrase, expected) ->
             val decision = CommandParser.parse(phrase)
@@ -154,6 +157,22 @@ class CommandParserTest {
         assertEquals(NuvaIntent.LOCAL_ANSWER, CommandParser.parse("tumi ki ki korte paro")!!.intent)
         assertEquals(NuvaIntent.SEARCH_WEB, CommandParser.parse("chicken biryani recipe")!!.intent)
         assertEquals(NuvaIntent.SEARCH_WEB, CommandParser.parse("photosynthesis ki")!!.intent)
+    }
+
+    @Test
+    fun `one hundred daily skill shortcuts route to sourced information`() {
+        listOf(
+            "kacher pharmacy",
+            "parcel tracking ZX123",
+            "passport application",
+            "current job circular",
+            "internet speed test",
+            "গাছের যত্ন",
+        ).forEach { phrase ->
+            val decision = CommandParser.parse(phrase)
+            assertNotNull(phrase, decision)
+            assertEquals(phrase, NuvaIntent.SEARCH_WEB, decision!!.intent)
+        }
     }
 
     @Test

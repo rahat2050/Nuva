@@ -176,8 +176,8 @@ object CommandParser {
     private fun ruleTable(text: String): CommandDecision? = parseNavigation(text)
         ?: parseUniversal(text)
         ?: parseScreenReading(text)
-        ?: parseDeviceStatus(text)
         ?: parseDailyUtility(text)
+        ?: parseDeviceStatus(text)
         ?: parseAssistantHelp(text)
         ?: parseRealtimeInfo(text)
         ?: parseMediaControl(text)
@@ -197,7 +197,19 @@ object CommandParser {
         ?: parseScrollSwipe(text)
         ?: parseCloseApp(text)
         ?: parseOpenApp(text)
+        ?: parseDailySkill(text)
         ?: parseKnowledgeSearch(text)
+
+    private fun parseDailySkill(text: String): CommandDecision? {
+        val match = DailySkillRegistry.resolve(text) ?: return null
+        val isBangla = text.any { it.code in 0x0980..0x09FF }
+        val speech = if (isBangla) {
+            "হালনাগাদ ও sourced তথ্য ওয়েবে খুঁজছি।"
+        } else {
+            "Updated sourced information web e khujchi."
+        }
+        return ok(NuvaAction.SearchWeb(match.query), speech)
+    }
 
     private fun parseDailyUtility(text: String): CommandDecision? {
         val result = DailyUtilityParser.parse(text) ?: return null
@@ -212,9 +224,9 @@ object CommandParser {
         ).any { text.contains(it) }
         if (asksCapabilities) {
             val answer = if (text.any { it.code in 0x0980..0x09FF }) {
-                "আমি ফোন কন্ট্রোল, কল-মেসেজ, রিমাইন্ডার, নোট-লিস্ট, হিসাব, শতাংশ, বিল ভাগ, BMI, EMI, তারিখ, এবং হাজারের বেশি ইউনিট কনভার্সন ও তথ্য খোঁজ করতে পারি। নিচের Features পেজে পুরো তালিকা আছে।"
+                "আমি ফোন কন্ট্রোল, কল-মেসেজ, রিমাইন্ডার, নোট-লিস্ট, উন্নত হিসাব, BMI, EMI, তারিখ, হাজারের বেশি কনভার্সন এবং স্বাস্থ্য, ভ্রমণ, বাজার, শিক্ষা, সরকারি সেবা ও নিরাপত্তার ১০০টি sourced daily skill চালাতে পারি। Features পেজে পুরো তালিকা আছে।"
             } else {
-                "Ami phone control, call-message, reminder, note-list, calculation, percentage, bill split, BMI, EMI, date, ar hajarer beshi unit conversion o information search korte pari. Features page e full list ache."
+                "Ami phone control, call-message, reminder, note-list, advanced calculation, BMI, EMI, date, hajarer beshi conversion, ar health, travel, shopping, education, public service o safety-r 100 ta sourced daily skill chalate pari. Features page e full list ache."
             }
             return ok(NuvaAction.LocalAnswer(answer, "assistant_help"), answer)
         }

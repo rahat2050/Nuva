@@ -173,10 +173,11 @@ object DailyUtilityParser {
         val style = detectStyle(rawText)
 
         return parseBill(text, style)
+            ?: parseMileage(text, style)
+            ?: AdvancedDailyCalculator.parse(rawText)
             ?: parsePercentage(text, style)
             ?: parseBmi(text, style)
             ?: parseEmi(text, style)
-            ?: parseMileage(text, style)
             ?: parseDateUtility(text, style, today)
             ?: parseConversion(text, style)
             ?: parseArithmetic(text, style)
