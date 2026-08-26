@@ -653,7 +653,7 @@ class CommandExecutor(
                     ExecutionOutcome("failed", r.speech, r.reason)
             }
 
-            is NuvaAction.Press -> executePress()
+            is NuvaAction.Press -> executePress(action.label)
 
             is NuvaAction.ClearText -> {
                 val service = com.nuva.assistant.accessibility.NuvaAccessibilityService.instance

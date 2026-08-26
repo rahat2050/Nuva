@@ -1,5 +1,7 @@
 package com.nuva.assistant.core.security
 
+import com.nuva.assistant.command.MessagingApp
+
 /**
  * FINANCIAL & SENSITIVE-DATA POLICY — three levels (v1.2 product spec).
  *

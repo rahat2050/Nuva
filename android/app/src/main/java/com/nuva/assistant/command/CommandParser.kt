@@ -778,7 +778,7 @@ object CommandParser {
             t.contains("location") || t.contains("কোথায়") || t.contains("kothay")
         if (!hasMapWord) return null
 
-        val query: String? = when {
+        val query = when {
             t.contains("map e") -> contentAfter(t, "map e")
             t.contains("maps e") -> contentAfter(t, "maps e")
             t.contains("er location") -> t.substringBefore(" er location").trim().takeIf { it.isNotBlank() }

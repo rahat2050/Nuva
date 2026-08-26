@@ -51,7 +51,7 @@ fun NuvaApp() {
     // Settings ("setup" route) so permissions can be granted/re-checked any time.
     val onboardingDone by NuvaContainer.preferences.onboardingDone
         .collectAsState(initial = null as Boolean?)
-    if (onboardingDone == null) return@Scaffold // brief blank frame while DataStore loads
+    if (onboardingDone == null) return // brief blank frame while DataStore loads
     val startDestination = if (onboardingDone!!) "home" else "onboarding"
 
     Scaffold(

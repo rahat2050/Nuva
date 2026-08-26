@@ -2,6 +2,7 @@ package com.nuva.assistant.ui.privacy
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -57,7 +58,7 @@ fun PrivacyScreen() {
 
 @Composable
 private fun PrivacyCard(title: String, body: String, highlight: Boolean = false) {
-    Card(Modifier.fillMaxWidth) {
+    Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 title,
