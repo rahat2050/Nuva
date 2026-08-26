@@ -96,6 +96,19 @@ object ConfirmationSummary {
                 detail = "কাজটি শুধু আপনার ফোনেই থাকবে।"
             }
 
+            is NuvaAction.UserFile -> {
+                title = "Android picker খুলবে"
+                lines += Line("কাজ", action.operation.wireName)
+                detail = when {
+                    action.operation.sharesOutsideDevice ->
+                        "আপনি file/media বেছে নেওয়ার পরে Android share sheet-এ final recipient বেছে নেবেন।"
+                    action.operation == com.nuva.assistant.command.UserFileOperation.OPEN_FOLDER ->
+                        "শুধু আপনার বেছে নেওয়া folder-এর access grant হবে।"
+                    else -> "শুধু আপনার বেছে নেওয়া file/media handle করা হবে।"
+                }
+                if (action.operation.sharesOutsideDevice) confirmLabelOverride = "CONTINUE"
+            }
+
             else -> {
                 title = "কাজটি নিশ্চিত করুন"
                 detail = "এই কাজটি করা হবে।"

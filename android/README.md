@@ -149,6 +149,9 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
 * **v2.1 natural command grammar**: 50 families × 5 aliases × 7 prefixes × 7 suffixes =
   **12,250 audited forms**, conservative dynamic-command rewrites, typo-aware security checks and
   up to six validated multi-step segments.
+* **v2.2 user-present files/media**: Storage Access Framework picker for selected file open/share,
+  bounded text read and folder grant; selected photo/video view/share via Android picker and share
+  sheet. No broad storage permission or guessed path.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

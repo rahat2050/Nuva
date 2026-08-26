@@ -1,6 +1,7 @@
 package com.nuva.assistant.ui.home
 
 import android.Manifest
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -40,9 +43,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nuva.assistant.R
 import com.nuva.assistant.accessibility.NuvaAccessibilityService
+import com.nuva.assistant.automation.UserPresentFileWorkflow
 import com.nuva.assistant.command.CommandDecision
 import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.core.permissions.NuvaPermissions
@@ -72,6 +77,7 @@ class HomeViewModel : ViewModel() {
     val pending = MutableStateFlow<Pair<Long, CommandDecision>?>(null)
     val contactChoice =
         MutableStateFlow<Pair<Long, List<com.nuva.assistant.contacts.ContactResolver.ContactMatch>>?>(null)
+    val fileWorkflow = UserPresentFileWorkflow.state
 
     fun startListening() = voice.startListening()
 
@@ -115,6 +121,18 @@ class HomeViewModel : ViewModel() {
         voice.reject(choice.first)
     }
 
+    fun onFileWorkflowUri(uri: Uri?) {
+        viewModelScope.launch {
+            val speech = UserPresentFileWorkflow.handleSelected(NuvaContainer.appContext, uri)
+            if (uri != null) {
+                val completed = UserPresentFileWorkflow.state.value as? UserPresentFileWorkflow.State.Completed
+                voice.speakIfEnabled(completed?.content?.take(600) ?: speech)
+            }
+        }
+    }
+
+    fun dismissFileWorkflowResult() = UserPresentFileWorkflow.clearResult()
+
     override fun onCleared() {
         voice.destroy()
         super.onCleared()
@@ -129,16 +147,34 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     ) { granted ->
         if (granted) viewModel.startListening()
     }
+    val documentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri -> viewModel.onFileWorkflowUri(uri) }
+    val folderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+    ) { uri -> viewModel.onFileWorkflowUri(uri) }
 
     val state by viewModel.state.collectAsState(initial = VoiceController.State.Idle)
     val pending by viewModel.pending.collectAsState()
     val contactChoice by viewModel.contactChoice.collectAsState()
     val recent by viewModel.recent.collectAsState()
+    val fileWorkflow by viewModel.fileWorkflow.collectAsState()
 
     var typedCommand by remember { mutableStateOf("") }
     var showAccessibilityGuide by remember { mutableStateOf(false) }
 
     LaunchedEffect(state) { viewModel.onStateChanged(state) }
+    LaunchedEffect(fileWorkflow) {
+        val pendingRequest = (fileWorkflow as? UserPresentFileWorkflow.State.Pending)?.request
+            ?: return@LaunchedEffect
+        val active = UserPresentFileWorkflow.markPickerActive(pendingRequest.id)
+            ?: return@LaunchedEffect
+        if (active.operation.usesFolderPicker) {
+            folderPicker.launch(null)
+        } else {
+            documentPicker.launch(arrayOf(active.operation.mimeType))
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -396,6 +432,42 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
                 }
             },
         )
+    }
+
+    // User-present file/media workflow result. The system picker remains the
+    // authority; only explicitly selected content can reach this dialog.
+    when (val workflow = fileWorkflow) {
+        is UserPresentFileWorkflow.State.Completed -> AlertDialog(
+            onDismissRequest = { viewModel.dismissFileWorkflowResult() },
+            title = { Text("File / media result") },
+            text = {
+                Column {
+                    Text(workflow.speech)
+                    workflow.content?.let { content ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            content.take(8_000),
+                            modifier = Modifier
+                                .height(280.dp)
+                                .verticalScroll(rememberScrollState()),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { viewModel.dismissFileWorkflowResult() }) { Text("OK") }
+            },
+        )
+        is UserPresentFileWorkflow.State.Failed -> AlertDialog(
+            onDismissRequest = { viewModel.dismissFileWorkflowResult() },
+            title = { Text("File / media problem") },
+            text = { Text(workflow.speech) },
+            confirmButton = {
+                Button(onClick = { viewModel.dismissFileWorkflowResult() }) { Text("OK") }
+            },
+        )
+        else -> Unit
     }
 
     // Accessibility step-by-step setup guide (req §13).

@@ -1,4 +1,4 @@
-# NUVA — Supported features (v2.1)
+# NUVA — Supported features (v2.2)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -30,13 +30,15 @@ Telegram/Messenger/Signal/Viber/IMO — **ANDROID-LIMITED**: message pre-filled,
 ## Media & camera — SUPPORTED / ANDROID-LIMITED
 YouTube search/play, Spotify fallback, pause/resume/next/previous (active MediaSession —
 ANDROID-LIMITED via notification access), volume up/down/mute. Camera open photo/video +
-explicit-capture flow (shutter always user-controlled). Gallery/media search/share —
-**UNSUPPORTED** (picker flows need an activity result).
+explicit-capture flow (shutter always user-controlled). v2.2 adds user-present Android pickers for
+photo/video selection, viewing and share-sheet handoff. Gallery-wide search/edit/delete remains
+**UNSUPPORTED**; the user chooses the concrete media URI.
 
-## Files — ANDROID-LIMITED
-Files app opens; arbitrary open/read/rename/move/delete — **UNSUPPORTED** from the background
-(SAF requires user-present activity results); delete-with-confirmation therefore not offered
-rather than faked.
+## Files — USER-PRESENT SUPPORTED / ANDROID-LIMITED
+v2.2 adds Storage Access Framework workflows for user-selected file open/view, file share-sheet
+handoff, bounded text-file reading, and persistable user-selected folder access. No broad storage
+permission or guessed path is used. Background-wide content search, arbitrary-path access,
+rename/move/delete are still **UNSUPPORTED** and remain future confirmation-gated phases.
 
 ## Daily-life utility engine — SUPPORTED (offline)
 Data-driven local answers cover well over 1,000 command forms rather than 1,000 hard-coded phrases:

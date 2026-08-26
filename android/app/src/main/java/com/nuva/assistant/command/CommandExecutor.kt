@@ -1,6 +1,8 @@
 package com.nuva.assistant.command
 
 import android.content.Context
+import android.content.Intent
+import com.nuva.assistant.MainActivity
 import com.nuva.assistant.ai.AIRepository
 import com.nuva.assistant.automation.AppLauncher
 import com.nuva.assistant.automation.BrowserAutomation
@@ -619,6 +621,8 @@ class CommandExecutor(
 
             is NuvaAction.ReadSavedItems -> readSavedItems(action.kind)
 
+            is NuvaAction.UserFile -> launchUserPresentFileWorkflow(context, action.operation)
+
             is NuvaAction.OpenSettingScreen -> when (val r = SettingsOpener.open(context, action.target)) {
                 is SettingsOpener.Result.Done -> ExecutionOutcome("completed", "Kore dilam.")
                 is SettingsOpener.Result.ManualStep -> ExecutionOutcome("completed", r.speech)
@@ -817,6 +821,29 @@ class CommandExecutor(
                     is BrowserAutomation.Result.Failed -> ExecutionOutcome("failed", r.userReason, r.userReason)
                 }
             }
+        }
+    }
+
+    private fun launchUserPresentFileWorkflow(context: Context, operation: UserFileOperation): ExecutionOutcome {
+        com.nuva.assistant.automation.UserPresentFileWorkflow.request(operation)
+        val activity = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val opened = runCatching { context.startActivity(activity); true }.getOrDefault(false)
+        return if (opened) {
+            val what = when (operation) {
+                UserFileOperation.OPEN_FILE -> "file"
+                UserFileOperation.SHARE_FILE -> "share korar file"
+                UserFileOperation.READ_TEXT -> "text file"
+                UserFileOperation.OPEN_FOLDER -> "folder"
+                UserFileOperation.PICK_PHOTO -> "photo"
+                UserFileOperation.SHARE_PHOTO -> "share korar photo"
+                UserFileOperation.PICK_VIDEO -> "video"
+                UserFileOperation.SHARE_VIDEO -> "share korar video"
+            }
+            ExecutionOutcome("completed", "$what picker khulchi — target apni select korun.")
+        } else {
+            com.nuva.assistant.automation.UserPresentFileWorkflow.cancel()
+            ExecutionOutcome("failed", "System picker khulte parini.", "activity launch failed")
         }
     }
 

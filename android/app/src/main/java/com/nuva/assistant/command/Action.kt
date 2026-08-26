@@ -179,6 +179,11 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.READ_SAVED_ITEMS
     }
 
+    /** Opens a system picker; the user always chooses the concrete file/media. */
+    data class UserFile(val operation: UserFileOperation) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.USER_FILE
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -342,6 +347,27 @@ enum class SavedItemKind(val wireName: String) {
 
     companion object {
         fun fromWire(value: String?): SavedItemKind? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/** User-present Storage Access Framework / media-picker operations. */
+enum class UserFileOperation(val wireName: String, val mimeType: String, val usesFolderPicker: Boolean = false) {
+    OPEN_FILE("open_file", "*/*"),
+    SHARE_FILE("share_file", "*/*"),
+    READ_TEXT("read_text", "text/*"),
+    OPEN_FOLDER("open_folder", "*/*", usesFolderPicker = true),
+    PICK_PHOTO("pick_photo", "image/*"),
+    SHARE_PHOTO("share_photo", "image/*"),
+    PICK_VIDEO("pick_video", "video/*"),
+    SHARE_VIDEO("share_video", "video/*"),
+    ;
+
+    val sharesOutsideDevice: Boolean
+        get() = this == SHARE_FILE || this == SHARE_PHOTO || this == SHARE_VIDEO
+
+    companion object {
+        fun fromWire(value: String?): UserFileOperation? =
             entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }

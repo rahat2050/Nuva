@@ -198,6 +198,35 @@ class CommandParserTest {
         assertEquals(NuvaIntent.DESCRIBE_SCREEN, CommandParser.parse("button gulo dekhao")!!.intent)
     }
 
+    // --- User-present files & gallery --------------------------------------------------
+
+    @Test
+    fun `file and media commands always become user picker workflows`() {
+        val cases = listOf(
+            "file open koro" to UserFileOperation.OPEN_FILE,
+            "file share koro" to UserFileOperation.SHARE_FILE,
+            "text file pore shonao" to UserFileOperation.READ_TEXT,
+            "folder select koro" to UserFileOperation.OPEN_FOLDER,
+            "gallery theke photo select koro" to UserFileOperation.PICK_PHOTO,
+            "photo share koro" to UserFileOperation.SHARE_PHOTO,
+            "gallery theke video select koro" to UserFileOperation.PICK_VIDEO,
+            "video share koro" to UserFileOperation.SHARE_VIDEO,
+        )
+        cases.forEach { (phrase, operation) ->
+            val decision = CommandParser.parse(phrase)
+            assertEquals(phrase, NuvaIntent.USER_FILE, decision!!.intent)
+            assertEquals(phrase, operation, (decision.action as NuvaAction.UserFile).operation)
+        }
+    }
+
+    @Test
+    fun `sharing and folder access require confirmation while local selection does not`() {
+        assertTrue(CommandParser.parse("file share koro")!!.requiresConfirmation)
+        assertTrue(CommandParser.parse("folder access dao")!!.requiresConfirmation)
+        assertFalse(CommandParser.parse("file open koro")!!.requiresConfirmation)
+        assertFalse(CommandParser.parse("text file poro")!!.requiresConfirmation)
+    }
+
     // --- Settings ----------------------------------------------------------------------
 
     @Test

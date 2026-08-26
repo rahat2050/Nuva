@@ -48,6 +48,8 @@ enum class NuvaIntent(val wireName: String, val localOnly: Boolean = false) {
     /** Deterministic calculator/converter/daily-utility result; never accepted from the server. */
     LOCAL_ANSWER("LOCAL_ANSWER", localOnly = true),
     READ_SAVED_ITEMS("READ_SAVED_ITEMS", localOnly = true),
+    /** User-present Android picker workflow; never accepted from server/AI. */
+    USER_FILE("USER_FILE", localOnly = true),
     ;
 
     companion object {

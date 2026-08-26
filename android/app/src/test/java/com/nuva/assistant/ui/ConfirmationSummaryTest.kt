@@ -3,6 +3,7 @@ package com.nuva.assistant.ui
 import com.nuva.assistant.command.MessagingApp
 import com.nuva.assistant.command.NuvaAction
 import com.nuva.assistant.command.NuvaRisk
+import com.nuva.assistant.command.UserFileOperation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -53,6 +54,18 @@ class ConfirmationSummaryTest {
         )
         assertTrue(summary.detail.contains("ফোনে"))
         assertTrue(summary.riskLabel.contains("কম"))
+    }
+
+    @Test
+    fun `file share summary keeps picker and final recipient user controlled`() {
+        val summary = ConfirmationSummary.build(
+            NuvaAction.UserFile(UserFileOperation.SHARE_FILE),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(summary.title.contains("picker"))
+        assertTrue(summary.detail.contains("share sheet"))
+        assertTrue(summary.detail.contains("recipient"))
+        assertEquals("CONTINUE", summary.confirmLabel)
     }
 
     @Test

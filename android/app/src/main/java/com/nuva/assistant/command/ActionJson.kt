@@ -105,6 +105,9 @@ object ActionJson {
         is NuvaAction.ReadSavedItems -> buildJsonObject {
             put("type", "READ_SAVED_ITEMS"); put("kind", action.kind.wireName)
         }
+        is NuvaAction.UserFile -> buildJsonObject {
+            put("type", "USER_FILE"); put("operation", action.operation.wireName)
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

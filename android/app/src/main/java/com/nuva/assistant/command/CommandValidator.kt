@@ -126,7 +126,14 @@ object CommandValidator {
             NuvaIntent.DESCRIBE_SCREEN -> ValidatedAction.Valid(NuvaAction.DescribeScreen)
             NuvaIntent.LOCAL_ANSWER -> validateLocalAnswer(actionJson)
             NuvaIntent.READ_SAVED_ITEMS -> validateReadSavedItems(actionJson)
+            NuvaIntent.USER_FILE -> validateUserFile(actionJson)
         }
+    }
+
+    private fun validateUserFile(json: JsonObject): ValidatedAction {
+        val operation = UserFileOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("USER_FILE requires a known operation"))
+        return ValidatedAction.Valid(NuvaAction.UserFile(operation))
     }
 
     private fun validateReadSavedItems(json: JsonObject): ValidatedAction {

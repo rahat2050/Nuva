@@ -12,6 +12,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -24,6 +25,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.nuva.assistant.R
+import com.nuva.assistant.automation.UserPresentFileWorkflow
 import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.ui.history.HistoryScreen
 import com.nuva.assistant.ui.home.HomeScreen
@@ -53,6 +55,14 @@ fun NuvaApp() {
         .collectAsState(initial = null as Boolean?)
     if (onboardingDone == null) return // brief blank frame while DataStore loads
     val startDestination = if (onboardingDone!!) "home" else "onboarding"
+    val fileWorkflow by UserPresentFileWorkflow.state.collectAsState()
+    LaunchedEffect(fileWorkflow, onboardingDone) {
+        if (onboardingDone == true && fileWorkflow is UserPresentFileWorkflow.State.Pending &&
+            currentDestination?.route != "home"
+        ) {
+            navController.navigate("home") { launchSingleTop = true }
+        }
+    }
 
     Scaffold(
         bottomBar = {

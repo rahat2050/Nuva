@@ -206,6 +206,7 @@ object CommandParser {
     private fun ruleTable(text: String): CommandDecision? = parseNavigation(text)
         ?: parseUniversal(text)
         ?: parseScreenReading(text)
+        ?: parseUserPresentFile(text)
         ?: parseDailyUtility(text)
         ?: parseRealtimeInfo(text)
         ?: parseDeviceStatus(text)
@@ -442,6 +443,64 @@ object CommandParser {
         ).any { t.contains(it) }
         if (readNotifications) return ok(NuvaAction.ReadNotifications, "Notification porchi.")
 
+        return null
+    }
+
+    // --- 2b. User-present files & gallery (v2.2) -----------------------------------------
+
+    private fun parseUserPresentFile(t: String): CommandDecision? {
+        fun decision(operation: UserFileOperation, speech: String): CommandDecision {
+            val risk = if (operation.sharesOutsideDevice || operation == UserFileOperation.OPEN_FOLDER) {
+                NuvaRisk.MEDIUM
+            } else {
+                NuvaRisk.LOW
+            }
+            return ok(NuvaAction.UserFile(operation), speech, risk)
+        }
+
+        val share = listOf("share", "pathao", "send", "শেয়ার", "শেয়ার", "পাঠাও").any { t.contains(it) }
+        val select = listOf("select", "choose", "pick", "beche", "বেছে", "নির্বাচন").any { t.contains(it) }
+        val open = listOf("open", "kholo", "khulo", "খোলো", "খুলে").any { t.contains(it) }
+
+        if (listOf("folder select", "folder choose", "folder access", "directory select", "ফোল্ডার বেছে", "ফোল্ডার সিলেক্ট")
+                .any { t.contains(it) }
+        ) {
+            return decision(UserFileOperation.OPEN_FOLDER, "Android folder picker khulbo — folder apni select korun.")
+        }
+
+        val photo = listOf("photo", "chobi", "image", "ছবি", "ফটো").any { t.contains(it) }
+        val video = listOf("video", "ভিডিও").any { t.contains(it) }
+        val gallerySource = listOf("gallery theke", "gallery থেকে", "গ্যালারি থেকে", "photo picker", "media picker")
+            .any { t.contains(it) }
+        if (photo && (gallerySource || share || select)) {
+            return if (share) {
+                decision(UserFileOperation.SHARE_PHOTO, "Photo picker-er por Android share sheet khulbo.")
+            } else {
+                decision(UserFileOperation.PICK_PHOTO, "Photo picker khulchi — photo apni select korun.")
+            }
+        }
+        if (video && (gallerySource || share || select)) {
+            return if (share) {
+                decision(UserFileOperation.SHARE_VIDEO, "Video picker-er por Android share sheet khulbo.")
+            } else {
+                decision(UserFileOperation.PICK_VIDEO, "Video picker khulchi — video apni select korun.")
+            }
+        }
+
+        val textFile = listOf("text file", "txt file", "লেখার ফাইল", "টেক্সট ফাইল").any { t.contains(it) }
+        val wantsRead = listOf("read", "poro", "পড়ো", "পড়ো", "pore shonao", "পড়ে শোনাও")
+            .any { t.contains(it) }
+        if (textFile && wantsRead) {
+            return decision(UserFileOperation.READ_TEXT, "Text file picker khulchi — file apni select korun.")
+        }
+
+        val fileWord = listOf("file", "document", "ফাইল", "ডকুমেন্ট").any { t.contains(it) }
+        if (fileWord && share) {
+            return decision(UserFileOperation.SHARE_FILE, "File picker-er por Android share sheet khulbo.")
+        }
+        if (fileWord && (select || open)) {
+            return decision(UserFileOperation.OPEN_FILE, "System file picker khulchi — file apni select korun.")
+        }
         return null
     }
 

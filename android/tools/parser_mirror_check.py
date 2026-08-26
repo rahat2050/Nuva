@@ -279,6 +279,32 @@ def parse_screen(t):
         return ok({"kind":"ReadNotifications"}, "READ_NOTIFICATIONS")
     return None
 
+def parse_user_file(t):
+    share = any(w in t for w in ["share","pathao","send","শেয়ার","শেয়ার","পাঠাও"])
+    select = any(w in t for w in ["select","choose","pick","beche","বেছে","নির্বাচন"])
+    opened = any(w in t for w in ["open","kholo","khulo","খোলো","খুলে"])
+    if any(w in t for w in ["folder select","folder choose","folder access","directory select","ফোল্ডার বেছে"]):
+        return ok({"kind":"userfile","operation":"OPEN_FOLDER"}, "USER_FILE", risk="MEDIUM")
+    photo = any(w in t for w in ["photo","chobi","image","ছবি","ফটো"])
+    video = any(w in t for w in ["video","ভিডিও"])
+    gallery = any(w in t for w in ["gallery theke","গ্যালারি থেকে","photo picker","media picker"])
+    if photo and (gallery or share or select):
+        op="SHARE_PHOTO" if share else "PICK_PHOTO"
+        return ok({"kind":"userfile","operation":op}, "USER_FILE", risk="MEDIUM" if share else "LOW")
+    if video and (gallery or share or select):
+        op="SHARE_VIDEO" if share else "PICK_VIDEO"
+        return ok({"kind":"userfile","operation":op}, "USER_FILE", risk="MEDIUM" if share else "LOW")
+    text_file=any(w in t for w in ["text file","txt file","টেক্সট ফাইল"])
+    wants_read=any(w in t for w in ["read","poro","পড়ো","পড়ো","pore shonao"])
+    if text_file and wants_read:
+        return ok({"kind":"userfile","operation":"READ_TEXT"}, "USER_FILE")
+    file_word=any(w in t for w in ["file","document","ফাইল","ডকুমেন্ট"])
+    if file_word and share:
+        return ok({"kind":"userfile","operation":"SHARE_FILE"}, "USER_FILE", risk="MEDIUM")
+    if file_word and (select or opened):
+        return ok({"kind":"userfile","operation":"OPEN_FILE"}, "USER_FILE")
+    return None
+
 def parse_status(t):
     if any(w in t for w in ["battery","battary","bettery","charge koto","charge koy","কত চার্জ","ব্যাটারি","চার্জ কত"]):
         return ok({"kind":"BATTERY"}, "DEVICE_STATUS")
@@ -730,7 +756,8 @@ def parse_knowledge(t):
     return None
 
 def rule_table(t):
-    return (parse_grammar(t) or parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_daily(t) or parse_realtime(t)
+    return (parse_grammar(t) or parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_user_file(t)
+            or parse_daily(t) or parse_realtime(t)
             or parse_status(t) or parse_help(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
@@ -858,6 +885,10 @@ check(len(grammar_aliases) * 7 * 7 == 12250, "12250 generated command forms")
 check(parse("please open notification app please")["intent"] == "OPEN_NOTIFICATION_APP", "grammar notification app")
 check(parse("nuva please battery percentage bolo taratari")["intent"] == "DEVICE_STATUS", "grammar battery")
 check(parse("bkash paymnt koro")["unsupported"], "grammar security typo")
+check(parse("file open koro")["action"]["operation"] == "OPEN_FILE", "user file picker")
+check(parse("file share koro")["confirm"], "file sharing confirms")
+check(parse("gallery theke photo select koro")["action"]["operation"] == "PICK_PHOTO", "photo picker")
+check(parse("video share koro")["action"]["operation"] == "SHARE_VIDEO", "video share picker")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")
