@@ -774,6 +774,19 @@ class CommandExecutor(
                     ExecutionOutcome("failed", result.reason, result.reason)
             }
 
+            is NuvaAction.OpenAppManagement -> when (
+                val result = com.nuva.assistant.automation.AppManagement.openPanel(context, action.app, action.panel)
+            ) {
+                is com.nuva.assistant.automation.AppManagement.Result.PromptOpened ->
+                    ExecutionOutcome("completed", "${result.label} er ${action.panel.wireName} screen khulechi.")
+                com.nuva.assistant.automation.AppManagement.Result.NotFound ->
+                    ExecutionOutcome("failed", "App ta installed list-e paini.", "app not found")
+                com.nuva.assistant.automation.AppManagement.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Ei app management action blocked.", "app action blocked")
+                is com.nuva.assistant.automation.AppManagement.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.OpenSettingScreen -> when (val r = SettingsOpener.open(context, action.target)) {
                 is SettingsOpener.Result.Done -> ExecutionOutcome("completed", "Kore dilam.")
                 is SettingsOpener.Result.ManualStep -> ExecutionOutcome("completed", r.speech)

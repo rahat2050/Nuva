@@ -326,6 +326,17 @@ def parse_user_file(t):
     return None
 
 def parse_productivity(t):
+    panel=None
+    if any(w in t for w in ["app info","application info","app details"]): panel="APP_INFO"
+    elif any(w in t for w in ["notification setting","notification settings"]): panel="NOTIFICATIONS"
+    elif any(w in t for w in ["play store page","store page"]): panel="PLAY_STORE"
+    if panel:
+        app=t
+        for w in ["application info","app details","app info","notification settings","notification setting","play store page","store page","khulo","kholo","open"]:
+            app=app.replace(w," ")
+        app=re.sub(r"\b(app|ta|please|er)\b"," ",app)
+        app=re.sub(r"\s+"," ",app).strip(" ,.: ")
+        if app: return ok({"kind":"appmanagement","app":app,"panel":panel},"OPEN_APP_MANAGEMENT")
     uninstall=next((w for w in ["uninstall koro","uninstall korun","remove app","app uninstall"] if w in t),None)
     if uninstall:
         app=re.sub(r"\b(app|ta|please|koro|korun)\b"," ",t.replace(uninstall," "))
@@ -405,7 +416,8 @@ def parse_communication(t):
     return ok({"kind":"email","recipient":recipient,"body":body,"attachment":attachment,"multiple":multiple},"COMPOSE_EMAIL",risk="MEDIUM",base="MEDIUM")
 
 def parse_status(t):
-    if any(w in t for w in ["battery","battary","bettery","charge koto","charge koy","কত চার্জ","ব্যাটারি","চার্জ কত"]):
+    if any(w in t for w in ["battery","battary","bettery","charge koto","charge koy","কত চার্জ","ব্যাটারি","চার্জ কত"]) and \
+       not any(w in t for w in ["battery saver","battery setting","power saving","ব্যাটারি সেভার"]):
         return ok({"kind":"BATTERY"}, "DEVICE_STATUS")
     now_words = ["ekhon","akhon","akon","akn","ekhn","now","current","এখন","বর্তমান"]
     time_phrases = ["koyta baje","koita baje","koi ta baje","koy ta baje","kota baje","koto baje",
@@ -428,7 +440,8 @@ def parse_status(t):
     if any(w in t for w in ["internet ache","internet ase","internet on ache","network kothay","net ache","net ase","wifi e connected",
         "নেটওয়ার্ক","ইন্টারনেট আছে","নেট আছে","network status","connection ache"]):
         return ok({"kind":"NETWORK"}, "DEVICE_STATUS")
-    if any(w in t for w in ["storage","koto jayga","koto jaiga","কত জায়গা","কত জায়গা","স্টোরেজ","memory koto","space koto","free space","jayga khali","jaiga khali"]):
+    if any(w in t for w in ["storage","koto jayga","koto jaiga","কত জায়গা","কত জায়গা","স্টোরেজ","memory koto","space koto","free space","jayga khali","jaiga khali"]) and \
+       not any(w in t for w in ["storage setting","স্টোরেজ সেটিং"]):
         return ok({"kind":"STORAGE"}, "DEVICE_STATUS")
     return None
 
@@ -553,6 +566,16 @@ def parse_settings(t):
         return ok({"kind":"WIFI"}, "OPEN_SETTING")
     if any(w in t for w in ["bluetooth","ব্লুটুথ"]):
         return ok({"kind":"BLUETOOTH"}, "OPEN_SETTING")
+    extended=[
+      (["mobile data setting","data usage setting"],"MOBILE_DATA"),(["airplane mode","flight mode"],"AIRPLANE_MODE"),
+      (["location setting","gps setting"],"LOCATION"),(["hotspot setting","tether setting"],"HOTSPOT"),
+      (["nfc setting"],"NFC"),(["vpn setting"],"VPN"),(["battery saver","power saving"],"BATTERY_SAVER"),
+      (["default app","default apps"],"DEFAULT_APPS"),(["date time setting","date and time setting"],"DATE_TIME"),
+      (["language setting"],"LANGUAGE"),(["storage setting"],"STORAGE_SETTINGS"),(["privacy setting"],"PRIVACY"),
+      (["security setting"],"SECURITY"),(["cast setting","screen cast"],"CAST"),(["print setting"],"PRINT"),
+      (["caption setting","subtitle setting"],"CAPTIONS")]
+    for aliases,target in extended:
+        if any(w in t for w in aliases): return ok({"kind":target},"OPEN_SETTING")
     if any(w in t for w in ["notification setting","notification settings","নোটিফিকেশন সেটিং"]):
         return ok({"kind":"NOTIF_SETTING"}, "OPEN_SETTING")
     if any(w in t for w in ["app setting","app settings","nuva er setting"]):
@@ -1012,6 +1035,12 @@ check(parse("onek photo share koro")["action"]["operation"] == "SHARE_MULTIPLE_P
 check(parse("email compose koro multiple attachment")["action"]["multiple"], "multiple email attachments")
 check(parse("contact edit koro")["intent"] == "CONTACT_HANDOFF", "contact edit handoff")
 check(parse("facebook uninstall koro")["intent"] == "UNINSTALL_APP", "system uninstall handoff")
+check(parse("whatsapp notification settings khulo")["action"]["panel"] == "NOTIFICATIONS", "app notification panel")
+check(parse("youtube play store page khulo")["action"]["panel"] == "PLAY_STORE", "app store page")
+check(parse("airplane mode setting khulo")["action"]["kind"] == "AIRPLANE_MODE", "airplane settings")
+check(parse("vpn setting khulo")["action"]["kind"] == "VPN", "vpn settings")
+check(parse("battery saver setting khulo")["action"]["kind"] == "BATTERY_SAVER", "battery saver settings")
+check(parse("storage setting khulo")["action"]["kind"] == "STORAGE_SETTINGS", "storage settings")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

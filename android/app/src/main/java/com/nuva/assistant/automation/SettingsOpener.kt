@@ -65,9 +65,25 @@ object SettingsOpener {
 
         SettingTarget.ACCESSIBILITY_SETTINGS -> start(
             context,
-            android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS,
+            Settings.ACTION_ACCESSIBILITY_SETTINGS,
             "Accessibility settings khulchi.",
         )
+        SettingTarget.MOBILE_DATA -> start(context, Settings.ACTION_DATA_USAGE_SETTINGS, "Mobile data settings khulchi.")
+        SettingTarget.AIRPLANE_MODE -> start(context, Settings.ACTION_AIRPLANE_MODE_SETTINGS, "Airplane mode settings khulchi.")
+        SettingTarget.LOCATION -> start(context, Settings.ACTION_LOCATION_SOURCE_SETTINGS, "Location settings khulchi.")
+        SettingTarget.HOTSPOT -> start(context, "android.settings.TETHER_SETTINGS", "Hotspot/tether settings khulchi.")
+        SettingTarget.NFC -> start(context, Settings.ACTION_NFC_SETTINGS, "NFC settings khulchi.")
+        SettingTarget.VPN -> start(context, Settings.ACTION_VPN_SETTINGS, "VPN settings khulchi.")
+        SettingTarget.BATTERY_SAVER -> start(context, Settings.ACTION_BATTERY_SAVER_SETTINGS, "Battery saver settings khulchi.")
+        SettingTarget.DEFAULT_APPS -> start(context, Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS, "Default apps settings khulchi.")
+        SettingTarget.DATE_TIME -> start(context, Settings.ACTION_DATE_SETTINGS, "Date and time settings khulchi.")
+        SettingTarget.LANGUAGE -> start(context, Settings.ACTION_LOCALE_SETTINGS, "Language settings khulchi.")
+        SettingTarget.STORAGE_SETTINGS -> start(context, Settings.ACTION_INTERNAL_STORAGE_SETTINGS, "Storage settings khulchi.")
+        SettingTarget.PRIVACY -> start(context, "android.settings.PRIVACY_SETTINGS", "Privacy settings khulchi.")
+        SettingTarget.SECURITY -> start(context, Settings.ACTION_SECURITY_SETTINGS, "Security settings khulchi.")
+        SettingTarget.CAST -> start(context, "android.settings.CAST_SETTINGS", "Cast settings khulchi.")
+        SettingTarget.PRINT -> start(context, Settings.ACTION_PRINT_SETTINGS, "Print settings khulchi.")
+        SettingTarget.CAPTIONS -> start(context, Settings.ACTION_CAPTIONING_SETTINGS, "Caption settings khulchi.")
     }
 
     // --- Torch --------------------------------------------------------------------

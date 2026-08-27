@@ -3,6 +3,7 @@ package com.nuva.assistant.automation
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.nuva.assistant.command.AppManagementPanel
 import com.nuva.assistant.core.security.SensitiveAppPolicy
 
 /** User-finalized Android package removal handoff. */
@@ -12,6 +13,40 @@ object AppManagement {
         data object NotFound : Result
         data object SensitiveBlocked : Result
         data class Failed(val reason: String) : Result
+    }
+
+    fun openPanel(context: Context, appName: String, panel: AppManagementPanel): Result {
+        val installed = AppLauncher.findInstalledApp(context, appName)
+        if (installed == null) {
+            return if (panel == AppManagementPanel.PLAY_STORE && AppLauncher.openPlayStoreSearch(context, appName)) {
+                Result.PromptOpened(appName)
+            } else {
+                Result.NotFound
+            }
+        }
+        val opened = when (panel) {
+            AppManagementPanel.APP_INFO -> AppLauncher.openAppInfo(context, installed.packageName)
+            AppManagementPanel.NOTIFICATIONS -> try {
+                context.startActivity(
+                    Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, installed.packageName)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+                true
+            } catch (_: Exception) {
+                false
+            }
+            AppManagementPanel.PLAY_STORE -> try {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${installed.packageName}"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+                true
+            } catch (_: Exception) {
+                AppLauncher.openUrl(context, "https://play.google.com/store/apps/details?id=${installed.packageName}")
+            }
+        }
+        return if (opened) Result.PromptOpened(installed.label) else Result.Failed("App management screen khulte parini.")
     }
 
     fun requestUninstall(context: Context, appName: String): Result {

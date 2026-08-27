@@ -334,6 +334,14 @@ class CommandParserTest {
 
         val financial = CommandParser.parse("bkash uninstall koro")
         assertTrue(financial!!.unsupported)
+
+        val info = CommandParser.parse("facebook app info khulo")!!.action as NuvaAction.OpenAppManagement
+        assertEquals(AppManagementPanel.APP_INFO, info.panel)
+        val notifications = CommandParser.parse("whatsapp notification settings khulo")!!.action as NuvaAction.OpenAppManagement
+        assertEquals("whatsapp", notifications.app)
+        assertEquals(AppManagementPanel.NOTIFICATIONS, notifications.panel)
+        val store = CommandParser.parse("youtube play store page khulo")!!.action as NuvaAction.OpenAppManagement
+        assertEquals(AppManagementPanel.PLAY_STORE, store.panel)
     }
 
     @Test
@@ -415,6 +423,27 @@ class CommandParserTest {
             SettingTarget.BRIGHTNESS,
             (CommandParser.parse("brightness kom koro")!!.action as NuvaAction.OpenSettingScreen).target,
         )
+        val extended = mapOf(
+            "mobile data setting khulo" to SettingTarget.MOBILE_DATA,
+            "airplane mode setting khulo" to SettingTarget.AIRPLANE_MODE,
+            "location setting khulo" to SettingTarget.LOCATION,
+            "hotspot setting khulo" to SettingTarget.HOTSPOT,
+            "nfc setting khulo" to SettingTarget.NFC,
+            "vpn setting khulo" to SettingTarget.VPN,
+            "battery saver setting khulo" to SettingTarget.BATTERY_SAVER,
+            "default apps setting khulo" to SettingTarget.DEFAULT_APPS,
+            "date time setting khulo" to SettingTarget.DATE_TIME,
+            "language setting khulo" to SettingTarget.LANGUAGE,
+            "storage setting khulo" to SettingTarget.STORAGE_SETTINGS,
+            "privacy setting khulo" to SettingTarget.PRIVACY,
+            "security setting khulo" to SettingTarget.SECURITY,
+            "cast setting khulo" to SettingTarget.CAST,
+            "print setting khulo" to SettingTarget.PRINT,
+            "caption setting khulo" to SettingTarget.CAPTIONS,
+        )
+        extended.forEach { (phrase, target) ->
+            assertEquals(phrase, target, (CommandParser.parse(phrase)!!.action as NuvaAction.OpenSettingScreen).target)
+        }
     }
 
     // --- Alarm / timer --------------------------------------------------------------------

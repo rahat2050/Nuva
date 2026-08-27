@@ -32,6 +32,8 @@ you say into a validated action, asks before doing anything risky, and carries i
 "onek photo share koro"              → up to 10 user-selected photos
 "contact edit koro"                  → exact picker + Contacts editor
 "facebook uninstall koro"            → Android system confirmation
+"vpn setting khulo"                  → exact official Settings screen
+"whatsapp notification settings khulo" → resolved app-specific panel
 ```
 
 ## Project status
@@ -40,7 +42,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v2.8 passes** — practical assistant → safe multi-item/system handoffs | ✅ Implemented in code (real-device QA still pending): reviewed files/communication/forms, recurring drafts, notification management, multi-share/attachments, contact picker edits and system-confirmed non-financial uninstall; see [`docs/supported-features.md`](docs/supported-features.md) |
+| **v1.1–v2.9 passes** — practical assistant → safe Android management | ✅ Implemented in code (real-device QA still pending): reviewed handoffs plus expanded exact system panels and dynamically resolved per-app Info/notification/Store screens; see [`docs/supported-features.md`](docs/supported-features.md) |
 
 `backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
@@ -171,6 +173,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [persistent-scheduled-drafts.md](docs/persistent-scheduled-drafts.md) | v2.6 Room persistence, recurrence, reboot restore and cancellation |
 | [safe-share-contact-notifications.md](docs/safe-share-contact-notifications.md) | v2.7 reviewed share/contact and exact notification actions |
 | [multi-share-contact-app-management.md](docs/multi-share-contact-app-management.md) | v2.8 multi-item, contact edit and uninstall handoffs |
+| [expanded-settings-app-management.md](docs/expanded-settings-app-management.md) | v2.9 exact system panels and per-app management |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |

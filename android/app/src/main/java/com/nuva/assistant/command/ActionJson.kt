@@ -151,6 +151,9 @@ object ActionJson {
         is NuvaAction.UninstallApp -> buildJsonObject {
             put("type", "UNINSTALL_APP"); put("app", action.app)
         }
+        is NuvaAction.OpenAppManagement -> buildJsonObject {
+            put("type", "OPEN_APP_MANAGEMENT"); put("app", action.app); put("panel", action.panel.wireName)
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

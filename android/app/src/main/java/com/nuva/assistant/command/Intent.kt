@@ -61,6 +61,7 @@ enum class NuvaIntent(val wireName: String, val localOnly: Boolean = false) {
     MANAGE_NOTIFICATION("MANAGE_NOTIFICATION", localOnly = true),
     CONTACT_HANDOFF("CONTACT_HANDOFF", localOnly = true),
     UNINSTALL_APP("UNINSTALL_APP", localOnly = true),
+    OPEN_APP_MANAGEMENT("OPEN_APP_MANAGEMENT", localOnly = true),
     ;
 
     companion object {

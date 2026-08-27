@@ -139,7 +139,16 @@ object CommandValidator {
             NuvaIntent.MANAGE_NOTIFICATION -> validateManageNotification(actionJson)
             NuvaIntent.CONTACT_HANDOFF -> validateContactHandoff(actionJson)
             NuvaIntent.UNINSTALL_APP -> validateUninstallApp(actionJson)
+            NuvaIntent.OPEN_APP_MANAGEMENT -> validateOpenAppManagement(actionJson)
         }
+    }
+
+    private fun validateOpenAppManagement(json: JsonObject): ValidatedAction {
+        val app = json.str("app")?.takeIf { it.length in 1..80 }
+            ?: return ValidatedAction.Invalid(listOf("OPEN_APP_MANAGEMENT requires app"))
+        val panel = AppManagementPanel.fromWire(json.str("panel"))
+            ?: return ValidatedAction.Invalid(listOf("OPEN_APP_MANAGEMENT requires panel"))
+        return ValidatedAction.Valid(NuvaAction.OpenAppManagement(app, panel))
     }
 
     private fun validateContactHandoff(json: JsonObject): ValidatedAction {

@@ -538,6 +538,28 @@ object CommandParser {
     // --- 2c. Forms/productivity handoff + scheduled compose reminder (v2.4) ------------
 
     private fun parseProductivityHandoff(t: String): CommandDecision? {
+        val managementPanel = when {
+            listOf("app info", "application info", "app details", "অ্যাপ ইনফো").any { t.contains(it) } ->
+                AppManagementPanel.APP_INFO
+            listOf("notification setting", "notification settings", "নোটিফিকেশন সেটিং").any { t.contains(it) } &&
+                !listOf("nuva er", "nuva-র").any { t.contains(it) } -> AppManagementPanel.NOTIFICATIONS
+            listOf("play store page", "store page", "প্লে স্টোর পেজ").any { t.contains(it) } ->
+                AppManagementPanel.PLAY_STORE
+            else -> null
+        }
+        if (managementPanel != null) {
+            var app = t
+            listOf(
+                "application info", "app details", "app info", "অ্যাপ ইনফো", "notification settings", "notification setting",
+                "নোটিফিকেশন সেটিং", "play store page", "store page", "প্লে স্টোর পেজ", "khulo", "kholo", "open", "দেখাও", "খোলো",
+            ).forEach { app = app.replace(it, " ") }
+            listOf("app", "ta", "টা", "please", "er", "এর").forEach { app = swapWord(app, it) }
+            app = app.replace(Regex("""\s+"""), " ").trim(' ', ',', '.', ':')
+            if (app.isNotBlank() && app.length <= 80) {
+                return ok(NuvaAction.OpenAppManagement(app, managementPanel), "$app er ${managementPanel.wireName} khulchi.")
+            }
+        }
+
         val uninstallMarker = listOf("uninstall koro", "uninstall korun", "remove app", "app uninstall", "আনইনস্টল করো")
             .firstOrNull { t.contains(it) }
         if (uninstallMarker != null) {
@@ -767,7 +789,9 @@ object CommandParser {
             "battery", "battary", "bettery", "charge koto", "charge koy", "চার্জ কত",
             "কত চার্জ", "ব্যাটারি", "battery percentage", "battery percent",
         ).any { t.contains(it) }
-        if (battery) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.BATTERY), "Battery dekhe nicchi.")
+        if (battery && !listOf("battery saver", "battery setting", "power saving", "ব্যাটারি সেভার").any { t.contains(it) }) {
+            return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.BATTERY), "Battery dekhe nicchi.")
+        }
 
         // Speech recognition writes the same Banglish sentence many ways. In
         // particular, users commonly say/type "akn koyta baje" rather than
@@ -819,7 +843,9 @@ object CommandParser {
             "storage", "koto jayga", "koto jaiga", "কত জায়গা", "কত জায়গা", "স্টোরেজ",
             "memory koto", "space koto", "free space", "jayga khali", "jaiga khali",
         ).any { t.contains(it) }
-        if (storage) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.STORAGE), "Storage dekhe nicchi.")
+        if (storage && !listOf("storage setting", "স্টোরেজ সেটিং").any { t.contains(it) }) {
+            return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.STORAGE), "Storage dekhe nicchi.")
+        }
 
         return null
     }
@@ -956,6 +982,28 @@ object CommandParser {
         }
         if (listOf("bluetooth", "ব্লুটুথ").any { t.contains(it) }) {
             return ok(NuvaAction.OpenSettingScreen(SettingTarget.BLUETOOTH), "Bluetooth setting khulchi.")
+        }
+        val extendedTarget = when {
+            listOf("mobile data setting", "data usage setting", "মোবাইল ডাটা সেটিং").any { t.contains(it) } -> SettingTarget.MOBILE_DATA
+            listOf("airplane mode", "flight mode", "এয়ারপ্লেন মোড", "ফ্লাইট মোড").any { t.contains(it) } -> SettingTarget.AIRPLANE_MODE
+            listOf("location setting", "gps setting", "লোকেশন সেটিং", "জিপিএস সেটিং").any { t.contains(it) } -> SettingTarget.LOCATION
+            listOf("hotspot setting", "tether setting", "হটস্পট সেটিং").any { t.contains(it) } -> SettingTarget.HOTSPOT
+            listOf("nfc setting", "এনএফসি সেটিং").any { t.contains(it) } -> SettingTarget.NFC
+            listOf("vpn setting", "ভিপিএন সেটিং").any { t.contains(it) } -> SettingTarget.VPN
+            listOf("battery saver", "power saving", "ব্যাটারি সেভার").any { t.contains(it) } -> SettingTarget.BATTERY_SAVER
+            listOf("default app", "default apps", "ডিফল্ট অ্যাপ").any { t.contains(it) } -> SettingTarget.DEFAULT_APPS
+            listOf("date time setting", "date and time setting", "তারিখ সময় সেটিং", "তারিখ সময় সেটিং").any { t.contains(it) } -> SettingTarget.DATE_TIME
+            listOf("language setting", "ভাষা সেটিং").any { t.contains(it) } -> SettingTarget.LANGUAGE
+            listOf("storage setting", "স্টোরেজ সেটিং").any { t.contains(it) } -> SettingTarget.STORAGE_SETTINGS
+            listOf("privacy setting", "প্রাইভেসি সেটিং", "গোপনীয়তা সেটিং").any { t.contains(it) } -> SettingTarget.PRIVACY
+            listOf("security setting", "সিকিউরিটি সেটিং", "নিরাপত্তা সেটিং").any { t.contains(it) } -> SettingTarget.SECURITY
+            listOf("cast setting", "screen cast", "কাস্ট সেটিং").any { t.contains(it) } -> SettingTarget.CAST
+            listOf("print setting", "printing setting", "প্রিন্ট সেটিং").any { t.contains(it) } -> SettingTarget.PRINT
+            listOf("caption setting", "subtitle setting", "ক্যাপশন সেটিং").any { t.contains(it) } -> SettingTarget.CAPTIONS
+            else -> null
+        }
+        if (extendedTarget != null) {
+            return ok(NuvaAction.OpenSettingScreen(extendedTarget), "${extendedTarget.wireName} screen khulchi — final change apni korben.")
         }
         if (listOf("notification setting", "notification settings", "নোটিফিকেশন সেটিং")
                 .any { t.contains(it) }

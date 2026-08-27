@@ -250,6 +250,10 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.UNINSTALL_APP
     }
 
+    data class OpenAppManagement(val app: String, val panel: AppManagementPanel) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_APP_MANAGEMENT
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -400,6 +404,18 @@ enum class CaptureMode(val wireName: String) {
 
     companion object {
         fun fromWire(value: String?): CaptureMode? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class AppManagementPanel(val wireName: String) {
+    APP_INFO("app_info"),
+    NOTIFICATIONS("notifications"),
+    PLAY_STORE("play_store"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): AppManagementPanel? =
             entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }
@@ -558,6 +574,22 @@ enum class SettingTarget(val wireName: String) {
     NOTIFICATION_SETTINGS("notification_settings"),
     APP_SETTINGS("app_settings"),
     ACCESSIBILITY_SETTINGS("accessibility_settings"),
+    MOBILE_DATA("mobile_data"),
+    AIRPLANE_MODE("airplane_mode"),
+    LOCATION("location"),
+    HOTSPOT("hotspot"),
+    NFC("nfc"),
+    VPN("vpn"),
+    BATTERY_SAVER("battery_saver"),
+    DEFAULT_APPS("default_apps"),
+    DATE_TIME("date_time"),
+    LANGUAGE("language"),
+    STORAGE_SETTINGS("storage_settings"),
+    PRIVACY("privacy"),
+    SECURITY("security"),
+    CAST("cast"),
+    PRINT("print"),
+    CAPTIONS("captions"),
     ;
 
     companion object {

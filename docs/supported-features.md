@@ -1,4 +1,4 @@
-# NUVA — Supported features (v2.8)
+# NUVA — Supported features (v2.9)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -88,10 +88,13 @@ prayer times, sunrise/sunset, air quality and transport schedules are routed to 
 rather than answered from stale model memory. Other factual/how-to/recipe/translation questions
 also open a sourced web result instead of returning `UNSUPPORTED`.
 
-## Settings screens — SUPPORTED (ANDROID-LIMITED by nature)
-Brightness/DND/Wi-Fi/BT/sound/display/notification/app/accessibility settings — Android
-forbids direct toggles for third-party apps, so the exact screen opens (torch & volume are
-direct where permitted).
+## Settings & app-management screens — SUPPORTED (ANDROID-LIMITED by nature)
+Exact user-controlled screens/panels cover brightness, DND, Wi-Fi, Bluetooth, mobile data, airplane
+mode, location, hotspot, NFC, VPN, battery saver, default apps, date/time, language, storage, privacy,
+security, cast, print, captions, sound, notification, app and accessibility. Android forbids most
+direct toggles, so NUVA opens the exact screen; torch/volume and DND-with-existing-policy-access are
+direct where permitted. v2.9 also resolves any installed app label to App Info, that app's notification
+settings, or its Play Store page. No secure setting is silently changed.
 
 ## Notifications — SUPPORTED / APP-LIMITED
 Read/summarize (OTP redacted, banking skipped), open source app and shade open. v2.3 uses an app's

@@ -44,6 +44,7 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("MANAGE_NOTIFICATION"))
         assertNull(NuvaIntent.fromWire("CONTACT_HANDOFF"))
         assertNull(NuvaIntent.fromWire("UNINSTALL_APP"))
+        assertNull(NuvaIntent.fromWire("OPEN_APP_MANAGEMENT"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -85,6 +86,10 @@ class ActionJsonTest {
             NuvaAction.ManageNotification(1, NotificationManageOperation.MARK_READ),
             NuvaAction.ContactHandoff(ContactHandoffOperation.EDIT),
             NuvaAction.UninstallApp("facebook"),
+            NuvaAction.OpenAppManagement("whatsapp", AppManagementPanel.NOTIFICATIONS),
+            NuvaAction.OpenSettingScreen(SettingTarget.AIRPLANE_MODE),
+            NuvaAction.OpenSettingScreen(SettingTarget.VPN),
+            NuvaAction.OpenSettingScreen(SettingTarget.DEFAULT_APPS),
             NuvaAction.UserFile(UserFileOperation.SHARE_MULTIPLE_FILES),
             NuvaAction.UserFile(UserFileOperation.SHARE_MULTIPLE_PHOTOS),
             NuvaAction.ComposeEmail("user@example.com", null, null, attachmentRequested = true, multipleAttachments = true),
@@ -104,6 +109,14 @@ class ActionJsonTest {
         cases.forEach { action ->
             val encoded = ActionJson.encode(action)
             assertEquals(action, ActionJson.decode(encoded))
+        }
+    }
+
+    @Test
+    fun `every settings target round trips through local validation`() {
+        SettingTarget.entries.forEach { target ->
+            val action = NuvaAction.OpenSettingScreen(target)
+            assertEquals(target.wireName, action, ActionJson.decode(ActionJson.encode(action)))
         }
     }
 
@@ -226,6 +239,13 @@ class ActionJsonTest {
             buildJsonObject { put("type", "CONTACT_HANDOFF"); put("operation", "delete") },
         )
         assertTrue(badHandoff is CommandValidator.ValidatedAction.Invalid)
+
+        val badAppPanel = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "OPEN_APP_MANAGEMENT"); put("app", "youtube"); put("panel", "force_stop")
+            },
+        )
+        assertTrue(badAppPanel is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test
