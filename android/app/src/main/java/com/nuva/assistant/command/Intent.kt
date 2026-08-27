@@ -64,6 +64,9 @@ enum class NuvaIntent(val wireName: String, val localOnly: Boolean = false) {
     OPEN_APP_MANAGEMENT("OPEN_APP_MANAGEMENT", localOnly = true),
     CLIPBOARD_ACTION("CLIPBOARD_ACTION", localOnly = true),
     CREATE_CALENDAR_EVENT("CREATE_CALENDAR_EVENT", localOnly = true),
+    COMPOSE_SOCIAL_POST("COMPOSE_SOCIAL_POST", localOnly = true),
+    COMPOSE_MMS("COMPOSE_MMS", localOnly = true),
+    OPEN_VOICEMAIL("OPEN_VOICEMAIL", localOnly = true),
     ;
 
     companion object {
@@ -105,6 +108,8 @@ fun baselineRisk(intent: NuvaIntent): NuvaRisk = when (intent) {
     NuvaIntent.UNINSTALL_APP,
     NuvaIntent.CLIPBOARD_ACTION,
     NuvaIntent.CREATE_CALENDAR_EVENT,
+    NuvaIntent.COMPOSE_SOCIAL_POST,
+    NuvaIntent.COMPOSE_MMS,
     // Policy §37: calendar edits always confirm (we prefill, the user saves).
     NuvaIntent.SET_REMINDER,
     -> NuvaRisk.MEDIUM

@@ -51,6 +51,11 @@ class UserPresentFileWorkflowTest {
         assertEquals(UserFileOperation.EMAIL_ATTACHMENTS, multiple.operation)
         assertTrue(multiple.operation.usesMultiplePicker)
         assertTrue(multiple.emailDraft?.multipleAttachments == false)
+
+        val mms = NuvaAction.ComposeMms("01712345678", "hello", attachmentRequested = true)
+        val mmsRequest = UserPresentFileWorkflow.requestMmsAttachment(mms)
+        assertEquals(UserFileOperation.MMS_ATTACHMENT, mmsRequest.operation)
+        assertTrue(mmsRequest.mmsDraft?.attachmentRequested == false)
     }
 
     @Test

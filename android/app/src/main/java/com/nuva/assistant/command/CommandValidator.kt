@@ -142,7 +142,32 @@ object CommandValidator {
             NuvaIntent.OPEN_APP_MANAGEMENT -> validateOpenAppManagement(actionJson)
             NuvaIntent.CLIPBOARD_ACTION -> validateClipboardAction(actionJson)
             NuvaIntent.CREATE_CALENDAR_EVENT -> validateCalendarEvent(actionJson)
+            NuvaIntent.COMPOSE_SOCIAL_POST -> validateSocialPost(actionJson)
+            NuvaIntent.COMPOSE_MMS -> validateMms(actionJson)
+            NuvaIntent.OPEN_VOICEMAIL -> ValidatedAction.Valid(NuvaAction.OpenVoicemail)
         }
+    }
+
+    private fun validateSocialPost(json: JsonObject): ValidatedAction {
+        val platform = SocialPlatform.fromWire(json.str("platform"))
+            ?: return ValidatedAction.Invalid(listOf("COMPOSE_SOCIAL_POST requires platform"))
+        val text = json.str("text")?.takeIf { it.isNotEmpty() && it.length <= 5_000 }
+            ?: return ValidatedAction.Invalid(listOf("COMPOSE_SOCIAL_POST requires text"))
+        return ValidatedAction.Valid(NuvaAction.ComposeSocialPost(platform, text))
+    }
+
+    private fun validateMms(json: JsonObject): ValidatedAction {
+        val rawRecipient = json.str("recipient")
+        val recipient = rawRecipient?.takeIf { PHONE_PATTERN.matches(it) }
+        if (rawRecipient != null && recipient == null) {
+            return ValidatedAction.Invalid(listOf("COMPOSE_MMS recipient is invalid"))
+        }
+        val body = json.str("body")?.takeIf { it.isNotEmpty() && it.length <= 2_000 }
+        val attachment = json.bool("attachment_requested") ?: false
+        if (body == null && !attachment) {
+            return ValidatedAction.Invalid(listOf("COMPOSE_MMS requires body or attachment"))
+        }
+        return ValidatedAction.Valid(NuvaAction.ComposeMms(recipient, body, attachment))
     }
 
     private fun validateClipboardAction(json: JsonObject): ValidatedAction {
@@ -282,7 +307,11 @@ object CommandValidator {
 
     private fun validateUserFile(json: JsonObject): ValidatedAction {
         val operation = UserFileOperation.fromWire(json.str("operation"))
-            ?.takeIf { it != UserFileOperation.EMAIL_ATTACHMENT && it != UserFileOperation.EMAIL_ATTACHMENTS }
+            ?.takeIf {
+                it != UserFileOperation.EMAIL_ATTACHMENT &&
+                    it != UserFileOperation.EMAIL_ATTACHMENTS &&
+                    it != UserFileOperation.MMS_ATTACHMENT
+            }
             ?: return ValidatedAction.Invalid(listOf("USER_FILE requires a public picker operation"))
         val rawName = json.str("new_name")
         val newName = rawName?.takeIf { name ->

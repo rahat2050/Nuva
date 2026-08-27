@@ -588,6 +588,45 @@ class CommandExecutor(
                 }
             }
 
+            is NuvaAction.ComposeSocialPost -> when (
+                val result = com.nuva.assistant.automation.SocialMmsComposer.social(context, action)
+            ) {
+                is com.nuva.assistant.automation.SocialMmsComposer.Result.Opened ->
+                    ExecutionOutcome("completed", result.speech)
+                com.nuva.assistant.automation.SocialMmsComposer.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive ba financial post draft blocked.", "sensitive social draft blocked")
+                is com.nuva.assistant.automation.SocialMmsComposer.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ComposeMms -> if (action.attachmentRequested) {
+                com.nuva.assistant.automation.UserPresentFileWorkflow.requestMmsAttachment(action)
+                val activity = Intent(context, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                if (runCatching { context.startActivity(activity); true }.getOrDefault(false)) {
+                    ExecutionOutcome("completed", "MMS attachment picker khulchi — file apni select korun.")
+                } else {
+                    com.nuva.assistant.automation.UserPresentFileWorkflow.cancel()
+                    ExecutionOutcome("failed", "MMS attachment picker khulte parini.", "activity launch failed")
+                }
+            } else {
+                when (val result = com.nuva.assistant.automation.SocialMmsComposer.mms(context, action)) {
+                    is com.nuva.assistant.automation.SocialMmsComposer.Result.Opened -> ExecutionOutcome("completed", result.speech)
+                    com.nuva.assistant.automation.SocialMmsComposer.Result.SensitiveBlocked ->
+                        ExecutionOutcome("failed", "Sensitive ba financial MMS blocked.", "sensitive MMS blocked")
+                    is com.nuva.assistant.automation.SocialMmsComposer.Result.Failed ->
+                        ExecutionOutcome("failed", result.reason, result.reason)
+                }
+            }
+
+            is NuvaAction.OpenVoicemail -> when (val result = com.nuva.assistant.automation.SocialMmsComposer.openVoicemail(context)) {
+                is com.nuva.assistant.automation.SocialMmsComposer.Result.Opened -> ExecutionOutcome("completed", result.speech)
+                com.nuva.assistant.automation.SocialMmsComposer.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Voicemail action blocked.", "voicemail blocked")
+                is com.nuva.assistant.automation.SocialMmsComposer.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.ComposeEmail -> if (action.attachmentRequested) {
                 com.nuva.assistant.automation.UserPresentFileWorkflow.requestEmailAttachment(action)
                 val activity = Intent(context, MainActivity::class.java)
@@ -1033,6 +1072,7 @@ class CommandExecutor(
                 UserFileOperation.SHARE_MULTIPLE_VIDEOS -> "share korar video-gulo"
                 UserFileOperation.EMAIL_ATTACHMENT -> "email attachment"
                 UserFileOperation.EMAIL_ATTACHMENTS -> "email attachments"
+                UserFileOperation.MMS_ATTACHMENT -> "MMS attachment"
                 UserFileOperation.RENAME_FILE -> "rename korar file"
                 UserFileOperation.COPY_FILE -> "copy korar source file"
                 UserFileOperation.MOVE_FILE -> "move korar source file"

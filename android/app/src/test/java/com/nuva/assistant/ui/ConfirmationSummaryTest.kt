@@ -130,6 +130,22 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `social and mms summaries keep final publish user controlled`() {
+        val social = ConfirmationSummary.build(
+            NuvaAction.ComposeSocialPost(com.nuva.assistant.command.SocialPlatform.FACEBOOK, "hello"),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(social.detail.contains("final Post"))
+
+        val mms = ConfirmationSummary.build(
+            NuvaAction.ComposeMms("01712345678", "hello", attachmentRequested = true),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(mms.detail.contains("final Send"))
+        assertTrue(mms.lines.any { it.label == "Attachment" })
+    }
+
+    @Test
     fun `clipboard and calendar summaries expose exact user data`() {
         val clipboard = ConfirmationSummary.build(
             NuvaAction.ClipboardAction(com.nuva.assistant.command.ClipboardOperation.COPY, "hello"),

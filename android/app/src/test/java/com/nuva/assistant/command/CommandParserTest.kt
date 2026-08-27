@@ -265,6 +265,25 @@ class CommandParserTest {
         assertNull(email.body)
     }
 
+    @Test
+    fun `social post mms and voicemail stay visible and user finalized`() {
+        val social = CommandParser.parse("facebook post draft je aj meeting ache")!!
+        val post = social.action as NuvaAction.ComposeSocialPost
+        assertEquals(SocialPlatform.FACEBOOK, post.platform)
+        assertEquals("aj meeting ache", post.text)
+        assertTrue(social.requiresConfirmation)
+
+        val mms = CommandParser.parse("mms compose 01712345678 photo attachment je ami ashchi")!!
+        val mmsAction = mms.action as NuvaAction.ComposeMms
+        assertEquals("01712345678", mmsAction.recipient)
+        assertEquals("ami ashchi", mmsAction.body)
+        assertTrue(mmsAction.attachmentRequested)
+        assertTrue(mms.requiresConfirmation)
+
+        assertEquals(NuvaIntent.OPEN_VOICEMAIL, CommandParser.parse("voicemail khulo")!!.intent)
+        assertTrue(CommandParser.parse("facebook post draft")!!.unsupported)
+    }
+
     // --- Email compose & notification RemoteInput -------------------------------------
 
     @Test

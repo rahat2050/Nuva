@@ -1,4 +1,4 @@
-# NUVA — Supported features (v3.0)
+# NUVA — Supported features (v3.1)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -31,6 +31,9 @@ Email recipient/subject/body compose is **SUPPORTED user-reviewed**: email app o
 v2.7 adds confirmed generic text-share chooser and Contacts-app insert drafts (name/phone/email); the
 user chooses the destination/final share or taps final Save. v2.8 adds contact picker view/edit
 handoff without contact-write permission; exact contact and final Save remain user-controlled.
+v3.1 adds text-only social compose handoffs for Facebook/Instagram/X/LinkedIn/Reddit/Threads/TikTok,
+MMS/message compose with one picker-selected attachment, and voicemail dialer handoff. Social/MMS
+content is rechecked; final Post/Send/call remains user-controlled and bulk/background use is absent.
 
 ## Forms & productivity — USER-REVIEWED SUPPORTED
 v2.4 can store an explicitly dictated local draft and open a sourced official-portal search for

@@ -48,6 +48,8 @@ val SUPPORTED_FEATURES = listOf(
     "Telegram / Messenger / Signal / Viber / IMO — মেসেজ লেখা বসিয়ে অ্যাপ খোলে, Send আপনি চাপবেন",
     "Email recipient/subject/body prefill; picker থেকে সর্বোচ্চ ১০ attachment — final Send আপনি চাপবেন",
     "Generic text share, new contact draft এবং exact contact picker view/edit — destination/Save user-controlled",
+    "Facebook/Instagram/X/LinkedIn/Reddit/Threads/TikTok text post draft — visible compose, final Post user",
+    "MMS/message composer with one picker attachment এবং voicemail dialer — final Send/call user",
     "Passport/NID/birth/driving/visa/admission/job/doctor/hotel/flight/courier local form draft + official portal handoff",
     "Persistent email/SMS draft reminder — once/daily/weekly, reboot restore, voice list/cancel; tap করলে draft, auto-Send নয়",
     "Explicit clipboard copy/read/clear — confirmation, bounded/redacted text; কোনো monitoring/history নয়",

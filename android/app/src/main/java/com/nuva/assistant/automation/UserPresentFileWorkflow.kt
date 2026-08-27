@@ -45,6 +45,7 @@ object UserPresentFileWorkflow {
         val operation: UserFileOperation,
         val newName: String? = null,
         val emailDraft: NuvaAction.ComposeEmail? = null,
+        val mmsDraft: NuvaAction.ComposeMms? = null,
     )
 
     private val _state = MutableStateFlow<State>(State.Idle)
@@ -68,6 +69,17 @@ object UserPresentFileWorkflow {
             id = System.nanoTime(),
             operation = operation,
             emailDraft = email.copy(attachmentRequested = false, multipleAttachments = false),
+        )
+        _state.value = State.Pending(request)
+        return request
+    }
+
+    @Synchronized
+    fun requestMmsAttachment(mms: NuvaAction.ComposeMms): Request {
+        val request = Request(
+            id = System.nanoTime(),
+            operation = UserFileOperation.MMS_ATTACHMENT,
+            mmsDraft = mms.copy(attachmentRequested = false),
         )
         _state.value = State.Pending(request)
         return request
@@ -199,6 +211,14 @@ object UserPresentFileWorkflow {
                 when (val result = EmailComposer.composeWithAttachment(context, draft, uri)) {
                     EmailComposer.Result.Opened -> complete("Attachment-shoho email composer khulechi — final Send apni chapun.")
                     is EmailComposer.Result.Failed -> error(result.reason)
+                }
+            }
+            UserFileOperation.MMS_ATTACHMENT -> {
+                val draft = request.mmsDraft ?: error("MMS draft missing")
+                when (val result = SocialMmsComposer.mmsWithAttachment(context, draft, uri)) {
+                    is SocialMmsComposer.Result.Opened -> complete(result.speech)
+                    SocialMmsComposer.Result.SensitiveBlocked -> error("sensitive MMS blocked")
+                    is SocialMmsComposer.Result.Failed -> error(result.reason)
                 }
             }
             UserFileOperation.SHARE_MULTIPLE_FILES,

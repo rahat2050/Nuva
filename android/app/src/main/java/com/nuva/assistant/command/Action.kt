@@ -269,6 +269,22 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.CREATE_CALENDAR_EVENT
     }
 
+    data class ComposeSocialPost(val platform: SocialPlatform, val text: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.COMPOSE_SOCIAL_POST
+    }
+
+    data class ComposeMms(
+        val recipient: String?,
+        val body: String?,
+        val attachmentRequested: Boolean,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.COMPOSE_MMS
+    }
+
+    data object OpenVoicemail : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_VOICEMAIL
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -423,6 +439,21 @@ enum class CaptureMode(val wireName: String) {
     }
 }
 
+enum class SocialPlatform(val wireName: String, val packageName: String) {
+    FACEBOOK("facebook", "com.facebook.katana"),
+    INSTAGRAM("instagram", "com.instagram.android"),
+    X("x", "com.twitter.android"),
+    LINKEDIN("linkedin", "com.linkedin.android"),
+    REDDIT("reddit", "com.reddit.frontpage"),
+    THREADS("threads", "com.instagram.barcelona"),
+    TIKTOK("tiktok", "com.zhiliaoapp.musically"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): SocialPlatform? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
 enum class ClipboardOperation(val wireName: String) {
     COPY("copy"),
     READ("read"),
@@ -537,6 +568,7 @@ enum class UserFileOperation(val wireName: String, val mimeType: String, val use
     SHARE_MULTIPLE_VIDEOS("share_multiple_videos", "video/*"),
     EMAIL_ATTACHMENT("email_attachment", "*/*"),
     EMAIL_ATTACHMENTS("email_attachments", "*/*"),
+    MMS_ATTACHMENT("mms_attachment", "*/*"),
     RENAME_FILE("rename_file", "*/*"),
     COPY_FILE("copy_file", "*/*"),
     MOVE_FILE("move_file", "*/*"),
@@ -547,7 +579,7 @@ enum class UserFileOperation(val wireName: String, val mimeType: String, val use
     val sharesOutsideDevice: Boolean
         get() = this == SHARE_FILE || this == SHARE_PHOTO || this == SHARE_VIDEO ||
             this == SHARE_MULTIPLE_FILES || this == SHARE_MULTIPLE_PHOTOS || this == SHARE_MULTIPLE_VIDEOS ||
-            this == EMAIL_ATTACHMENT || this == EMAIL_ATTACHMENTS
+            this == EMAIL_ATTACHMENT || this == EMAIL_ATTACHMENTS || this == MMS_ATTACHMENT
 
     val usesMultiplePicker: Boolean
         get() = this == SHARE_MULTIPLE_FILES || this == SHARE_MULTIPLE_PHOTOS ||

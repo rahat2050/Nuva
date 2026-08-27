@@ -168,6 +168,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   resolved App Info, app-notification and Play Store pages; no secure setting bypass.
 * **v3.0 explicit productivity**: confirmation-gated bounded clipboard copy/read/clear with no
   monitoring, and rich Calendar insert drafts with user-controlled final Save.
+* **v3.1 visible communication**: text-only social compose handoffs, MMS/message compose with one
+  picker attachment, and voicemail dialer; final Post/Send/call always user-controlled.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

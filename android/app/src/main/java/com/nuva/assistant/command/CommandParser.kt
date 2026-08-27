@@ -754,6 +754,53 @@ object CommandParser {
     // --- 2d. User-reviewed email + official notification reply (v2.3) ------------------
 
     private fun parseCommunicationCompose(t: String): CommandDecision? {
+        if (listOf("voicemail khulo", "open voicemail", "voicemail dialer", "ভয়েসমেইল খোলো", "ভয়েসমেইল খোলো")
+                .any { t.contains(it) }
+        ) {
+            return ok(NuvaAction.OpenVoicemail, "Voicemail dialer khulchi — final call apni korben.")
+        }
+
+        val socialPlatform = when {
+            t.contains("facebook") -> SocialPlatform.FACEBOOK
+            t.contains("instagram") -> SocialPlatform.INSTAGRAM
+            t.contains("linkedin") -> SocialPlatform.LINKEDIN
+            t.contains("reddit") -> SocialPlatform.REDDIT
+            t.contains("threads") -> SocialPlatform.THREADS
+            t.contains("tiktok") -> SocialPlatform.TIKTOK
+            Regex("""(^|\s)(x|twitter)(\s|$)""").containsMatchIn(t) -> SocialPlatform.X
+            else -> null
+        }
+        val socialCompose = listOf("post draft", "post compose", "compose post", "post likho", "পোস্ট ড্রাফট", "পোস্ট লেখো")
+            .any { t.contains(it) }
+        if (socialPlatform != null && socialCompose) {
+            val marker = listOf(" je ", " যে ", " text ", " লেখা ").firstOrNull { t.contains(it) }
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            val text = quoted ?: marker?.let { t.substringAfter(it).trim(' ', ',', '.', ':') }
+            if (text.isNullOrBlank()) return unsupported("Social post draft-er text bolun.")
+            return ok(
+                NuvaAction.ComposeSocialPost(socialPlatform, text.take(5_000)),
+                "${socialPlatform.wireName} compose khulbo — final Post apni korben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val mmsRequested = listOf("mms compose", "mms pathao", "multimedia message", "photo message", "এমএমএস")
+            .any { t.contains(it) }
+        if (mmsRequested) {
+            val recipient = PHONE_NUMBER.find(t)?.value?.let { digitsOnly(it) }
+            val attachment = listOf("attachment", "attach", "photo", "image", "file", "ছবি", "ফাইল").any { t.contains(it) }
+            val marker = listOf(" message ", " body ", " je ", " যে ").firstOrNull { t.contains(it) }
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            var body = quoted ?: marker?.let { t.substringAfter(it).trim(' ', ',', '.', ':') }
+            body = body?.removePrefix("je ")?.removePrefix("যে ")?.trim()
+            if (body.isNullOrBlank() && !attachment) return unsupported("MMS-er body ba attachment bolun.")
+            return ok(
+                NuvaAction.ComposeMms(recipient, body?.take(2_000), attachment),
+                "MMS composer khulbo${if (attachment) "; age file beche nin" else ""} — final Send apni korben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
         val mentionsNotification = t.contains("notification") || t.contains("নোটিফিকেশন")
         if (mentionsNotification && listOf("dismiss", "clear notification", "notification muchhe", "সরাও", "মুছে দাও")
                 .any { t.contains(it) }

@@ -137,6 +137,23 @@ object ConfirmationSummary {
                 confirmLabelOverride = "CANCEL DRAFT"
             }
 
+            is NuvaAction.ComposeSocialPost -> {
+                title = "Social post draft"
+                lines += Line("Platform", action.platform.wireName)
+                lines += Line("লেখা", "“${action.text.take(500)}”")
+                detail = "Visible compose screen খুলবে; final Post আপনি করবেন।"
+                confirmLabelOverride = "CONTINUE"
+            }
+
+            is NuvaAction.ComposeMms -> {
+                title = "MMS/message draft"
+                action.recipient?.let { lines += Line("প্রাপক", it) }
+                action.body?.let { lines += Line("লেখা", "“${it.take(500)}”") }
+                if (action.attachmentRequested) lines += Line("Attachment", "Android picker থেকে একটি")
+                detail = "Visible messaging composer/chooser খুলবে; final Send আপনি করবেন।"
+                confirmLabelOverride = "CONTINUE"
+            }
+
             is NuvaAction.ClipboardAction -> {
                 title = "Clipboard action"
                 lines += Line("কাজ", action.operation.wireName)

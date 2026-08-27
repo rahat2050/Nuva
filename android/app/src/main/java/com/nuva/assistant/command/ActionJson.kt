@@ -165,6 +165,16 @@ object ActionJson {
             action.description?.let { put("description", it) }
             action.attendeeEmail?.let { put("attendee_email", it) }
         }
+        is NuvaAction.ComposeSocialPost -> buildJsonObject {
+            put("type", "COMPOSE_SOCIAL_POST"); put("platform", action.platform.wireName); put("text", action.text)
+        }
+        is NuvaAction.ComposeMms -> buildJsonObject {
+            put("type", "COMPOSE_MMS")
+            action.recipient?.let { put("recipient", it) }
+            action.body?.let { put("body", it) }
+            if (action.attachmentRequested) put("attachment_requested", true)
+        }
+        is NuvaAction.OpenVoicemail -> buildJsonObject { put("type", "OPEN_VOICEMAIL") }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

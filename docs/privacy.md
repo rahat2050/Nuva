@@ -13,6 +13,8 @@ no ad SDKs**.
 * Clipboard access happens only on an explicit foreground copy/read/clear command; NUVA stores no
   clipboard history and never registers a clipboard-change monitor.
 * Rich calendar event fields are passed to the visible Calendar insert screen and not saved by NUVA.
+* Social/MMS text and a picker-selected attachment go only to the visible Android compose/share intent
+  chosen by the user; NUVA does not upload them to its backend or press Post/Send.
 * Screen snapshots (`ScreenStateModel`) — transient, in RAM, never persisted or
   uploaded. Password fields are never captured; OTP-like codes are redacted even
   in memory before display.

@@ -402,6 +402,24 @@ def parse_productivity(t):
     return ok({"kind":"prepareform","form_kind":kind,"details":details},"PREPARE_FORM",risk="MEDIUM",base="MEDIUM")
 
 def parse_communication(t):
+    if any(w in t for w in ["voicemail khulo","open voicemail","voicemail dialer"]):
+        return ok({"kind":"voicemail"},"OPEN_VOICEMAIL")
+    platforms=[("facebook","FACEBOOK"),("instagram","INSTAGRAM"),("linkedin","LINKEDIN"),("reddit","REDDIT"),
+               ("threads","THREADS"),("tiktok","TIKTOK"),("twitter","X")]
+    platform=next((value for marker,value in platforms if marker in t),None)
+    if platform and any(w in t for w in ["post draft","post compose","compose post","post likho"]):
+        marker=next((w for w in [" je "," text "] if w in t),None)
+        text=t.split(marker,1)[1].strip() if marker else None
+        if not text: return unsupported("Post text bolun")
+        return ok({"kind":"socialpost","platform":platform,"text":text},"COMPOSE_SOCIAL_POST",risk="MEDIUM",base="MEDIUM")
+    if any(w in t for w in ["mms compose","mms pathao","multimedia message","photo message"]):
+        m=PHONE_NUMBER.search(t); recipient=digits_only(m.group(0)) if m else None
+        attachment=any(w in t for w in ["attachment","attach","photo","image","file"])
+        marker=next((w for w in [" message "," body "," je "] if w in t),None)
+        body=t.split(marker,1)[1].strip() if marker else None
+        if body: body=re.sub(r"^je\s+","",body).strip()
+        if not body and not attachment: return unsupported("MMS body bolun")
+        return ok({"kind":"mms","recipient":recipient,"body":body,"attachment":attachment},"COMPOSE_MMS",risk="MEDIUM",base="MEDIUM")
     mentions_notification="notification" in t or "নোটিফিকেশন" in t
     if mentions_notification and any(w in t for w in ["dismiss","clear notification","notification muchhe","সরাও","মুছে দাও"]):
         m=re.search(r"(\d+)",t); ordinal=int(m.group(1)) if m else 1
@@ -1061,6 +1079,9 @@ check(parse("clipboard e copy koro je hello")["action"]["operation"] == "COPY", 
 check(parse("clipboard poro")["action"]["operation"] == "READ", "clipboard read")
 check(parse("clipboard clear koro")["action"]["operation"] == "CLEAR", "clipboard clear")
 check(parse("kal 9 tay calendar event create title meeting")["intent"] == "CREATE_CALENDAR_EVENT", "rich calendar event")
+check(parse("facebook post draft je hello")["intent"] == "COMPOSE_SOCIAL_POST", "social post draft")
+check(parse("mms compose 01712345678 photo attachment je hello")["intent"] == "COMPOSE_MMS", "MMS attachment draft")
+check(parse("voicemail khulo")["intent"] == "OPEN_VOICEMAIL", "voicemail dialer")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")
