@@ -1,4 +1,4 @@
-# NUVA — Supported features (v3.2)
+# NUVA — Supported features (v3.3)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -96,9 +96,11 @@ no device location; Maps applies its own user-granted location permission.
 
 ## Device utilities & current information — SUPPORTED
 Torch, battery/time/date/network/storage answers read from the phone at execution time (offline;
-Bangla/Banglish/English, including ASR variants such as `aj koto tarik` and `akn koyta baje`),
-alarms/timers, calendar-prefilled reminders, notes/to-dos, maps search (`dhaka er map dekhao`),
-and app-agnostic press/clear/describe commands. Current weather/news/live scores/traffic/rates,
+Bangla/Banglish/English, including ASR variants such as `aj koto tarik` and `akn koyta baje`). v3.3
+adds privacy-safe diagnostics: manufacturer/model + Android/API, RAM total/available, uptime, display
+resolution/density, media volume/ringer, timezone/UTC offset, locale, launchable app count and sensor
+count/names. Serial, Android ID, MAC, IMEI and other persistent identifiers are deliberately absent.
+Alarms/timers, reminders, notes/to-dos and app-agnostic press/clear/describe remain supported. Current weather/news/live scores/traffic/rates,
 prayer times, sunrise/sunset, air quality and transport schedules are routed to a live web search
 rather than answered from stale model memory. Other factual/how-to/recipe/translation questions
 also open a sourced web result instead of returning `UNSUPPORTED`.

@@ -63,7 +63,7 @@ val SUPPORTED_FEATURES = listOf(
     "দৈনন্দিন calculator — BMI/BMR, পানি, EMI/interest, profit-loss, unit price, savings, mileage/fuel cost/ETA, statistics, ratio, grade, geometry, download time, date, random",
     "৬০০টি sourced daily skill — ১০০ broad shortcut + ৫০০ precise entity×task skill: local service, সরকারি আবেদন, learning ও product help",
     "১,০০০+ command form: length/weight/volume/area/বাংলাদেশি জমি/speed/time/data/temperature/energy/pressure conversion",
-    "ব্যাটারি, সময়, তারিখ, নেটওয়ার্ক, স্টোরেজ জিজ্ঞাসা — ফোন থেকেই তাৎক্ষণিক উত্তর, ইন্টারনেট/AI লাগে না",
+    "Offline device diagnostics — battery/time/date/network/storage/model/Android/RAM/uptime/display/audio/timezone/locale/app count/sensors",
     "১৬+ exact system panel: mobile data/airplane/location/hotspot/NFC/VPN/battery/default app/date/language/storage/privacy/security/cast/print/caption",
     "যেকোনো installed app-এর App Info, app-specific notification settings ও Play Store page",
     "টর্চ/ভলিউম direct; DND access থাকলে direct—অন্য secure toggle final user-controlled",

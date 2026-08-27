@@ -128,6 +128,14 @@ class ActionJsonTest {
     }
 
     @Test
+    fun `every device status kind round trips through local validation`() {
+        DeviceStatusKind.entries.forEach { kind ->
+            val action = NuvaAction.DeviceStatusQuery(kind)
+            assertEquals(kind.wireName, action, ActionJson.decode(ActionJson.encode(action)))
+        }
+    }
+
+    @Test
     fun `every settings target round trips through local validation`() {
         SettingTarget.entries.forEach { target ->
             val action = NuvaAction.OpenSettingScreen(target)

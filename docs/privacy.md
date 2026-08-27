@@ -17,6 +17,8 @@ no ad SDKs**.
   chosen by the user; NUVA does not upload them to its backend or press Post/Send.
 * Maps routes contain only the places the user dictated. NUVA requests no location permission and
   does not read current coordinates; the selected Maps app manages its own location access.
+* Device diagnostics stay local and omit IMEI, serial, Android ID, ad ID, SIM identity, MAC, account
+  list, exact IP/location and other persistent identifiers.
 * Screen snapshots (`ScreenStateModel`) — transient, in RAM, never persisted or
   uploaded. Password fields are never captured; OTP-like codes are redacted even
   in memory before display.

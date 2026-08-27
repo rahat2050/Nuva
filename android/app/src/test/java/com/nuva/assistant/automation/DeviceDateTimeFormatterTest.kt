@@ -35,6 +35,14 @@ class DeviceDateTimeFormatterTest {
     }
 
     @Test
+    fun `uptime duration formatter is deterministic and bounded`() {
+        assertEquals("0 minute", DeviceStatusProvider.formatDuration(0))
+        assertEquals("1 hour 30 minute", DeviceStatusProvider.formatDuration(5_400_000))
+        assertEquals("2 day 3 hour 4 minute", DeviceStatusProvider.formatDuration(183_840_000))
+        assertEquals("0 minute", DeviceStatusProvider.formatDuration(-1))
+    }
+
+    @Test
     fun `zero minutes are spoken naturally`() {
         val calendar = fixedCalendar().apply { set(Calendar.HOUR_OF_DAY, 9); set(Calendar.MINUTE, 0) }
         assertEquals("Ekhon shokal 9 ta.", DeviceDateTimeFormatter.time(calendar, "banglish"))

@@ -86,6 +86,25 @@ class CommandParserTest {
     }
 
     @Test
+    fun `extended device diagnostics map to local status kinds`() {
+        val cases = mapOf(
+            "phone model ki" to DeviceStatusKind.DEVICE_INFO,
+            "ram koto" to DeviceStatusKind.MEMORY,
+            "phone uptime koto" to DeviceStatusKind.UPTIME,
+            "screen resolution koto" to DeviceStatusKind.DISPLAY,
+            "volume koto" to DeviceStatusKind.AUDIO,
+            "timezone ki" to DeviceStatusKind.TIMEZONE,
+            "phone language ki" to DeviceStatusKind.LOCALE,
+            "koyta app installed" to DeviceStatusKind.INSTALLED_APPS,
+            "phone e ki sensor ache" to DeviceStatusKind.SENSORS,
+        )
+        cases.forEach { (phrase, expected) ->
+            val query = CommandParser.parse(phrase)!!.action as NuvaAction.DeviceStatusQuery
+            assertEquals(phrase, expected, query.query)
+        }
+    }
+
+    @Test
     fun `common banglish spellings get local realtime date and time`() {
         val date = CommandParser.parse("aj koto tarik")!!.action as NuvaAction.DeviceStatusQuery
         assertEquals(DeviceStatusKind.DATE, date.query)

@@ -172,6 +172,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   picker attachment, and voicemail dialer; final Post/Send/call always user-controlled.
 * **v3.2 maps/navigation**: dynamic origin/destination, route modes, nearby search and coordinate
   Street View through visible native/web map handoffs; NUVA reads no device location.
+* **v3.3 diagnostics**: local device/Android/RAM/uptime/display/audio/timezone/locale/app-count/sensor
+  answers with no IMEI/serial/Android-ID/MAC/location or additional permission.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

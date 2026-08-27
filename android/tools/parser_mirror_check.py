@@ -475,6 +475,8 @@ def parse_status(t):
     if any(w in t for w in ["battery","battary","bettery","charge koto","charge koy","কত চার্জ","ব্যাটারি","চার্জ কত"]) and \
        not any(w in t for w in ["battery saver","battery setting","power saving","ব্যাটারি সেভার"]):
         return ok({"kind":"BATTERY"}, "DEVICE_STATUS")
+    if any(w in t for w in ["uptime","phone koto khon on","device koto khon cholche"]):
+        return ok({"kind":"UPTIME"},"DEVICE_STATUS")
     now_words = ["ekhon","akhon","akon","akn","ekhn","now","current","এখন","বর্তমান"]
     time_phrases = ["koyta baje","koita baje","koi ta baje","koy ta baje","kota baje","koto baje",
         "koyta bajche","koita bajche","koto bajche","somoy koto","shomoy koto","time koto",
@@ -493,6 +495,18 @@ def parse_status(t):
     if asks_time and asks_date: return ok({"kind":"DATE_TIME"}, "DEVICE_STATUS")
     if asks_time: return ok({"kind":"TIME"}, "DEVICE_STATUS")
     if asks_date: return ok({"kind":"DATE"}, "DEVICE_STATUS")
+    diagnostics=[
+      (["phone model","device info","phone info","android version"],"DEVICE_INFO"),
+      (["ram koto","ram status","available ram","free ram"],"MEMORY"),
+      (["uptime","phone koto khon on","device koto khon cholche"],"UPTIME"),
+      (["display resolution","screen resolution","display size pixel"],"DISPLAY"),
+      (["volume koto","audio status","ringer mode","sound status"],"AUDIO"),
+      (["timezone","time zone","utc offset"],"TIMEZONE"),
+      (["phone language ki","current locale","locale ki","system language"],"LOCALE"),
+      (["koyta app installed","installed app count","app koyta ache"],"INSTALLED_APPS"),
+      (["sensor list","phone e ki sensor","koyta sensor"],"SENSORS")]
+    for aliases,kind in diagnostics:
+        if any(w in t for w in aliases): return ok({"kind":kind},"DEVICE_STATUS")
     if any(w in t for w in ["internet ache","internet ase","internet on ache","network kothay","net ache","net ase","wifi e connected",
         "নেটওয়ার্ক","ইন্টারনেট আছে","নেট আছে","network status","connection ache"]):
         return ok({"kind":"NETWORK"}, "DEVICE_STATUS")
@@ -1033,6 +1047,14 @@ check(parse("nuva google e dhaka weather khujho")["action"]["query"] == "dhaka w
 check(parse("aj koto tarik")["action"]["kind"] == "DATE", "user phrase current date")
 check(parse("akn koyta baje")["action"]["kind"] == "TIME", "user phrase current time")
 check(parse("aj koto tarik akn koyta baje")["action"]["kind"] == "DATE_TIME", "combined current date and time")
+check(parse("phone model ki")["action"]["kind"] == "DEVICE_INFO", "device info")
+check(parse("ram koto")["action"]["kind"] == "MEMORY", "ram info")
+check(parse("phone uptime koto")["action"]["kind"] == "UPTIME", "uptime info")
+check(parse("screen resolution koto")["action"]["kind"] == "DISPLAY", "display info")
+check(parse("volume koto")["action"]["kind"] == "AUDIO", "audio info")
+check(parse("timezone ki")["action"]["kind"] == "TIMEZONE", "timezone info")
+check(parse("koyta app installed")["action"]["kind"] == "INSTALLED_APPS", "app count")
+check(parse("phone e ki sensor ache")["action"]["kind"] == "SENSORS", "sensor info")
 check(parse("latest news ki")["intent"] == "SEARCH_WEB", "latest info web search")
 check(parse("2 + 3 * 4 koto")["intent"] == "LOCAL_ANSWER", "offline arithmetic")
 check(parse("500 er 20 percent discount")["intent"] == "LOCAL_ANSWER", "offline percentage")

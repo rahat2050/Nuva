@@ -642,6 +642,15 @@ enum class DeviceStatusKind(val wireName: String) {
     DATE_TIME("date_time"),
     NETWORK("network"),
     STORAGE("storage"),
+    DEVICE_INFO("device_info"),
+    MEMORY("memory"),
+    UPTIME("uptime"),
+    DISPLAY("display"),
+    AUDIO("audio"),
+    TIMEZONE("timezone"),
+    LOCALE("locale"),
+    INSTALLED_APPS("installed_apps"),
+    SENSORS("sensors"),
     ;
 
     companion object {

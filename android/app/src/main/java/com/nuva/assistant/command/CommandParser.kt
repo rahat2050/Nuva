@@ -953,6 +953,9 @@ object CommandParser {
         if (battery && !listOf("battery saver", "battery setting", "power saving", "ব্যাটারি সেভার").any { t.contains(it) }) {
             return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.BATTERY), "Battery dekhe nicchi.")
         }
+        if (listOf("uptime", "phone koto khon on", "device koto khon cholche", "কতক্ষণ ধরে ফোন চলছে", "ফোন আপটাইম")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.UPTIME), "Uptime dekhe nicchi.")
 
         // Speech recognition writes the same Banglish sentence many ways. In
         // particular, users commonly say/type "akn koyta baje" rather than
@@ -993,6 +996,38 @@ object CommandParser {
         }
         if (asksTime) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.TIME), "Somoy dekhe nicchi.")
         if (asksDate) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.DATE), "Tarikh dekhe nicchi.")
+
+        if (listOf("phone model", "device info", "phone info", "android version", "mobile model", "ফোনের মডেল", "অ্যান্ড্রয়েড ভার্সন")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.DEVICE_INFO), "Device info dekhe nicchi.")
+
+        if (listOf("ram koto", "ram status", "available ram", "free ram", "র‍্যাম কত", "র‍্যাম স্ট্যাটাস")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.MEMORY), "RAM status dekhe nicchi.")
+
+        if (listOf("display resolution", "screen resolution", "display size pixel", "স্ক্রিন রেজোলিউশন", "ডিসপ্লে রেজোলিউশন")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.DISPLAY), "Display info dekhe nicchi.")
+
+        if (listOf("volume koto", "audio status", "ringer mode", "sound status", "ভলিউম কত", "রিঙ্গার মোড")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.AUDIO), "Audio status dekhe nicchi.")
+
+        if (listOf("timezone", "time zone", "utc offset", "টাইমজোন", "সময় অঞ্চল", "সময় অঞ্চল")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.TIMEZONE), "Timezone dekhe nicchi.")
+
+        if (listOf("phone language ki", "current locale", "locale ki", "system language", "ফোনের ভাষা কী", "লোকেল কী")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.LOCALE), "Locale dekhe nicchi.")
+
+        if (listOf("koyta app installed", "installed app count", "app koyta ache", "কয়টা অ্যাপ আছে", "ইনস্টলড অ্যাপ কত")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.INSTALLED_APPS), "Installed app count korchi.")
+
+        if (listOf("sensor list", "phone e ki sensor", "koyta sensor", "সেন্সর লিস্ট", "কী সেন্সর আছে")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.SENSORS), "Sensor info dekhe nicchi.")
 
         val network = listOf(
             "internet ache", "internet ase", "internet on ache", "network kothay", "net ache", "net ase",

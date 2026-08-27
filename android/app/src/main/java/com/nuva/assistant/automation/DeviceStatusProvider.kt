@@ -1,17 +1,24 @@
 package com.nuva.assistant.automation
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.Sensor
+import android.hardware.SensorManager
+import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Environment
 import android.os.StatFs
+import android.os.SystemClock
 import com.nuva.assistant.command.DeviceStatusKind
 import java.io.File
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Local, real-time answers for device-status questions: battery, clock time,
@@ -29,6 +36,15 @@ class DeviceStatusProvider(private val contextProvider: () -> Context) {
             DeviceStatusKind.DATE_TIME -> DeviceDateTimeFormatter.dateTime(Calendar.getInstance(), language)
             DeviceStatusKind.NETWORK -> network(language)
             DeviceStatusKind.STORAGE -> storage(language)
+            DeviceStatusKind.DEVICE_INFO -> deviceInfo(language)
+            DeviceStatusKind.MEMORY -> memory(language)
+            DeviceStatusKind.UPTIME -> uptime(language)
+            DeviceStatusKind.DISPLAY -> display(language)
+            DeviceStatusKind.AUDIO -> audio(language)
+            DeviceStatusKind.TIMEZONE -> timezone(language)
+            DeviceStatusKind.LOCALE -> locale(language)
+            DeviceStatusKind.INSTALLED_APPS -> installedApps(language)
+            DeviceStatusKind.SENSORS -> sensors(language)
         }
     }
 
@@ -155,10 +171,122 @@ class DeviceStatusProvider(private val contextProvider: () -> Context) {
         ),
     )
 
+    private fun deviceInfo(language: String): String {
+        val maker = Build.MANUFACTURER.replaceFirstChar { it.uppercase() }
+        val model = Build.MODEL.ifBlank { "unknown model" }
+        return localize(
+            language,
+            bn = "ফোন: $maker $model। Android ${Build.VERSION.RELEASE}, API ${Build.VERSION.SDK_INT}।",
+            en = "Phone: $maker $model. Android ${Build.VERSION.RELEASE}, API ${Build.VERSION.SDK_INT}.",
+            banglish = "Phone: $maker $model. Android ${Build.VERSION.RELEASE}, API ${Build.VERSION.SDK_INT}.",
+        )
+    }
+
+    private fun memory(language: String): String {
+        val context = contextProvider()
+        val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            ?: return localize(language, "RAM তথ্য পড়তে পারিনি।", "I couldn't read memory information.", "RAM info porte parini.")
+        val info = ActivityManager.MemoryInfo()
+        manager.getMemoryInfo(info)
+        val total = info.totalMem / (1024.0 * 1024 * 1024)
+        val available = info.availMem / (1024.0 * 1024 * 1024)
+        val totalText = String.format(Locale.ENGLISH, "%.1f", total)
+        val availableText = String.format(Locale.ENGLISH, "%.1f", available)
+        return localize(
+            language,
+            bn = "RAM মোট ${DeviceDateTimeFormatter.banglaDigits(totalText)} জিবি; এখন প্রায় ${DeviceDateTimeFormatter.banglaDigits(availableText)} জিবি available।",
+            en = "RAM: $totalText GB total, about $availableText GB available.",
+            banglish = "RAM $totalText GB total; ekhon pray $availableText GB available.",
+        )
+    }
+
+    private fun uptime(language: String): String {
+        val human = formatDuration(SystemClock.elapsedRealtime())
+        return localize(language, "ফোন প্রায় $human ধরে চালু আছে।", "The phone has been on for about $human.", "Phone pray $human dhore on ache.")
+    }
+
+    private fun display(language: String): String {
+        val metrics = contextProvider().resources.displayMetrics
+        val density = String.format(Locale.ENGLISH, "%.2f", metrics.density)
+        return localize(
+            language,
+            bn = "Display ${DeviceDateTimeFormatter.banglaDigits(metrics.widthPixels.toString())} × ${DeviceDateTimeFormatter.banglaDigits(metrics.heightPixels.toString())} pixel; density ${DeviceDateTimeFormatter.banglaDigits(density)}।",
+            en = "Display: ${metrics.widthPixels} × ${metrics.heightPixels} pixels; density $density.",
+            banglish = "Display ${metrics.widthPixels} by ${metrics.heightPixels} pixel; density $density.",
+        )
+    }
+
+    private fun audio(language: String): String {
+        val audio = contextProvider().getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ?: return localize(language, "Audio status পড়তে পারিনি।", "I couldn't read audio status.", "Audio status porte parini.")
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        val percent = (audio.getStreamVolume(AudioManager.STREAM_MUSIC) * 100 / max).coerceIn(0, 100)
+        val mode = when (audio.ringerMode) {
+            AudioManager.RINGER_MODE_SILENT -> "silent"
+            AudioManager.RINGER_MODE_VIBRATE -> "vibrate"
+            else -> "ring"
+        }
+        return localize(
+            language,
+            bn = "Media volume ${DeviceDateTimeFormatter.banglaDigits(percent.toString())} শতাংশ; ringer mode $mode।",
+            en = "Media volume is $percent%; ringer mode is $mode.",
+            banglish = "Media volume $percent percent; ringer mode $mode.",
+        )
+    }
+
+    private fun timezone(language: String): String {
+        val zone = TimeZone.getDefault()
+        val offsetMinutes = zone.getOffset(System.currentTimeMillis()) / 60_000
+        val sign = if (offsetMinutes >= 0) "+" else "-"
+        val absolute = kotlin.math.abs(offsetMinutes)
+        val offset = String.format(Locale.ENGLISH, "%s%02d:%02d", sign, absolute / 60, absolute % 60)
+        return localize(language, "Timezone ${zone.id}, UTC$offset।", "Time zone: ${zone.id}, UTC$offset.", "Timezone ${zone.id}, UTC$offset.")
+    }
+
+    private fun locale(language: String): String {
+        val locale = contextProvider().resources.configuration.locales[0]
+        val label = locale.getDisplayName(locale).ifBlank { locale.toLanguageTag() }
+        return localize(language, "ফোনের ভাষা/locale: $label (${locale.toLanguageTag()})।", "Phone locale: $label (${locale.toLanguageTag()}).", "Phone locale $label (${locale.toLanguageTag()}).")
+    }
+
+    private fun installedApps(language: String): String {
+        val count = AppLauncher.installedLaunchableApps(contextProvider()).size
+        val shown = if (language == "bn") DeviceDateTimeFormatter.banglaDigits(count.toString()) else count.toString()
+        return localize(language, "Launch করা যায় এমন $shown টি app পেয়েছি।", "I found $shown launchable apps.", "$shown ta launchable app peyechi.")
+    }
+
+    private fun sensors(language: String): String {
+        val manager = contextProvider().getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+            ?: return localize(language, "Sensor list পড়তে পারিনি।", "I couldn't read the sensor list.", "Sensor list porte parini.")
+        val sensors = manager.getSensorList(Sensor.TYPE_ALL)
+        val names = sensors.map { it.name }.distinct().take(5).joinToString(", ")
+        val suffix = if (sensors.size > 5) " +${sensors.size - 5} more" else ""
+        return localize(
+            language,
+            bn = "${DeviceDateTimeFormatter.banglaDigits(sensors.size.toString())} টি sensor: $names$suffix।",
+            en = "${sensors.size} sensors: $names$suffix.",
+            banglish = "${sensors.size} ta sensor: $names$suffix.",
+        )
+    }
+
     private fun localize(language: String, bn: String, en: String, banglish: String): String = when (language) {
         "bn" -> bn
         "en" -> en
         else -> banglish
+    }
+
+    companion object {
+        fun formatDuration(milliseconds: Long): String {
+            val totalMinutes = (milliseconds.coerceAtLeast(0) / 60_000)
+            val days = totalMinutes / (24 * 60)
+            val hours = (totalMinutes % (24 * 60)) / 60
+            val minutes = totalMinutes % 60
+            return buildList {
+                if (days > 0) add("$days day")
+                if (hours > 0) add("$hours hour")
+                if (minutes > 0 || isEmpty()) add("$minutes minute")
+            }.joinToString(" ")
+        }
     }
 }
 
