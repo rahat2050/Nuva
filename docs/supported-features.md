@@ -1,4 +1,4 @@
-# NUVA — Supported features (v2.4)
+# NUVA — Supported features (v2.5)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -39,15 +39,18 @@ reminders require notification permission and do not survive a device reboot.
 ## Media & camera — SUPPORTED / ANDROID-LIMITED
 YouTube search/play, Spotify fallback, pause/resume/next/previous (active MediaSession —
 ANDROID-LIMITED via notification access), volume up/down/mute. Camera open photo/video +
-explicit-capture flow (shutter always user-controlled). v2.2 adds user-present Android pickers for
-photo/video selection, viewing and share-sheet handoff. Gallery-wide search/edit/delete remains
-**UNSUPPORTED**; the user chooses the concrete media URI.
+explicit-capture flow (shutter always user-controlled). User-present Android pickers support
+photo/video selection, viewing and share-sheet handoff. v2.5 adds selected-photo `ACTION_EDIT`
+handoff; the installed editor remains visible and final Save is user-controlled. Gallery-wide search,
+automatic editing and background deletion remain **UNSUPPORTED**.
 
-## Files — USER-PRESENT SUPPORTED / ANDROID-LIMITED
-v2.2 adds Storage Access Framework workflows for user-selected file open/view, file share-sheet
-handoff, bounded text-file reading, and persistable user-selected folder access. No broad storage
-permission or guessed path is used. Background-wide content search, arbitrary-path access,
-rename/move/delete are still **UNSUPPORTED** and remain future confirmation-gated phases.
+## Files — TARGET-AWARE SUPPORTED / PROVIDER-LIMITED
+Storage Access Framework supports user-selected file open/view/share, bounded text reading, folder
+grants and—since v2.5—rename, copy, move and delete. Mutations require command confirmation, exact
+source/destination picker selection, then a second target-aware confirmation. Move copies first and
+only deletes the source when permission succeeds; otherwise both copies remain and NUVA says so.
+Provider support/write grants can still limit an operation. Broad storage scan and arbitrary/model-
+invented paths remain **UNSUPPORTED**.
 
 ## Daily-life utility engine — SUPPORTED (offline)
 Data-driven local answers cover well over 1,000 command forms rather than 1,000 hard-coded phrases:

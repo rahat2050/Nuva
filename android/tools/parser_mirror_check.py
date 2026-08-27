@@ -283,11 +283,25 @@ def parse_user_file(t):
     share = any(w in t for w in ["share","pathao","send","শেয়ার","শেয়ার","পাঠাও"])
     select = any(w in t for w in ["select","choose","pick","beche","বেছে","নির্বাচন"])
     opened = any(w in t for w in ["open","kholo","khulo","খোলো","খুলে"])
+    file_word=any(w in t for w in ["file","document","ফাইল","ডকুমেন্ট"])
+    if file_word and any(w in t for w in ["delete","remove","muchhe","মুছে","ডিলিট"]):
+        return ok({"kind":"userfile","operation":"DELETE_FILE"},"USER_FILE",risk="MEDIUM")
+    if file_word and any(w in t for w in ["rename","nam bodlao","নাম বদল","রিনেম"]):
+        marker=next((w for w in ["new name","rename to","nam dao","নাম দাও","নতুন নাম"] if w in t),None)
+        name=t.split(marker,1)[1].strip(" ,.: ") if marker else None
+        if not name: return unsupported("Notun nam bolun")
+        return ok({"kind":"userfile","operation":"RENAME_FILE","new_name":name},"USER_FILE",risk="MEDIUM")
+    if file_word and any(w in t for w in ["copy","কপি"]):
+        return ok({"kind":"userfile","operation":"COPY_FILE"},"USER_FILE",risk="MEDIUM")
+    if file_word and any(w in t for w in ["move","sorao","সরাও","মুভ"]):
+        return ok({"kind":"userfile","operation":"MOVE_FILE"},"USER_FILE",risk="MEDIUM")
     if any(w in t for w in ["folder select","folder choose","folder access","directory select","ফোল্ডার বেছে"]):
         return ok({"kind":"userfile","operation":"OPEN_FOLDER"}, "USER_FILE", risk="MEDIUM")
     photo = any(w in t for w in ["photo","chobi","image","ছবি","ফটো"])
     video = any(w in t for w in ["video","ভিডিও"])
     gallery = any(w in t for w in ["gallery theke","গ্যালারি থেকে","photo picker","media picker"])
+    if photo and any(w in t for w in ["edit","crop","rotate","filter","এডিট","ক্রপ"]):
+        return ok({"kind":"userfile","operation":"EDIT_PHOTO"},"USER_FILE",risk="MEDIUM")
     if photo and (gallery or share or select):
         op="SHARE_PHOTO" if share else "PICK_PHOTO"
         return ok({"kind":"userfile","operation":op}, "USER_FILE", risk="MEDIUM" if share else "LOW")
@@ -298,7 +312,6 @@ def parse_user_file(t):
     wants_read=any(w in t for w in ["read","poro","পড়ো","পড়ো","pore shonao"])
     if text_file and wants_read:
         return ok({"kind":"userfile","operation":"READ_TEXT"}, "USER_FILE")
-    file_word=any(w in t for w in ["file","document","ফাইল","ডকুমেন্ট"])
     if file_word and share:
         return ok({"kind":"userfile","operation":"SHARE_FILE"}, "USER_FILE", risk="MEDIUM")
     if file_word and (select or opened):
@@ -937,6 +950,11 @@ check(reply_probe["intent"] == "REPLY_NOTIFICATION" and reply_probe["confirm"], 
 check(parse("email compose koro attachment")["action"]["attachment"], "email attachment picker handoff")
 check(parse("passport application form kholo details local draft")["intent"] == "PREPARE_FORM", "form handoff")
 check(parse("kal 9 tay schedule email je ami ashchi")["intent"] == "SCHEDULE_COMPOSE", "scheduled compose reminder")
+check(parse("file delete koro")["action"]["operation"] == "DELETE_FILE", "target-aware delete")
+check(parse("file rename koro new name report.pdf")["action"]["new_name"] == "report.pdf", "target-aware rename")
+check(parse("file copy koro")["action"]["operation"] == "COPY_FILE", "picker copy")
+check(parse("file move koro")["action"]["operation"] == "MOVE_FILE", "picker move")
+check(parse("photo crop koro")["action"]["operation"] == "EDIT_PHOTO", "photo editor handoff")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

@@ -452,18 +452,33 @@ object CommandParser {
     // --- 2b. User-present files & gallery (v2.2) -----------------------------------------
 
     private fun parseUserPresentFile(t: String): CommandDecision? {
-        fun decision(operation: UserFileOperation, speech: String): CommandDecision {
-            val risk = if (operation.sharesOutsideDevice || operation == UserFileOperation.OPEN_FOLDER) {
-                NuvaRisk.MEDIUM
-            } else {
-                NuvaRisk.LOW
-            }
-            return ok(NuvaAction.UserFile(operation), speech, risk)
+        fun decision(operation: UserFileOperation, speech: String, newName: String? = null): CommandDecision {
+            val risk = if (operation.needsBlockingConfirmation) NuvaRisk.MEDIUM else NuvaRisk.LOW
+            return ok(NuvaAction.UserFile(operation, newName), speech, risk)
         }
 
         val share = listOf("share", "pathao", "send", "শেয়ার", "শেয়ার", "পাঠাও").any { t.contains(it) }
         val select = listOf("select", "choose", "pick", "beche", "বেছে", "নির্বাচন").any { t.contains(it) }
         val open = listOf("open", "kholo", "khulo", "খোলো", "খুলে").any { t.contains(it) }
+        val fileWord = listOf("file", "document", "ফাইল", "ডকুমেন্ট").any { t.contains(it) }
+
+        if (fileWord && listOf("delete", "remove", "muchhe", "মুছে", "ডিলিট").any { t.contains(it) }) {
+            return decision(UserFileOperation.DELETE_FILE, "File picker-er por selected target abar dekhie delete confirmation nebo.")
+        }
+        if (fileWord && listOf("rename", "nam bodlao", "নাম বদল", "রিনেম").any { t.contains(it) }) {
+            val nameMarker = listOf("new name", "rename to", "nam dao", "নাম দাও", "নতুন নাম")
+                .firstOrNull { t.contains(it) }
+            val newName = nameMarker?.let { t.substringAfter(it).trim(' ', ',', '.', ':') }
+                ?.takeIf { it.isNotBlank() && it.length <= 120 && '/' !in it && '\\' !in it }
+                ?: return unsupported("File-er notun nam bolun — jemon: file rename koro new name report.pdf")
+            return decision(UserFileOperation.RENAME_FILE, "File select korar por target-aware rename confirmation nebo.", newName)
+        }
+        if (fileWord && listOf("copy", "কপি").any { t.contains(it) }) {
+            return decision(UserFileOperation.COPY_FILE, "Source file o destination folder apni select korben; tarpor copy confirm korbo.")
+        }
+        if (fileWord && listOf("move", "sorao", "সরাও", "মুভ").any { t.contains(it) }) {
+            return decision(UserFileOperation.MOVE_FILE, "Source file o destination folder apni select korben; tarpor move confirm korbo.")
+        }
 
         if (listOf("folder select", "folder choose", "folder access", "directory select", "ফোল্ডার বেছে", "ফোল্ডার সিলেক্ট")
                 .any { t.contains(it) }
@@ -475,6 +490,9 @@ object CommandParser {
         val video = listOf("video", "ভিডিও").any { t.contains(it) }
         val gallerySource = listOf("gallery theke", "gallery থেকে", "গ্যালারি থেকে", "photo picker", "media picker")
             .any { t.contains(it) }
+        if (photo && listOf("edit", "crop", "rotate", "filter", "এডিট", "ক্রপ", "ঘোরাও").any { t.contains(it) }) {
+            return decision(UserFileOperation.EDIT_PHOTO, "Photo select korar por installed editor khulbo; final Save apni korben.")
+        }
         if (photo && (gallerySource || share || select)) {
             return if (share) {
                 decision(UserFileOperation.SHARE_PHOTO, "Photo picker-er por Android share sheet khulbo.")
@@ -497,7 +515,6 @@ object CommandParser {
             return decision(UserFileOperation.READ_TEXT, "Text file picker khulchi — file apni select korun.")
         }
 
-        val fileWord = listOf("file", "document", "ফাইল", "ডকুমেন্ট").any { t.contains(it) }
         if (fileWord && share) {
             return decision(UserFileOperation.SHARE_FILE, "File picker-er por Android share sheet khulbo.")
         }

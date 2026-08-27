@@ -180,7 +180,7 @@ sealed interface NuvaAction {
     }
 
     /** Opens a system picker; the user always chooses the concrete file/media. */
-    data class UserFile(val operation: UserFileOperation) : NuvaAction {
+    data class UserFile(val operation: UserFileOperation, val newName: String? = null) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.USER_FILE
     }
 
@@ -420,10 +420,24 @@ enum class UserFileOperation(val wireName: String, val mimeType: String, val use
     PICK_VIDEO("pick_video", "video/*"),
     SHARE_VIDEO("share_video", "video/*"),
     EMAIL_ATTACHMENT("email_attachment", "*/*"),
+    RENAME_FILE("rename_file", "*/*"),
+    COPY_FILE("copy_file", "*/*"),
+    MOVE_FILE("move_file", "*/*"),
+    DELETE_FILE("delete_file", "*/*"),
+    EDIT_PHOTO("edit_photo", "image/*"),
     ;
 
     val sharesOutsideDevice: Boolean
         get() = this == SHARE_FILE || this == SHARE_PHOTO || this == SHARE_VIDEO || this == EMAIL_ATTACHMENT
+
+    val changesSelectedContent: Boolean
+        get() = this == RENAME_FILE || this == MOVE_FILE || this == DELETE_FILE || this == EDIT_PHOTO
+
+    val needsWriteGrant: Boolean
+        get() = this == OPEN_FOLDER || this == RENAME_FILE || this == COPY_FILE || this == MOVE_FILE || this == DELETE_FILE || this == EDIT_PHOTO
+
+    val needsBlockingConfirmation: Boolean
+        get() = sharesOutsideDevice || changesSelectedContent || this == COPY_FILE || this == OPEN_FOLDER
 
     companion object {
         fun fromWire(value: String?): UserFileOperation? =

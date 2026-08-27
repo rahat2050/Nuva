@@ -135,14 +135,19 @@ object ConfirmationSummary {
             is NuvaAction.UserFile -> {
                 title = "Android picker খুলবে"
                 lines += Line("কাজ", action.operation.wireName)
+                action.newName?.let { lines += Line("নতুন নাম", it) }
                 detail = when {
                     action.operation.sharesOutsideDevice ->
                         "আপনি file/media বেছে নেওয়ার পরে Android share sheet-এ final recipient বেছে নেবেন।"
                     action.operation == com.nuva.assistant.command.UserFileOperation.OPEN_FOLDER ->
                         "শুধু আপনার বেছে নেওয়া folder-এর access grant হবে।"
+                    action.operation == com.nuva.assistant.command.UserFileOperation.EDIT_PHOTO ->
+                        "আপনি photo বেছে নেবেন; installed editor-এ final Save আপনি করবেন।"
+                    action.operation.changesSelectedContent || action.operation == com.nuva.assistant.command.UserFileOperation.COPY_FILE ->
+                        "Picker-এর পরে exact source/destination দেখিয়ে দ্বিতীয় confirmation নেওয়া হবে।"
                     else -> "শুধু আপনার বেছে নেওয়া file/media handle করা হবে।"
                 }
-                if (action.operation.sharesOutsideDevice) confirmLabelOverride = "CONTINUE"
+                if (action.operation.needsBlockingConfirmation) confirmLabelOverride = "CONTINUE"
             }
 
             else -> {

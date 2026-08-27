@@ -97,6 +97,16 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `file mutation summary promises exact target second confirmation`() {
+        val summary = ConfirmationSummary.build(
+            NuvaAction.UserFile(UserFileOperation.RENAME_FILE, "report.pdf"),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(summary.lines.any { it.value == "report.pdf" })
+        assertTrue(summary.detail.contains("দ্বিতীয় confirmation"))
+    }
+
+    @Test
     fun `file share summary keeps picker and final recipient user controlled`() {
         val summary = ConfirmationSummary.build(
             NuvaAction.UserFile(UserFileOperation.SHARE_FILE),

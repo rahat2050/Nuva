@@ -27,11 +27,10 @@ the user explicitly selects is handled.
 - Read text is bounded; the full file is not copied to NUVA's database or backend.
 - The operations are LOCAL_ONLY and cannot be emitted by the server/AI.
 
-## Still pending in later phases
+## Later phases now delivered
 
-- URI-specific rename with confirmation.
-- Copy/move to a user-selected destination folder.
-- URI-specific delete with a second target-aware confirmation.
-- Gallery edit/crop workflows.
-- Notification RemoteInput reply and email compose are implemented in v2.3.
-- Email document-attachment handoff remains pending.
+- v2.3: official RemoteInput reply and email compose.
+- v2.4: email attachment handoff, forms and scheduled compose reminders.
+- v2.5: URI-specific rename/copy/move/delete with second target-aware confirmation and selected-photo editor handoff.
+
+Broad storage scans, arbitrary paths, hidden/bulk mutation and automatic background editing remain unsupported.

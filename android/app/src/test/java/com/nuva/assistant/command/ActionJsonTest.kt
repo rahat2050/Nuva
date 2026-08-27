@@ -53,6 +53,11 @@ class ActionJsonTest {
             NuvaAction.ReadSavedItems(SavedItemKind.SHOPPING),
             NuvaAction.UserFile(UserFileOperation.OPEN_FILE),
             NuvaAction.UserFile(UserFileOperation.SHARE_PHOTO),
+            NuvaAction.UserFile(UserFileOperation.RENAME_FILE, "report.pdf"),
+            NuvaAction.UserFile(UserFileOperation.COPY_FILE),
+            NuvaAction.UserFile(UserFileOperation.MOVE_FILE),
+            NuvaAction.UserFile(UserFileOperation.DELETE_FILE),
+            NuvaAction.UserFile(UserFileOperation.EDIT_PHOTO),
             NuvaAction.ComposeEmail("user@example.com", "meeting", "kal 9 tay"),
             NuvaAction.ComposeEmail(null, null, null, attachmentRequested = true),
             NuvaAction.ReplyNotification(2, "ami ashchi"),
@@ -111,6 +116,22 @@ class ActionJsonTest {
             },
         )
         assertTrue(unsafeFileOperation is CommandValidator.ValidatedAction.Invalid)
+
+        val renameWithoutName = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "USER_FILE")
+                put("operation", "rename_file")
+            },
+        )
+        assertTrue(renameWithoutName is CommandValidator.ValidatedAction.Invalid)
+
+        val internalAttachmentOperation = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "USER_FILE")
+                put("operation", "email_attachment")
+            },
+        )
+        assertTrue(internalAttachmentOperation is CommandValidator.ValidatedAction.Invalid)
 
         val badEmail = CommandValidator.validateAction(
             buildJsonObject {

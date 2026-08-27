@@ -41,7 +41,8 @@ val SUPPORTED_FEATURES = listOf(
     "মিউজিক কন্ট্রোল — pause/resume/next/previous (চলমান MediaSession দিয়ে)",
     "ভলিউম সরাসরি বাড়ানো/কমানো/মিউট",
     "ক্যামেরা খোলা (ছবি/ভিডিও মোড); ছবি তোলার কমান্ডে ক্যাপচার স্ক্রিন — শাটার আপনার হাতে",
-    "Android picker দিয়ে user-selected file open/share, text file read, folder access এবং photo/video select/view/share",
+    "Android picker দিয়ে selected file open/share/read/rename/copy/move/delete; mutation-এর আগে exact-target second confirmation",
+    "Selected photo/video view/share এবং selected photo installed editor-এ edit/crop handoff — final Save আপনি করবেন",
     "কল করা (নাম বা নম্বর — কনফার্মেশন বাধ্যতামূলক)",
     "SMS ও WhatsApp — কনফার্মেশনের পর সরাসরি পাঠানো",
     "Telegram / Messenger / Signal / Viber / IMO — মেসেজ লেখা বসিয়ে অ্যাপ খোলে, Send আপনি চাপবেন",
@@ -68,7 +69,7 @@ val UNSUPPORTED_FEATURES = listOf(
     FeatureRow("ফাইন্যান্সিয়াল অ্যাপের স্ক্রিন পড়া ও বাটনে ট্যাপ/টাইপ", false, "নীতি (LEVEL 2/3): OTP/PIN/ব্যালেন্স স্ক্রিন আলাদা করা নির্ভরযোগ্যভাবে সম্ভব নয়, তাই ওয়ালেট/ব্যাংক অ্যাপের সামনে স্ক্রিন-রিড ও ট্যাপ/টাইপ বন্ধ থাকে। অ্যাপ খোলা, স্ক্রল, back/home চলে।"),
     FeatureRow("OTP / PIN / পাসওয়ার্ড / CVV / কার্ড নম্বর পড়া, টাইপ বা সেভ করা", false, "নীতি (LEVEL 2): কোনো সিক্রেট NUVA ছুঁবে না — পাসওয়ার্ড ফিল্ড স্কিপ হয়, OTP-সদৃশ কোড সব জায়গায় লুকানো থাকে।"),
     FeatureRow("Official RemoteInput নেই এমন notification-এর reply", false, "v2.3-এ RemoteInput action থাকলে confirmation-এর পর reply চলে; action না দিলে NUVA app/UI আন্দাজ করে reply করে না।"),
-    FeatureRow("Storage/gallery জুড়ে background search, arbitrary-path access, rename/move/delete বা automatic edit", false, "User-selected file/photo/video picker flow এখন supported; কিন্তু NUVA broad storage scan বা target না বেছে destructive operation করে না।"),
+    FeatureRow("Storage/gallery জুড়ে background search, arbitrary/model path বা automatic bulk edit/delete", false, "User-selected target operation এখন supported; কিন্তু NUVA broad storage scan, hidden path বা target না বেছে destructive operation করে না।"),
     FeatureRow("সব অ্যাপে অন্ধ ট্যাপ/বোতাম চাপা", false, "NUVA শুধু স্ক্রিনে খুঁজে পাওয়া নির্দিষ্ট বাটনে কাজ করে; UI বদলালে নিরাপদে ফেল করে জানায়।"),
 )
 

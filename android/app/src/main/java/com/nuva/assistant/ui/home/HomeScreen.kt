@@ -131,6 +131,15 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    fun confirmFileMutation() {
+        viewModelScope.launch {
+            val speech = UserPresentFileWorkflow.confirmMutation(NuvaContainer.appContext)
+            voice.speakIfEnabled(speech)
+        }
+    }
+
+    fun cancelFileMutation() = UserPresentFileWorkflow.cancel()
+
     fun dismissFileWorkflowResult() = UserPresentFileWorkflow.clearResult()
 
     override fun onCleared() {
@@ -148,7 +157,7 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
         if (granted) viewModel.startListening()
     }
     val documentPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
+        contract = OpenNuvaDocumentContract(),
     ) { uri -> viewModel.onFileWorkflowUri(uri) }
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree(),
@@ -165,14 +174,19 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
 
     LaunchedEffect(state) { viewModel.onStateChanged(state) }
     LaunchedEffect(fileWorkflow) {
-        val pendingRequest = (fileWorkflow as? UserPresentFileWorkflow.State.Pending)?.request
-            ?: return@LaunchedEffect
-        val active = UserPresentFileWorkflow.markPickerActive(pendingRequest.id)
-            ?: return@LaunchedEffect
-        if (active.operation.usesFolderPicker) {
-            folderPicker.launch(null)
-        } else {
-            documentPicker.launch(arrayOf(active.operation.mimeType))
+        when (val workflow = fileWorkflow) {
+            is UserPresentFileWorkflow.State.Pending -> {
+                val active = UserPresentFileWorkflow.markPickerActive(workflow.request.id)
+                    ?: return@LaunchedEffect
+                if (active.operation.usesFolderPicker) folderPicker.launch(null)
+                else documentPicker.launch(active.operation.mimeType)
+            }
+            is UserPresentFileWorkflow.State.DestinationPending -> {
+                UserPresentFileWorkflow.markDestinationPickerActive(workflow.request.id)
+                    ?: return@LaunchedEffect
+                folderPicker.launch(null)
+            }
+            else -> Unit
         }
     }
 
@@ -437,6 +451,25 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     // User-present file/media workflow result. The system picker remains the
     // authority; only explicitly selected content can reach this dialog.
     when (val workflow = fileWorkflow) {
+        is UserPresentFileWorkflow.State.AwaitingMutation -> AlertDialog(
+            onDismissRequest = { viewModel.cancelFileMutation() },
+            title = { Text("Selected target confirm করুন") },
+            text = {
+                Column {
+                    Text("File: ${workflow.sourceName}")
+                    workflow.request.newName?.let { Text("New name: $it") }
+                    workflow.destinationTree?.let { Text("Destination: ${it.lastPathSegment.orEmpty()}") }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Operation: ${workflow.request.operation.wireName}")
+                }
+            },
+            confirmButton = {
+                Button(onClick = { viewModel.confirmFileMutation() }) { Text("CONFIRM") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { viewModel.cancelFileMutation() }) { Text("CANCEL") }
+            },
+        )
         is UserPresentFileWorkflow.State.Completed -> AlertDialog(
             onDismissRequest = { viewModel.dismissFileWorkflowResult() },
             title = { Text("File / media result") },

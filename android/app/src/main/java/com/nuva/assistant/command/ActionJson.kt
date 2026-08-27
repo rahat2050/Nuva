@@ -107,6 +107,7 @@ object ActionJson {
         }
         is NuvaAction.UserFile -> buildJsonObject {
             put("type", "USER_FILE"); put("operation", action.operation.wireName)
+            action.newName?.let { put("new_name", it) }
         }
         is NuvaAction.ComposeEmail -> buildJsonObject {
             put("type", "COMPOSE_EMAIL")

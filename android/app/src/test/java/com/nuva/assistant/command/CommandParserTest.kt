@@ -220,9 +220,27 @@ class CommandParserTest {
     }
 
     @Test
-    fun `sharing and folder access require confirmation while local selection does not`() {
+    fun `target aware file mutations and photo editor handoff parse safely`() {
+        val rename = CommandParser.parse("file rename koro new name report.pdf")!!
+        val renameAction = rename.action as NuvaAction.UserFile
+        assertEquals(UserFileOperation.RENAME_FILE, renameAction.operation)
+        assertEquals("report.pdf", renameAction.newName)
+        assertTrue(rename.requiresConfirmation)
+
+        assertEquals(UserFileOperation.COPY_FILE, (CommandParser.parse("file copy koro")!!.action as NuvaAction.UserFile).operation)
+        assertEquals(UserFileOperation.MOVE_FILE, (CommandParser.parse("file move koro")!!.action as NuvaAction.UserFile).operation)
+        assertEquals(UserFileOperation.DELETE_FILE, (CommandParser.parse("file delete koro")!!.action as NuvaAction.UserFile).operation)
+        assertEquals(UserFileOperation.EDIT_PHOTO, (CommandParser.parse("photo crop koro")!!.action as NuvaAction.UserFile).operation)
+        assertTrue(CommandParser.parse("file rename koro")!!.unsupported)
+    }
+
+    @Test
+    fun `sharing mutations and folder access confirm while read only selection does not`() {
         assertTrue(CommandParser.parse("file share koro")!!.requiresConfirmation)
         assertTrue(CommandParser.parse("folder access dao")!!.requiresConfirmation)
+        assertTrue(CommandParser.parse("file delete koro")!!.requiresConfirmation)
+        assertTrue(CommandParser.parse("file copy koro")!!.requiresConfirmation)
+        assertTrue(CommandParser.parse("photo edit koro")!!.requiresConfirmation)
         assertFalse(CommandParser.parse("file open koro")!!.requiresConfirmation)
         assertFalse(CommandParser.parse("text file poro")!!.requiresConfirmation)
     }

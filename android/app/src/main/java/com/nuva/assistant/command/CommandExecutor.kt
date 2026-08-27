@@ -692,7 +692,7 @@ class CommandExecutor(
 
             is NuvaAction.ReadSavedItems -> readSavedItems(action.kind)
 
-            is NuvaAction.UserFile -> launchUserPresentFileWorkflow(context, action.operation)
+            is NuvaAction.UserFile -> launchUserPresentFileWorkflow(context, action)
 
             is NuvaAction.OpenSettingScreen -> when (val r = SettingsOpener.open(context, action.target)) {
                 is SettingsOpener.Result.Done -> ExecutionOutcome("completed", "Kore dilam.")
@@ -895,8 +895,9 @@ class CommandExecutor(
         }
     }
 
-    private fun launchUserPresentFileWorkflow(context: Context, operation: UserFileOperation): ExecutionOutcome {
-        com.nuva.assistant.automation.UserPresentFileWorkflow.request(operation)
+    private fun launchUserPresentFileWorkflow(context: Context, action: NuvaAction.UserFile): ExecutionOutcome {
+        val operation = action.operation
+        com.nuva.assistant.automation.UserPresentFileWorkflow.request(operation, action.newName)
         val activity = Intent(context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val opened = runCatching { context.startActivity(activity); true }.getOrDefault(false)
@@ -911,6 +912,11 @@ class CommandExecutor(
                 UserFileOperation.PICK_VIDEO -> "video"
                 UserFileOperation.SHARE_VIDEO -> "share korar video"
                 UserFileOperation.EMAIL_ATTACHMENT -> "email attachment"
+                UserFileOperation.RENAME_FILE -> "rename korar file"
+                UserFileOperation.COPY_FILE -> "copy korar source file"
+                UserFileOperation.MOVE_FILE -> "move korar source file"
+                UserFileOperation.DELETE_FILE -> "delete korar file"
+                UserFileOperation.EDIT_PHOTO -> "edit korar photo"
             }
             ExecutionOutcome("completed", "$what picker khulchi — target apni select korun.")
         } else {

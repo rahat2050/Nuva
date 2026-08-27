@@ -183,7 +183,17 @@ object CommandValidator {
         val operation = UserFileOperation.fromWire(json.str("operation"))
             ?.takeIf { it != UserFileOperation.EMAIL_ATTACHMENT }
             ?: return ValidatedAction.Invalid(listOf("USER_FILE requires a public picker operation"))
-        return ValidatedAction.Valid(NuvaAction.UserFile(operation))
+        val rawName = json.str("new_name")
+        val newName = rawName?.takeIf { name ->
+            name.length in 1..120 && name.none { it == '/' || it == '\\' || it.isISOControl() }
+        }
+        if (operation == UserFileOperation.RENAME_FILE && newName == null) {
+            return ValidatedAction.Invalid(listOf("RENAME_FILE requires safe new_name"))
+        }
+        if (operation != UserFileOperation.RENAME_FILE && rawName != null) {
+            return ValidatedAction.Invalid(listOf("new_name is only allowed for RENAME_FILE"))
+        }
+        return ValidatedAction.Valid(NuvaAction.UserFile(operation, newName))
     }
 
     private fun validateReadSavedItems(json: JsonObject): ValidatedAction {

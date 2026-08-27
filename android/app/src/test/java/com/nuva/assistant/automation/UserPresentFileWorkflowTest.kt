@@ -48,11 +48,23 @@ class UserPresentFileWorkflowTest {
     }
 
     @Test
-    fun `operation metadata keeps folder and sharing policy explicit`() {
+    fun `rename request keeps validated target name`() {
+        val request = UserPresentFileWorkflow.request(UserFileOperation.RENAME_FILE, "report.pdf")
+        assertEquals("report.pdf", request.newName)
+        assertTrue(request.operation.needsBlockingConfirmation)
+        assertTrue(request.operation.needsWriteGrant)
+    }
+
+    @Test
+    fun `operation metadata keeps picker mutation and sharing policy explicit`() {
         assertTrue(UserFileOperation.OPEN_FOLDER.usesFolderPicker)
         assertTrue(UserFileOperation.SHARE_FILE.sharesOutsideDevice)
         assertTrue(UserFileOperation.SHARE_PHOTO.sharesOutsideDevice)
         assertTrue(UserFileOperation.EMAIL_ATTACHMENT.sharesOutsideDevice)
+        assertTrue(UserFileOperation.DELETE_FILE.changesSelectedContent)
+        assertTrue(UserFileOperation.MOVE_FILE.changesSelectedContent)
+        assertTrue(UserFileOperation.COPY_FILE.needsBlockingConfirmation)
+        assertTrue(UserFileOperation.EDIT_PHOTO.needsWriteGrant)
         assertTrue(!UserFileOperation.READ_TEXT.sharesOutsideDevice)
     }
 }
