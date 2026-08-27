@@ -749,6 +749,31 @@ class CommandExecutor(
 
             is NuvaAction.UserFile -> launchUserPresentFileWorkflow(context, action)
 
+            is NuvaAction.ContactHandoff -> {
+                com.nuva.assistant.automation.UserPresentContactWorkflow.request(action.operation)
+                val activity = Intent(context, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                if (runCatching { context.startActivity(activity); true }.getOrDefault(false)) {
+                    ExecutionOutcome("completed", "Contact picker khulchi — exact contact apni select korun.")
+                } else {
+                    com.nuva.assistant.automation.UserPresentContactWorkflow.clear()
+                    ExecutionOutcome("failed", "Contact picker khulte parini.", "activity launch failed")
+                }
+            }
+
+            is NuvaAction.UninstallApp -> when (
+                val result = com.nuva.assistant.automation.AppManagement.requestUninstall(context, action.app)
+            ) {
+                is com.nuva.assistant.automation.AppManagement.Result.PromptOpened ->
+                    ExecutionOutcome("completed", "${result.label} uninstall confirmation khulechi — final decision apnar.")
+                com.nuva.assistant.automation.AppManagement.Result.NotFound ->
+                    ExecutionOutcome("failed", "App ta installed list-e paini.", "app not found")
+                com.nuva.assistant.automation.AppManagement.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Financial app uninstall NUVA initiate korbe na.", "sensitive app blocked")
+                is com.nuva.assistant.automation.AppManagement.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.OpenSettingScreen -> when (val r = SettingsOpener.open(context, action.target)) {
                 is SettingsOpener.Result.Done -> ExecutionOutcome("completed", "Kore dilam.")
                 is SettingsOpener.Result.ManualStep -> ExecutionOutcome("completed", r.speech)
@@ -966,7 +991,11 @@ class CommandExecutor(
                 UserFileOperation.SHARE_PHOTO -> "share korar photo"
                 UserFileOperation.PICK_VIDEO -> "video"
                 UserFileOperation.SHARE_VIDEO -> "share korar video"
+                UserFileOperation.SHARE_MULTIPLE_FILES -> "share korar file-gulo"
+                UserFileOperation.SHARE_MULTIPLE_PHOTOS -> "share korar photo-gulo"
+                UserFileOperation.SHARE_MULTIPLE_VIDEOS -> "share korar video-gulo"
                 UserFileOperation.EMAIL_ATTACHMENT -> "email attachment"
+                UserFileOperation.EMAIL_ATTACHMENTS -> "email attachments"
                 UserFileOperation.RENAME_FILE -> "rename korar file"
                 UserFileOperation.COPY_FILE -> "copy korar source file"
                 UserFileOperation.MOVE_FILE -> "move korar source file"

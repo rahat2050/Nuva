@@ -461,7 +461,12 @@ object CommandParser {
         val select = listOf("select", "choose", "pick", "beche", "বেছে", "নির্বাচন").any { t.contains(it) }
         val open = listOf("open", "kholo", "khulo", "খোলো", "খুলে").any { t.contains(it) }
         val fileWord = listOf("file", "document", "ফাইল", "ডকুমেন্ট").any { t.contains(it) }
+        val multiple = listOf("multiple", "several", "onek", "sob", "all selected", "একাধিক", "অনেক", "কয়েকটি", "কয়েকটি")
+            .any { t.contains(it) }
 
+        if (fileWord && share && multiple) {
+            return decision(UserFileOperation.SHARE_MULTIPLE_FILES, "Multiple file picker-er por Android share sheet khulbo.")
+        }
         if (fileWord && listOf("delete", "remove", "muchhe", "মুছে", "ডিলিট").any { t.contains(it) }) {
             return decision(UserFileOperation.DELETE_FILE, "File picker-er por selected target abar dekhie delete confirmation nebo.")
         }
@@ -490,6 +495,12 @@ object CommandParser {
         val video = listOf("video", "ভিডিও").any { t.contains(it) }
         val gallerySource = listOf("gallery theke", "gallery থেকে", "গ্যালারি থেকে", "photo picker", "media picker")
             .any { t.contains(it) }
+        if (photo && share && multiple) {
+            return decision(UserFileOperation.SHARE_MULTIPLE_PHOTOS, "Multiple photo picker-er por Android share sheet khulbo.")
+        }
+        if (video && share && multiple) {
+            return decision(UserFileOperation.SHARE_MULTIPLE_VIDEOS, "Multiple video picker-er por Android share sheet khulbo.")
+        }
         if (photo && listOf("edit", "crop", "rotate", "filter", "এডিট", "ক্রপ", "ঘোরাও").any { t.contains(it) }) {
             return decision(UserFileOperation.EDIT_PHOTO, "Photo select korar por installed editor khulbo; final Save apni korben.")
         }
@@ -527,6 +538,35 @@ object CommandParser {
     // --- 2c. Forms/productivity handoff + scheduled compose reminder (v2.4) ------------
 
     private fun parseProductivityHandoff(t: String): CommandDecision? {
+        val uninstallMarker = listOf("uninstall koro", "uninstall korun", "remove app", "app uninstall", "আনইনস্টল করো")
+            .firstOrNull { t.contains(it) }
+        if (uninstallMarker != null) {
+            var app = t.replace(uninstallMarker, " ")
+            listOf("app", "ta", "টা", "please").forEach { app = swapWord(app, it) }
+            TAIL_VERBS.forEach { app = swapWord(app, it) }
+            app = app.replace(Regex("""\s+"""), " ").trim(' ', ',', '.', ':')
+            if (app.isBlank() || app.length > 80) return unsupported("Kon app uninstall korbo? App-er nam bolun.")
+            if (SensitiveAppPolicy.isSensitiveAppName(app)) {
+                return unsupported("Financial app uninstall NUVA initiate korbe na — Android Settings theke manually korun.")
+            }
+            return ok(NuvaAction.UninstallApp(app), "$app uninstall prompt khulbo — nishchit korun.", NuvaRisk.MEDIUM)
+        }
+
+        val contactHandoff = when {
+            listOf("contact edit", "edit contact", "contact bodlao", "কন্টাক্ট এডিট", "কন্টাক্ট বদলাও").any { t.contains(it) } ->
+                ContactHandoffOperation.EDIT
+            listOf("contact dekhao", "contact details", "view contact", "কন্টাক্ট দেখাও").any { t.contains(it) } ->
+                ContactHandoffOperation.VIEW
+            else -> null
+        }
+        if (contactHandoff != null) {
+            return ok(
+                NuvaAction.ContactHandoff(contactHandoff),
+                "Contact picker khulbo — exact contact apni select korun.",
+                if (contactHandoff == ContactHandoffOperation.EDIT) NuvaRisk.MEDIUM else NuvaRisk.LOW,
+            )
+        }
+
         val contactDraft = listOf(
             "new contact add", "contact create", "contact draft", "contact save screen", "নতুন কন্টাক্ট", "কন্টাক্ট যোগ",
         ).any { t.contains(it) }
@@ -705,12 +745,16 @@ object CommandParser {
             "attachment", "attach file", "file attach", "document attach", "সংযুক্তি", "ফাইল অ্যাটাচ",
         )
         val attachmentRequested = attachmentWords.any { t.contains(it) }
+        val multipleAttachments = attachmentRequested && listOf(
+            "multiple", "several", "onek", "একাধিক", "অনেক", "কয়েকটি", "কয়েকটি",
+        ).any { t.contains(it) }
         if (attachmentRequested && quoted == null && bodyMarker == null) {
-            attachmentWords.forEach { word -> body = body?.replace(word, " ") }
+            (attachmentWords + listOf("multiple", "several", "onek", "একাধিক", "অনেক", "কয়েকটি", "কয়েকটি"))
+                .forEach { word -> body = body?.replace(word, " ") }
             body = body?.replace(Regex("""\s+"""), " ")?.trim()?.ifBlank { null }
         }
         return ok(
-            NuvaAction.ComposeEmail(recipient, subject, body?.take(5_000), attachmentRequested),
+            NuvaAction.ComposeEmail(recipient, subject, body?.take(5_000), attachmentRequested, multipleAttachments),
             "Email composer khulbo${recipient?.let { " — recipient $it" } ?: ""}${if (attachmentRequested) "; age attachment beche nin" else ""}; Send apni chapben.",
             NuvaRisk.MEDIUM,
         )

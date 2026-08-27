@@ -245,6 +245,26 @@ class CommandParserTest {
         assertFalse(CommandParser.parse("text file poro")!!.requiresConfirmation)
     }
 
+    @Test
+    fun `multiple files media and email attachments use bounded multi picker`() {
+        assertEquals(
+            UserFileOperation.SHARE_MULTIPLE_FILES,
+            (CommandParser.parse("multiple file share koro")!!.action as NuvaAction.UserFile).operation,
+        )
+        assertEquals(
+            UserFileOperation.SHARE_MULTIPLE_PHOTOS,
+            (CommandParser.parse("onek photo share koro")!!.action as NuvaAction.UserFile).operation,
+        )
+        assertEquals(
+            UserFileOperation.SHARE_MULTIPLE_VIDEOS,
+            (CommandParser.parse("multiple video share koro")!!.action as NuvaAction.UserFile).operation,
+        )
+        val email = CommandParser.parse("email compose koro multiple attachment")!!.action as NuvaAction.ComposeEmail
+        assertTrue(email.attachmentRequested)
+        assertTrue(email.multipleAttachments)
+        assertNull(email.body)
+    }
+
     // --- Email compose & notification RemoteInput -------------------------------------
 
     @Test
@@ -300,6 +320,20 @@ class CommandParserTest {
         assertEquals("01712345678", draft.phone)
         assertEquals("rahim@example.com", draft.email)
         assertTrue(contact.requiresConfirmation)
+    }
+
+    @Test
+    fun `contact picker handoff and uninstall stay system finalized`() {
+        val edit = CommandParser.parse("contact edit koro")!!
+        assertEquals(ContactHandoffOperation.EDIT, (edit.action as NuvaAction.ContactHandoff).operation)
+        assertTrue(edit.requiresConfirmation)
+
+        val uninstall = CommandParser.parse("facebook uninstall koro")!!
+        assertEquals("facebook", (uninstall.action as NuvaAction.UninstallApp).app)
+        assertTrue(uninstall.requiresConfirmation)
+
+        val financial = CommandParser.parse("bkash uninstall koro")
+        assertTrue(financial!!.unsupported)
     }
 
     @Test

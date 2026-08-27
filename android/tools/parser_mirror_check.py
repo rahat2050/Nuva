@@ -284,6 +284,9 @@ def parse_user_file(t):
     select = any(w in t for w in ["select","choose","pick","beche","বেছে","নির্বাচন"])
     opened = any(w in t for w in ["open","kholo","khulo","খোলো","খুলে"])
     file_word=any(w in t for w in ["file","document","ফাইল","ডকুমেন্ট"])
+    multiple=any(w in t for w in ["multiple","several","onek","sob","একাধিক","অনেক"])
+    if file_word and share and multiple:
+        return ok({"kind":"userfile","operation":"SHARE_MULTIPLE_FILES"},"USER_FILE",risk="MEDIUM")
     if file_word and any(w in t for w in ["delete","remove","muchhe","মুছে","ডিলিট"]):
         return ok({"kind":"userfile","operation":"DELETE_FILE"},"USER_FILE",risk="MEDIUM")
     if file_word and any(w in t for w in ["rename","nam bodlao","নাম বদল","রিনেম"]):
@@ -300,6 +303,10 @@ def parse_user_file(t):
     photo = any(w in t for w in ["photo","chobi","image","ছবি","ফটো"])
     video = any(w in t for w in ["video","ভিডিও"])
     gallery = any(w in t for w in ["gallery theke","গ্যালারি থেকে","photo picker","media picker"])
+    if photo and share and multiple:
+        return ok({"kind":"userfile","operation":"SHARE_MULTIPLE_PHOTOS"},"USER_FILE",risk="MEDIUM")
+    if video and share and multiple:
+        return ok({"kind":"userfile","operation":"SHARE_MULTIPLE_VIDEOS"},"USER_FILE",risk="MEDIUM")
     if photo and any(w in t for w in ["edit","crop","rotate","filter","এডিট","ক্রপ"]):
         return ok({"kind":"userfile","operation":"EDIT_PHOTO"},"USER_FILE",risk="MEDIUM")
     if photo and (gallery or share or select):
@@ -319,6 +326,17 @@ def parse_user_file(t):
     return None
 
 def parse_productivity(t):
+    uninstall=next((w for w in ["uninstall koro","uninstall korun","remove app","app uninstall"] if w in t),None)
+    if uninstall:
+        app=re.sub(r"\b(app|ta|please|koro|korun)\b"," ",t.replace(uninstall," "))
+        app=re.sub(r"\s+"," ",app).strip(" ,.: ")
+        if not app: return unsupported("App name bolun")
+        if app in ["bkash","nagad","rocket","upay"]: return unsupported("financial app uninstall blocked")
+        return ok({"kind":"uninstall","app":app},"UNINSTALL_APP",risk="MEDIUM",base="MEDIUM")
+    if any(w in t for w in ["contact edit","edit contact","contact bodlao"]):
+        return ok({"kind":"contacthandoff","operation":"EDIT"},"CONTACT_HANDOFF",risk="MEDIUM",base="MEDIUM")
+    if any(w in t for w in ["contact dekhao","contact details","view contact"]):
+        return ok({"kind":"contacthandoff","operation":"VIEW"},"CONTACT_HANDOFF",risk="MEDIUM",base="MEDIUM")
     if any(w in t for w in ["new contact add","contact create","contact draft","নতুন কন্টাক্ট"]):
         m=re.search(r"\s(?:name|nam|নাম)\s+(.+?)(?=\s+(?:number|phone|email)\s|$)",t)
         if not m: return unsupported("Contact name bolun")
@@ -383,7 +401,8 @@ def parse_communication(t):
     body_marker=next((w for w in [" body "," message "," je "," যে "] if w in t),None)
     body=t.split(body_marker,1)[1].strip(" ,.:") if body_marker else None
     attachment=any(w in t for w in ["attachment","attach file","file attach","document attach"])
-    return ok({"kind":"email","recipient":recipient,"body":body,"attachment":attachment},"COMPOSE_EMAIL",risk="MEDIUM",base="MEDIUM")
+    multiple=attachment and any(w in t for w in ["multiple","several","onek","একাধিক","অনেক"])
+    return ok({"kind":"email","recipient":recipient,"body":body,"attachment":attachment,"multiple":multiple},"COMPOSE_EMAIL",risk="MEDIUM",base="MEDIUM")
 
 def parse_status(t):
     if any(w in t for w in ["battery","battary","bettery","charge koto","charge koy","কত চার্জ","ব্যাটারি","চার্জ কত"]):
@@ -988,6 +1007,11 @@ check(parse("text share koro je ami ashchi")["intent"] == "SHARE_TEXT", "text sh
 check(parse("new contact add koro name Rahim number 01712345678")["intent"] == "CREATE_CONTACT_DRAFT", "contact draft")
 check(parse("2 number notification dismiss koro")["action"]["operation"] == "DISMISS", "notification dismiss")
 check(parse("notification mark as read koro")["action"]["operation"] == "MARK_READ", "notification mark read")
+check(parse("multiple file share koro")["action"]["operation"] == "SHARE_MULTIPLE_FILES", "multiple file share")
+check(parse("onek photo share koro")["action"]["operation"] == "SHARE_MULTIPLE_PHOTOS", "multiple photo share")
+check(parse("email compose koro multiple attachment")["action"]["multiple"], "multiple email attachments")
+check(parse("contact edit koro")["intent"] == "CONTACT_HANDOFF", "contact edit handoff")
+check(parse("facebook uninstall koro")["intent"] == "UNINSTALL_APP", "system uninstall handoff")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

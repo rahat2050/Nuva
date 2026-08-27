@@ -1,4 +1,4 @@
-# NUVA — Supported features (v2.7)
+# NUVA — Supported features (v2.8)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -18,8 +18,9 @@ segments. Details: [`10000-command-grammar.md`](10000-command-grammar.md).
 
 ## Apps & navigation — SUPPORTED
 Open any installed app by name (+ Play Store suggestion when missing), close/home/back/recents,
-scroll/swipe anywhere, notification shade open, per-app capability truth via
-AppCapabilityRegistry.
+scroll/swipe anywhere, notification shade open, per-app capability truth via AppCapabilityRegistry.
+v2.8 can open Android's system uninstall confirmation for one dynamically resolved non-financial
+app; financial apps and NUVA itself are refused, and Android owns the final decision.
 
 ## Communication — SUPPORTED (confirmation mandatory)
 Contacts: dynamic resolution, kinship fallback, multi-match asks, phone numbers incl.
@@ -28,7 +29,8 @@ send-after-confirmation with package + recipient verification. Chat open (wa.me)
 Telegram/Messenger/Signal/Viber/IMO — **ANDROID-LIMITED**: message pre-filled, user taps Send.
 Email recipient/subject/body compose is **SUPPORTED user-reviewed**: email app opens and user taps Send.
 v2.7 adds confirmed generic text-share chooser and Contacts-app insert drafts (name/phone/email); the
-user chooses the destination/final share or taps final Save.
+user chooses the destination/final share or taps final Save. v2.8 adds contact picker view/edit
+handoff without contact-write permission; exact contact and final Save remain user-controlled.
 
 ## Forms & productivity — USER-REVIEWED SUPPORTED
 v2.4 can store an explicitly dictated local draft and open a sourced official-portal search for
@@ -49,7 +51,8 @@ automatic editing and background deletion remain **UNSUPPORTED**.
 
 ## Files — TARGET-AWARE SUPPORTED / PROVIDER-LIMITED
 Storage Access Framework supports user-selected file open/view/share, bounded text reading, folder
-grants and—since v2.5—rename, copy, move and delete. Mutations require command confirmation, exact
+grants and—since v2.5—rename, copy, move and delete. v2.8 adds picker-based sharing of up to 10
+files/photos/videos and up to 10 email attachments through `ACTION_SEND_MULTIPLE`. Mutations require command confirmation, exact
 source/destination picker selection, then a second target-aware confirmation. Move copies first and
 only deletes the source when permission succeeds; otherwise both copies remain and NUVA says so.
 Provider support/write grants can still limit an operation. Broad storage scan and arbitrary/model-

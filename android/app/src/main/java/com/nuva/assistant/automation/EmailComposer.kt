@@ -50,6 +50,30 @@ object EmailComposer {
         }
     }
 
+    fun composeWithAttachments(context: Context, action: NuvaAction.ComposeEmail, attachments: List<Uri>): Result {
+        if (attachments.isEmpty()) return Result.Failed("Kono attachment select hoyni.")
+        val selected = attachments.distinct().take(10)
+        val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "*/*"
+            action.recipient?.let { putExtra(Intent.EXTRA_EMAIL, arrayOf(it)) }
+            action.subject?.let { putExtra(Intent.EXTRA_SUBJECT, it.take(200)) }
+            action.body?.let { putExtra(Intent.EXTRA_TEXT, it.take(5_000)) }
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(selected))
+            clipData = ClipData.newUri(context.contentResolver, "NUVA email attachments", selected.first()).also { clip ->
+                selected.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
+            }
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        return try {
+            context.startActivity(
+                Intent.createChooser(intent, "Email with attachments").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+            Result.Opened
+        } catch (_: Exception) {
+            Result.Failed("Multiple attachment-shoho email app khulte parini.")
+        }
+    }
+
     fun mailtoUri(recipient: String?): String =
         if (recipient.isNullOrBlank()) "mailto:" else "mailto:$recipient"
 }

@@ -45,6 +45,12 @@ class UserPresentFileWorkflowTest {
         assertEquals(UserFileOperation.EMAIL_ATTACHMENT, request.operation)
         assertEquals("user@example.com", request.emailDraft?.recipient)
         assertTrue(request.emailDraft?.attachmentRequested == false)
+
+        val multipleDraft = draft.copy(multipleAttachments = true)
+        val multiple = UserPresentFileWorkflow.requestEmailAttachment(multipleDraft)
+        assertEquals(UserFileOperation.EMAIL_ATTACHMENTS, multiple.operation)
+        assertTrue(multiple.operation.usesMultiplePicker)
+        assertTrue(multiple.emailDraft?.multipleAttachments == false)
     }
 
     @Test
@@ -61,6 +67,8 @@ class UserPresentFileWorkflowTest {
         assertTrue(UserFileOperation.SHARE_FILE.sharesOutsideDevice)
         assertTrue(UserFileOperation.SHARE_PHOTO.sharesOutsideDevice)
         assertTrue(UserFileOperation.EMAIL_ATTACHMENT.sharesOutsideDevice)
+        assertTrue(UserFileOperation.SHARE_MULTIPLE_FILES.usesMultiplePicker)
+        assertTrue(UserFileOperation.SHARE_MULTIPLE_PHOTOS.usesMultiplePicker)
         assertTrue(UserFileOperation.DELETE_FILE.changesSelectedContent)
         assertTrue(UserFileOperation.MOVE_FILE.changesSelectedContent)
         assertTrue(UserFileOperation.COPY_FILE.needsBlockingConfirmation)

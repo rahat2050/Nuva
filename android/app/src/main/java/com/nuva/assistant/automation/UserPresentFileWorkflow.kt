@@ -59,10 +59,15 @@ object UserPresentFileWorkflow {
 
     @Synchronized
     fun requestEmailAttachment(email: NuvaAction.ComposeEmail): Request {
+        val operation = if (email.multipleAttachments) {
+            UserFileOperation.EMAIL_ATTACHMENTS
+        } else {
+            UserFileOperation.EMAIL_ATTACHMENT
+        }
         val request = Request(
             id = System.nanoTime(),
-            operation = UserFileOperation.EMAIL_ATTACHMENT,
-            emailDraft = email.copy(attachmentRequested = false),
+            operation = operation,
+            emailDraft = email.copy(attachmentRequested = false, multipleAttachments = false),
         )
         _state.value = State.Pending(request)
         return request
@@ -120,6 +125,42 @@ object UserPresentFileWorkflow {
         }
     }
 
+    suspend fun handleMultipleSelected(context: Context, uris: List<Uri>): String {
+        val active = _state.value as? State.PickerActive ?: return "Kono multiple picker active nei."
+        if (uris.isEmpty()) {
+            cancel()
+            return "Selection batil korechi."
+        }
+        val selected = uris.distinct().take(MAX_MULTI_SELECT)
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                selected.forEach { persistGrant(context, it, write = false) }
+                when (active.request.operation) {
+                    UserFileOperation.SHARE_MULTIPLE_FILES -> {
+                        shareMultiple(context, selected, "*/*")
+                        complete("${selected.size} ta file share sheet e diyechi — final destination apni beche nin.")
+                    }
+                    UserFileOperation.SHARE_MULTIPLE_PHOTOS -> {
+                        shareMultiple(context, selected, "image/*")
+                        complete("${selected.size} ta photo share sheet e diyechi — final destination apni beche nin.")
+                    }
+                    UserFileOperation.SHARE_MULTIPLE_VIDEOS -> {
+                        shareMultiple(context, selected, "video/*")
+                        complete("${selected.size} ta video share sheet e diyechi — final destination apni beche nin.")
+                    }
+                    UserFileOperation.EMAIL_ATTACHMENTS -> {
+                        val draft = active.request.emailDraft ?: error("email draft missing")
+                        when (val result = EmailComposer.composeWithAttachments(context, draft, selected)) {
+                            EmailComposer.Result.Opened -> complete("${selected.size} attachment-shoho email composer khulechi — Send apni chapun.")
+                            is EmailComposer.Result.Failed -> error(result.reason)
+                        }
+                    }
+                    else -> error("operation does not accept multiple selections")
+                }
+            }.getOrElse { error -> fail("Multiple selection handle korte parini. ${error.message.orEmpty()}".trim()) }
+        }
+    }
+
     private fun handleSource(context: Context, request: Request, uri: Uri): String = runCatching {
         persistGrant(context, uri, request.operation.needsWriteGrant)
         val name = displayName(context, uri).ifBlank { "selected item" }
@@ -160,6 +201,11 @@ object UserPresentFileWorkflow {
                     is EmailComposer.Result.Failed -> error(result.reason)
                 }
             }
+            UserFileOperation.SHARE_MULTIPLE_FILES,
+            UserFileOperation.SHARE_MULTIPLE_PHOTOS,
+            UserFileOperation.SHARE_MULTIPLE_VIDEOS,
+            UserFileOperation.EMAIL_ATTACHMENTS,
+            -> error("multiple picker operation routed as single")
             UserFileOperation.RENAME_FILE,
             UserFileOperation.DELETE_FILE,
             -> awaitMutation(request, uri, name)
@@ -303,6 +349,19 @@ object UserPresentFileWorkflow {
         context.startActivity(Intent.createChooser(share, "Share with").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
+    private fun shareMultiple(context: Context, uris: List<Uri>, mime: String) {
+        val streams = ArrayList(uris)
+        val share = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = mime
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, streams)
+            clipData = ClipData.newUri(context.contentResolver, "NUVA selected files", uris.first()).also { clip ->
+                uris.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
+            }
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(share, "Share selected items").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
     private fun editPhoto(context: Context, uri: Uri) {
         val edit = Intent(Intent.ACTION_EDIT)
             .setDataAndType(uri, context.contentResolver.getType(uri) ?: "image/*")
@@ -333,4 +392,5 @@ object UserPresentFileWorkflow {
 
     private const val MAX_TEXT_CHARS = 100_000
     private const val COPY_BUFFER_SIZE = 64 * 1024
+    private const val MAX_MULTI_SELECT = 10
 }

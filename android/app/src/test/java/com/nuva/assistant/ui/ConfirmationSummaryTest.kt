@@ -113,6 +113,15 @@ class ConfirmationSummaryTest {
         )
         assertTrue(contact.detail.contains("Save"))
 
+        val contactEdit = ConfirmationSummary.build(
+            NuvaAction.ContactHandoff(com.nuva.assistant.command.ContactHandoffOperation.EDIT),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(contactEdit.detail.contains("exact contact", ignoreCase = true))
+
+        val uninstall = ConfirmationSummary.build(NuvaAction.UninstallApp("facebook"), NuvaRisk.MEDIUM)
+        assertTrue(uninstall.detail.contains("Android system"))
+
         val notification = ConfirmationSummary.build(
             NuvaAction.ManageNotification(2, com.nuva.assistant.command.NotificationManageOperation.DISMISS),
             NuvaRisk.MEDIUM,

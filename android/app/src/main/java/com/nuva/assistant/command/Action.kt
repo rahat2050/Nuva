@@ -190,6 +190,7 @@ sealed interface NuvaAction {
         val subject: String?,
         val body: String?,
         val attachmentRequested: Boolean = false,
+        val multipleAttachments: Boolean = false,
     ) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.COMPOSE_EMAIL
     }
@@ -239,6 +240,14 @@ sealed interface NuvaAction {
         val operation: NotificationManageOperation,
     ) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.MANAGE_NOTIFICATION
+    }
+
+    data class ContactHandoff(val operation: ContactHandoffOperation) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CONTACT_HANDOFF
+    }
+
+    data class UninstallApp(val app: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.UNINSTALL_APP
     }
 
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
@@ -395,6 +404,17 @@ enum class CaptureMode(val wireName: String) {
     }
 }
 
+enum class ContactHandoffOperation(val wireName: String) {
+    VIEW("view"),
+    EDIT("edit"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): ContactHandoffOperation? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
 enum class NotificationManageOperation(val wireName: String) {
     DISMISS("dismiss"),
     MARK_READ("mark_read"),
@@ -469,7 +489,11 @@ enum class UserFileOperation(val wireName: String, val mimeType: String, val use
     SHARE_PHOTO("share_photo", "image/*"),
     PICK_VIDEO("pick_video", "video/*"),
     SHARE_VIDEO("share_video", "video/*"),
+    SHARE_MULTIPLE_FILES("share_multiple_files", "*/*"),
+    SHARE_MULTIPLE_PHOTOS("share_multiple_photos", "image/*"),
+    SHARE_MULTIPLE_VIDEOS("share_multiple_videos", "video/*"),
     EMAIL_ATTACHMENT("email_attachment", "*/*"),
+    EMAIL_ATTACHMENTS("email_attachments", "*/*"),
     RENAME_FILE("rename_file", "*/*"),
     COPY_FILE("copy_file", "*/*"),
     MOVE_FILE("move_file", "*/*"),
@@ -478,7 +502,13 @@ enum class UserFileOperation(val wireName: String, val mimeType: String, val use
     ;
 
     val sharesOutsideDevice: Boolean
-        get() = this == SHARE_FILE || this == SHARE_PHOTO || this == SHARE_VIDEO || this == EMAIL_ATTACHMENT
+        get() = this == SHARE_FILE || this == SHARE_PHOTO || this == SHARE_VIDEO ||
+            this == SHARE_MULTIPLE_FILES || this == SHARE_MULTIPLE_PHOTOS || this == SHARE_MULTIPLE_VIDEOS ||
+            this == EMAIL_ATTACHMENT || this == EMAIL_ATTACHMENTS
+
+    val usesMultiplePicker: Boolean
+        get() = this == SHARE_MULTIPLE_FILES || this == SHARE_MULTIPLE_PHOTOS ||
+            this == SHARE_MULTIPLE_VIDEOS || this == EMAIL_ATTACHMENTS
 
     val changesSelectedContent: Boolean
         get() = this == RENAME_FILE || this == MOVE_FILE || this == DELETE_FILE || this == EDIT_PHOTO

@@ -162,6 +162,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   and confirmed cancellation commands, plus BOOT_COMPLETED/app-update restoration.
 * **v2.7 safe handoffs**: confirmed generic text share, Contacts-app insert drafts, and single safe
   notification dismiss/exact allowlisted Mark-as-read actions; no bulk or guessed action.
+* **v2.8 multi/system handoffs**: max-10 file/photo/video sharing and email attachments, exact contact
+  picker view/edit, and Android-confirmed uninstall for dynamically resolved non-financial apps.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

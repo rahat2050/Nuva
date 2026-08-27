@@ -42,6 +42,8 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("SHARE_TEXT"))
         assertNull(NuvaIntent.fromWire("CREATE_CONTACT_DRAFT"))
         assertNull(NuvaIntent.fromWire("MANAGE_NOTIFICATION"))
+        assertNull(NuvaIntent.fromWire("CONTACT_HANDOFF"))
+        assertNull(NuvaIntent.fromWire("UNINSTALL_APP"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -81,6 +83,11 @@ class ActionJsonTest {
             NuvaAction.CreateContactDraft("Rahim", "01712345678", "rahim@example.com"),
             NuvaAction.ManageNotification(2, NotificationManageOperation.DISMISS),
             NuvaAction.ManageNotification(1, NotificationManageOperation.MARK_READ),
+            NuvaAction.ContactHandoff(ContactHandoffOperation.EDIT),
+            NuvaAction.UninstallApp("facebook"),
+            NuvaAction.UserFile(UserFileOperation.SHARE_MULTIPLE_FILES),
+            NuvaAction.UserFile(UserFileOperation.SHARE_MULTIPLE_PHOTOS),
+            NuvaAction.ComposeEmail("user@example.com", null, null, attachmentRequested = true, multipleAttachments = true),
             NuvaAction.OpenSettingScreen(SettingTarget.TORCH),
             NuvaAction.ReadNotifications,
             NuvaAction.SetReminder("medicine", 1_770_000_000_000L, "kal"),
@@ -207,6 +214,18 @@ class ActionJsonTest {
             },
         )
         assertTrue(badContact is CommandValidator.ValidatedAction.Invalid)
+
+        val badMultipleEmail = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "COMPOSE_EMAIL"); put("multiple_attachments", true)
+            },
+        )
+        assertTrue(badMultipleEmail is CommandValidator.ValidatedAction.Invalid)
+
+        val badHandoff = CommandValidator.validateAction(
+            buildJsonObject { put("type", "CONTACT_HANDOFF"); put("operation", "delete") },
+        )
+        assertTrue(badHandoff is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test
@@ -222,6 +241,8 @@ class ActionJsonTest {
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SHARE_TEXT))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CREATE_CONTACT_DRAFT))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.MANAGE_NOTIFICATION))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CONTACT_HANDOFF))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.UNINSTALL_APP))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.LIST_SCHEDULED_DRAFTS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.DEVICE_STATUS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CREATE_NOTE))

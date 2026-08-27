@@ -137,7 +137,21 @@ object CommandValidator {
             NuvaIntent.SHARE_TEXT -> validateShareText(actionJson)
             NuvaIntent.CREATE_CONTACT_DRAFT -> validateCreateContactDraft(actionJson)
             NuvaIntent.MANAGE_NOTIFICATION -> validateManageNotification(actionJson)
+            NuvaIntent.CONTACT_HANDOFF -> validateContactHandoff(actionJson)
+            NuvaIntent.UNINSTALL_APP -> validateUninstallApp(actionJson)
         }
+    }
+
+    private fun validateContactHandoff(json: JsonObject): ValidatedAction {
+        val operation = ContactHandoffOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("CONTACT_HANDOFF requires operation"))
+        return ValidatedAction.Valid(NuvaAction.ContactHandoff(operation))
+    }
+
+    private fun validateUninstallApp(json: JsonObject): ValidatedAction {
+        val app = json.str("app")?.takeIf { it.length in 1..80 }
+            ?: return ValidatedAction.Invalid(listOf("UNINSTALL_APP requires app"))
+        return ValidatedAction.Valid(NuvaAction.UninstallApp(app))
     }
 
     private fun validateShareText(json: JsonObject): ValidatedAction {
@@ -209,7 +223,13 @@ object CommandValidator {
         val subject = json.str("subject")?.takeIf { it.isNotEmpty() && it.length <= 200 }
         val body = json.str("body")?.takeIf { it.isNotEmpty() && it.length <= 5_000 }
         val attachmentRequested = json.bool("attachment_requested") ?: false
-        return ValidatedAction.Valid(NuvaAction.ComposeEmail(recipient, subject, body, attachmentRequested))
+        val multipleAttachments = json.bool("multiple_attachments") ?: false
+        if (multipleAttachments && !attachmentRequested) {
+            return ValidatedAction.Invalid(listOf("multiple_attachments requires attachment_requested"))
+        }
+        return ValidatedAction.Valid(
+            NuvaAction.ComposeEmail(recipient, subject, body, attachmentRequested, multipleAttachments),
+        )
     }
 
     private fun validateReplyNotification(json: JsonObject): ValidatedAction {
@@ -221,7 +241,7 @@ object CommandValidator {
 
     private fun validateUserFile(json: JsonObject): ValidatedAction {
         val operation = UserFileOperation.fromWire(json.str("operation"))
-            ?.takeIf { it != UserFileOperation.EMAIL_ATTACHMENT }
+            ?.takeIf { it != UserFileOperation.EMAIL_ATTACHMENT && it != UserFileOperation.EMAIL_ATTACHMENTS }
             ?: return ValidatedAction.Invalid(listOf("USER_FILE requires a public picker operation"))
         val rawName = json.str("new_name")
         val newName = rawName?.takeIf { name ->

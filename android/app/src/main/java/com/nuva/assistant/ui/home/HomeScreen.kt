@@ -47,6 +47,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nuva.assistant.R
 import com.nuva.assistant.accessibility.NuvaAccessibilityService
+import com.nuva.assistant.automation.UserPresentContactWorkflow
 import com.nuva.assistant.automation.UserPresentFileWorkflow
 import com.nuva.assistant.command.CommandDecision
 import com.nuva.assistant.core.NuvaContainer
@@ -78,6 +79,7 @@ class HomeViewModel : ViewModel() {
     val contactChoice =
         MutableStateFlow<Pair<Long, List<com.nuva.assistant.contacts.ContactResolver.ContactMatch>>?>(null)
     val fileWorkflow = UserPresentFileWorkflow.state
+    val contactWorkflow = UserPresentContactWorkflow.state
 
     fun startListening() = voice.startListening()
 
@@ -131,6 +133,20 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    fun onFileWorkflowUris(uris: List<Uri>) {
+        viewModelScope.launch {
+            val speech = UserPresentFileWorkflow.handleMultipleSelected(NuvaContainer.appContext, uris)
+            if (uris.isNotEmpty()) voice.speakIfEnabled(speech)
+        }
+    }
+
+    fun onContactWorkflowUri(uri: Uri?) {
+        val speech = UserPresentContactWorkflow.handleSelected(NuvaContainer.appContext, uri)
+        if (uri != null) voice.speakIfEnabled(speech)
+    }
+
+    fun dismissContactWorkflowResult() = UserPresentContactWorkflow.clear()
+
     fun confirmFileMutation() {
         viewModelScope.launch {
             val speech = UserPresentFileWorkflow.confirmMutation(NuvaContainer.appContext)
@@ -159,15 +175,22 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     val documentPicker = rememberLauncherForActivityResult(
         contract = OpenNuvaDocumentContract(),
     ) { uri -> viewModel.onFileWorkflowUri(uri) }
+    val multipleDocumentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris -> viewModel.onFileWorkflowUris(uris) }
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree(),
     ) { uri -> viewModel.onFileWorkflowUri(uri) }
+    val contactPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickContact(),
+    ) { uri -> viewModel.onContactWorkflowUri(uri) }
 
     val state by viewModel.state.collectAsState(initial = VoiceController.State.Idle)
     val pending by viewModel.pending.collectAsState()
     val contactChoice by viewModel.contactChoice.collectAsState()
     val recent by viewModel.recent.collectAsState()
     val fileWorkflow by viewModel.fileWorkflow.collectAsState()
+    val contactWorkflow by viewModel.contactWorkflow.collectAsState()
 
     var typedCommand by remember { mutableStateOf("") }
     var showAccessibilityGuide by remember { mutableStateOf(false) }
@@ -178,8 +201,11 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
             is UserPresentFileWorkflow.State.Pending -> {
                 val active = UserPresentFileWorkflow.markPickerActive(workflow.request.id)
                     ?: return@LaunchedEffect
-                if (active.operation.usesFolderPicker) folderPicker.launch(null)
-                else documentPicker.launch(active.operation.mimeType)
+                when {
+                    active.operation.usesFolderPicker -> folderPicker.launch(null)
+                    active.operation.usesMultiplePicker -> multipleDocumentPicker.launch(arrayOf(active.operation.mimeType))
+                    else -> documentPicker.launch(active.operation.mimeType)
+                }
             }
             is UserPresentFileWorkflow.State.DestinationPending -> {
                 UserPresentFileWorkflow.markDestinationPickerActive(workflow.request.id)
@@ -188,6 +214,13 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
             }
             else -> Unit
         }
+    }
+
+    LaunchedEffect(contactWorkflow) {
+        val pendingContact = contactWorkflow as? UserPresentContactWorkflow.State.Pending
+            ?: return@LaunchedEffect
+        UserPresentContactWorkflow.markActive(pendingContact.id) ?: return@LaunchedEffect
+        contactPicker.launch(null)
     }
 
     Column(
@@ -498,6 +531,26 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
             text = { Text(workflow.speech) },
             confirmButton = {
                 Button(onClick = { viewModel.dismissFileWorkflowResult() }) { Text("OK") }
+            },
+        )
+        else -> Unit
+    }
+
+    when (val workflow = contactWorkflow) {
+        is UserPresentContactWorkflow.State.Completed -> AlertDialog(
+            onDismissRequest = { viewModel.dismissContactWorkflowResult() },
+            title = { Text("Contact handoff") },
+            text = { Text(workflow.speech) },
+            confirmButton = {
+                Button(onClick = { viewModel.dismissContactWorkflowResult() }) { Text("OK") }
+            },
+        )
+        is UserPresentContactWorkflow.State.Failed -> AlertDialog(
+            onDismissRequest = { viewModel.dismissContactWorkflowResult() },
+            title = { Text("Contact problem") },
+            text = { Text(workflow.speech) },
+            confirmButton = {
+                Button(onClick = { viewModel.dismissContactWorkflowResult() }) { Text("OK") }
             },
         )
         else -> Unit

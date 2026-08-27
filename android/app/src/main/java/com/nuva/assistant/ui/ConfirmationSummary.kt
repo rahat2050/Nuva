@@ -101,7 +101,12 @@ object ConfirmationSummary {
                 action.recipient?.let { lines += Line("প্রাপক", it) }
                 action.subject?.let { lines += Line("বিষয়", it) }
                 action.body?.let { lines += Line("লেখা", "“${it.take(500)}”") }
-                if (action.attachmentRequested) lines += Line("সংযুক্তি", "Android picker থেকে আপনি বেছে নেবেন")
+                if (action.attachmentRequested) {
+                    lines += Line(
+                        "সংযুক্তি",
+                        if (action.multipleAttachments) "Android picker থেকে সর্বোচ্চ ১০টি" else "Android picker থেকে একটি",
+                    )
+                }
                 detail = "Email app-এ draft খুলবে; final Send আপনি চাপবেন।"
                 confirmLabelOverride = "CONTINUE"
             }
@@ -145,6 +150,24 @@ object ConfirmationSummary {
                 action.phone?.let { lines += Line("ফোন", it) }
                 action.email?.let { lines += Line("Email", it) }
                 detail = "Contacts app-এ draft খুলবে; final Save আপনি চাপবেন।"
+                confirmLabelOverride = "CONTINUE"
+            }
+
+            is NuvaAction.ContactHandoff -> {
+                title = "Contact picker খুলবে"
+                lines += Line("কাজ", action.operation.wireName)
+                detail = if (action.operation == com.nuva.assistant.command.ContactHandoffOperation.EDIT) {
+                    "Exact contact আপনি বেছে নেবেন; Contacts app-এ final Save আপনি করবেন।"
+                } else {
+                    "Exact contact আপনি বেছে নেবেন; শুধু details screen খুলবে।"
+                }
+                confirmLabelOverride = "CONTINUE"
+            }
+
+            is NuvaAction.UninstallApp -> {
+                title = "App uninstall prompt"
+                lines += Line("অ্যাপ", action.app)
+                detail = "Android system uninstall confirmation খুলবে; final decision আপনি করবেন। Financial app blocked।"
                 confirmLabelOverride = "CONTINUE"
             }
 

@@ -115,6 +115,7 @@ object ActionJson {
             action.subject?.let { put("subject", it) }
             action.body?.let { put("body", it) }
             if (action.attachmentRequested) put("attachment_requested", true)
+            if (action.multipleAttachments) put("multiple_attachments", true)
         }
         is NuvaAction.ReplyNotification -> buildJsonObject {
             put("type", "REPLY_NOTIFICATION"); put("ordinal", action.ordinal); put("message", action.message)
@@ -143,6 +144,12 @@ object ActionJson {
         }
         is NuvaAction.ManageNotification -> buildJsonObject {
             put("type", "MANAGE_NOTIFICATION"); put("ordinal", action.ordinal); put("operation", action.operation.wireName)
+        }
+        is NuvaAction.ContactHandoff -> buildJsonObject {
+            put("type", "CONTACT_HANDOFF"); put("operation", action.operation.wireName)
+        }
+        is NuvaAction.UninstallApp -> buildJsonObject {
+            put("type", "UNINSTALL_APP"); put("app", action.app)
         }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)

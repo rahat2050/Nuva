@@ -25,6 +25,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.nuva.assistant.R
+import com.nuva.assistant.automation.UserPresentContactWorkflow
 import com.nuva.assistant.automation.UserPresentFileWorkflow
 import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.ui.history.HistoryScreen
@@ -56,10 +57,11 @@ fun NuvaApp() {
     if (onboardingDone == null) return // brief blank frame while DataStore loads
     val startDestination = if (onboardingDone!!) "home" else "onboarding"
     val fileWorkflow by UserPresentFileWorkflow.state.collectAsState()
-    LaunchedEffect(fileWorkflow, onboardingDone) {
-        if (onboardingDone == true && fileWorkflow is UserPresentFileWorkflow.State.Pending &&
-            currentDestination?.route != "home"
-        ) {
+    val contactWorkflow by UserPresentContactWorkflow.state.collectAsState()
+    LaunchedEffect(fileWorkflow, contactWorkflow, onboardingDone) {
+        val pickerPending = fileWorkflow is UserPresentFileWorkflow.State.Pending ||
+            contactWorkflow is UserPresentContactWorkflow.State.Pending
+        if (onboardingDone == true && pickerPending && currentDestination?.route != "home") {
             navController.navigate("home") { launchSingleTop = true }
         }
     }

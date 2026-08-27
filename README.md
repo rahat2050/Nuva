@@ -29,6 +29,9 @@ you say into a validated action, asks before doing anything risky, and carries i
 "text share koro je ami ashchi"       → confirmed Android share chooser
 "new contact add koro name Rahim number 01712345678" → user-reviewed contact draft
 "2 number notification dismiss koro" → confirmed exact notification dismissal
+"onek photo share koro"              → up to 10 user-selected photos
+"contact edit koro"                  → exact picker + Contacts editor
+"facebook uninstall koro"            → Android system confirmation
 ```
 
 ## Project status
@@ -37,7 +40,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v2.7 passes** — practical assistant → persistent productivity → safe handoffs | ✅ Implemented in code (real-device QA still pending): reviewed files/communication/forms, recurring drafts, text-share/contact drafts, and exact single-notification management; see [`docs/supported-features.md`](docs/supported-features.md) |
+| **v1.1–v2.8 passes** — practical assistant → safe multi-item/system handoffs | ✅ Implemented in code (real-device QA still pending): reviewed files/communication/forms, recurring drafts, notification management, multi-share/attachments, contact picker edits and system-confirmed non-financial uninstall; see [`docs/supported-features.md`](docs/supported-features.md) |
 
 `backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
@@ -167,6 +170,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [target-aware-file-mutations.md](docs/target-aware-file-mutations.md) | v2.5 rename/copy/move/delete and photo-editor safety flow |
 | [persistent-scheduled-drafts.md](docs/persistent-scheduled-drafts.md) | v2.6 Room persistence, recurrence, reboot restore and cancellation |
 | [safe-share-contact-notifications.md](docs/safe-share-contact-notifications.md) | v2.7 reviewed share/contact and exact notification actions |
+| [multi-share-contact-app-management.md](docs/multi-share-contact-app-management.md) | v2.8 multi-item, contact edit and uninstall handoffs |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |
