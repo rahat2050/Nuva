@@ -67,6 +67,7 @@ enum class NuvaIntent(val wireName: String, val localOnly: Boolean = false) {
     COMPOSE_SOCIAL_POST("COMPOSE_SOCIAL_POST", localOnly = true),
     COMPOSE_MMS("COMPOSE_MMS", localOnly = true),
     OPEN_VOICEMAIL("OPEN_VOICEMAIL", localOnly = true),
+    MAP_NAVIGATION("MAP_NAVIGATION", localOnly = true),
     ;
 
     companion object {

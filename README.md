@@ -38,6 +38,8 @@ you say into a validated action, asks before doing anything risky, and carries i
 "kal 9 tay calendar event create title meeting" → rich user-saved event draft
 "facebook post draft je project update" → visible social composer; user posts
 "mms compose 01712345678 photo attachment je hello" → picker + visible message draft
+"from sylhet to dhaka public transport" → dynamic transit directions
+"navigate to dhaka walking"           → visible walking navigation handoff
 ```
 
 ## Project status
@@ -46,7 +48,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v3.1 passes** — practical assistant → explicit communication handoffs | ✅ Implemented in code (real-device QA still pending): reviewed Android controls plus social post drafts, MMS attachment compose and voicemail dialer handoff with user-owned final action; see [`docs/supported-features.md`](docs/supported-features.md) |
+| **v1.1–v3.2 passes** — practical assistant → navigation handoffs | ✅ Implemented in code (real-device QA still pending): reviewed Android controls plus dynamic Maps directions/navigation/nearby/street-view handoffs with travel modes and no NUVA location collection; see [`docs/supported-features.md`](docs/supported-features.md) |
 
 `backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
@@ -180,6 +182,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [expanded-settings-app-management.md](docs/expanded-settings-app-management.md) | v2.9 exact system panels and per-app management |
 | [clipboard-rich-calendar.md](docs/clipboard-rich-calendar.md) | v3.0 explicit clipboard and rich calendar safety flow |
 | [social-mms-voicemail-handoffs.md](docs/social-mms-voicemail-handoffs.md) | v3.1 visible social/MMS/voicemail handoffs |
+| [maps-navigation.md](docs/maps-navigation.md) | v3.2 dynamic directions, navigation, nearby and street-view handoffs |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |

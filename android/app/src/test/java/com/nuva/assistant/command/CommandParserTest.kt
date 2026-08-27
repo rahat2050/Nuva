@@ -161,8 +161,8 @@ class CommandParserTest {
 
     @Test
     fun `one hundred daily skill shortcuts route to sourced information`() {
+        assertEquals(NuvaIntent.MAP_NAVIGATION, CommandParser.parse("kacher pharmacy")!!.intent)
         listOf(
-            "kacher pharmacy",
             "parcel tracking ZX123",
             "passport application",
             "current job circular",
@@ -177,8 +177,8 @@ class CommandParserTest {
 
     @Test
     fun `five hundred matrix generated skills require entity plus task`() {
+        assertEquals(NuvaIntent.MAP_NAVIGATION, CommandParser.parse("nearby private tutor")!!.intent)
         listOf(
-            "nearby private tutor",
             "passport ki kagoj lagbe",
             "excel tutorial",
             "washing machine repair",
@@ -282,6 +282,29 @@ class CommandParserTest {
 
         assertEquals(NuvaIntent.OPEN_VOICEMAIL, CommandParser.parse("voicemail khulo")!!.intent)
         assertTrue(CommandParser.parse("facebook post draft")!!.unsupported)
+    }
+
+    // --- Maps/navigation ---------------------------------------------------------------
+
+    @Test
+    fun `directions navigation nearby and street view preserve dynamic places`() {
+        val navigation = CommandParser.parse("navigate to dhaka walking")!!.action as NuvaAction.MapNavigation
+        assertEquals(MapRequestType.NAVIGATION, navigation.requestType)
+        assertEquals("dhaka", navigation.destination)
+        assertEquals(TravelMode.WALKING, navigation.travelMode)
+
+        val directions = CommandParser.parse("from sylhet to dhaka public transport")!!.action as NuvaAction.MapNavigation
+        assertEquals("sylhet", directions.origin)
+        assertEquals("dhaka", directions.destination)
+        assertEquals(TravelMode.TRANSIT, directions.travelMode)
+
+        val nearby = CommandParser.parse("nearby pharmacy")!!.action as NuvaAction.MapNavigation
+        assertEquals(MapRequestType.NEARBY, nearby.requestType)
+        assertEquals("pharmacy", nearby.destination)
+
+        val street = CommandParser.parse("street view 24.8949,91.8687")!!.action as NuvaAction.MapNavigation
+        assertEquals(MapRequestType.STREET_VIEW, street.requestType)
+        assertEquals("24.8949,91.8687", street.destination)
     }
 
     // --- Email compose & notification RemoteInput -------------------------------------

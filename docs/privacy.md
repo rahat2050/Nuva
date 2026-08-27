@@ -15,6 +15,8 @@ no ad SDKs**.
 * Rich calendar event fields are passed to the visible Calendar insert screen and not saved by NUVA.
 * Social/MMS text and a picker-selected attachment go only to the visible Android compose/share intent
   chosen by the user; NUVA does not upload them to its backend or press Post/Send.
+* Maps routes contain only the places the user dictated. NUVA requests no location permission and
+  does not read current coordinates; the selected Maps app manages its own location access.
 * Screen snapshots (`ScreenStateModel`) — transient, in RAM, never persisted or
   uploaded. Password fields are never captured; OTP-like codes are redacted even
   in memory before display.

@@ -50,6 +50,7 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("COMPOSE_SOCIAL_POST"))
         assertNull(NuvaIntent.fromWire("COMPOSE_MMS"))
         assertNull(NuvaIntent.fromWire("OPEN_VOICEMAIL"))
+        assertNull(NuvaIntent.fromWire("MAP_NAVIGATION"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -100,6 +101,7 @@ class ActionJsonTest {
             NuvaAction.ComposeSocialPost(SocialPlatform.FACEBOOK, "hello world"),
             NuvaAction.ComposeMms("01712345678", "hello", attachmentRequested = true),
             NuvaAction.OpenVoicemail,
+            NuvaAction.MapNavigation(MapRequestType.DIRECTIONS, "Dhaka", "Sylhet", TravelMode.TRANSIT),
             NuvaAction.OpenSettingScreen(SettingTarget.AIRPLANE_MODE),
             NuvaAction.OpenSettingScreen(SettingTarget.VPN),
             NuvaAction.OpenSettingScreen(SettingTarget.DEFAULT_APPS),
@@ -282,6 +284,13 @@ class ActionJsonTest {
             buildJsonObject { put("type", "COMPOSE_MMS") },
         )
         assertTrue(emptyMms is CommandValidator.ValidatedAction.Invalid)
+
+        val emptyMap = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "MAP_NAVIGATION"); put("request_type", "directions"); put("destination", "")
+            },
+        )
+        assertTrue(emptyMap is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test
@@ -304,6 +313,7 @@ class ActionJsonTest {
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.COMPOSE_SOCIAL_POST))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.COMPOSE_MMS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.OPEN_VOICEMAIL))
+        assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.MAP_NAVIGATION))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.LIST_SCHEDULED_DRAFTS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.DEVICE_STATUS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CREATE_NOTE))

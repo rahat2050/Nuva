@@ -799,6 +799,13 @@ class CommandExecutor(
                 is BrowserAutomation.Result.Failed -> ExecutionOutcome("failed", r.userReason, r.userReason)
             }
 
+            is NuvaAction.MapNavigation -> when (val result = com.nuva.assistant.automation.MapsNavigation.open(context, action)) {
+                com.nuva.assistant.automation.MapsNavigation.Result.Opened ->
+                    ExecutionOutcome("completed", "Maps e ${action.destination} khulechi.")
+                is com.nuva.assistant.automation.MapsNavigation.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.DeviceStatusQuery ->
                 ExecutionOutcome(
                     "completed",

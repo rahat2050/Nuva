@@ -137,6 +137,15 @@ object ConfirmationSummary {
                 confirmLabelOverride = "CANCEL DRAFT"
             }
 
+            is NuvaAction.MapNavigation -> {
+                title = "Maps handoff"
+                action.origin?.let { lines += Line("শুরু", it) }
+                lines += Line("গন্তব্য", action.destination)
+                lines += Line("Mode", action.travelMode.wireName)
+                detail = "Visible Maps/browser route খুলবে; NUVA current location পড়ে বা save করে না।"
+                confirmLabelOverride = "OPEN MAPS"
+            }
+
             is NuvaAction.ComposeSocialPost -> {
                 title = "Social post draft"
                 lines += Line("Platform", action.platform.wireName)

@@ -401,6 +401,28 @@ def parse_productivity(t):
     details=t.split(" details ",1)[1].strip() if " details " in t else None
     return ok({"kind":"prepareform","form_kind":kind,"details":details},"PREPARE_FORM",risk="MEDIUM",base="MEDIUM")
 
+def parse_map_navigation(t):
+    street=any(w in t for w in ["street view","স্ট্রিট ভিউ"])
+    nearby=any(w in t for w in ["nearby ","near me","kacher ","কাছের "])
+    nav=next((w for w in ["navigate to","navigation to","start navigation","niye jao"] if w in t),None)
+    directions=next((w for w in ["directions to","direction to","route to","rasta dekhao","jawar rasta","kivabe jabo"] if w in t),None)
+    kind="STREET_VIEW" if street else ("NEARBY" if nearby else ("NAVIGATION" if nav else ("DIRECTIONS" if directions or re.search(r"\bfrom\s+.+\s+to\s+.+",t) else None)))
+    if not kind: return None
+    mode="WALKING" if any(w in t for w in ["walking","walk","hete"]) else ("BICYCLING" if any(w in t for w in ["bicycle","cycling","cycle"]) else ("TRANSIT" if any(w in t for w in ["transit","bus e","train e","public transport"]) else "DRIVING"))
+    origin=None; dest=None
+    m=re.search(r"\bfrom\s+(.+?)\s+to\s+(.+)$",t)
+    if m: origin,dest=m.group(1),m.group(2)
+    marker=nav if kind=="NAVIGATION" else (directions if kind=="DIRECTIONS" else ("street view" if kind=="STREET_VIEW" else next((w for w in ["nearby ","kacher ","near me"] if w in t),None)))
+    if dest is None and marker:
+        after=t.split(marker,1)[1].strip(); dest=after if after else t.split(marker,1)[0].strip()
+    def clean(v):
+        if v is None: return None
+        for w in ["walking","walk","driving","drive","bicycle","cycling","transit","public transport"]: v=v.replace(w," ")
+        return re.sub(r"\s+"," ",v).strip(" ,.:?!")
+    origin,dest=clean(origin),clean(dest)
+    if not dest: return unsupported("Destination bolun")
+    return ok({"kind":"mapnav","request_type":kind,"destination":dest,"origin":origin,"mode":mode},"MAP_NAVIGATION")
+
 def parse_communication(t):
     if any(w in t for w in ["voicemail khulo","open voicemail","voicemail dialer"]):
         return ok({"kind":"voicemail"},"OPEN_VOICEMAIL")
@@ -913,7 +935,7 @@ def parse_knowledge(t):
 
 def rule_table(t):
     return (parse_nav(t) or parse_user_file(t) or parse_productivity(t) or parse_communication(t)
-            or parse_grammar(t) or parse_universal(t) or parse_screen(t) or parse_daily(t) or parse_realtime(t)
+            or parse_map_navigation(t) or parse_grammar(t) or parse_universal(t) or parse_screen(t) or parse_daily(t) or parse_realtime(t)
             or parse_status(t) or parse_help(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
@@ -1028,7 +1050,7 @@ registry_ids = re.findall(r'^\s*skill\("([^"]+)"', registry_source, re.MULTILINE
 check(len(registry_ids) == 100 and len(set(registry_ids)) == 100, "exact 100 unique daily skills")
 extended_source = (Path(__file__).parent.parent / "app/src/main/java/com/nuva/assistant/command/ExtendedDailySkillRegistry.kt").read_text()
 check(re.search(r"EXPECTED_SKILL_COUNT\s*=\s*500", extended_source) is not None, "extended registry declares 500 skills")
-check(parse("nearby private tutor")["intent"] == "SEARCH_WEB", "extended service skill")
+check(parse("nearby private tutor")["intent"] == "MAP_NAVIGATION", "extended nearby service maps")
 check(parse("passport ki kagoj lagbe")["intent"] == "SEARCH_WEB", "extended public skill")
 check(parse("excel tutorial")["intent"] == "SEARCH_WEB", "extended learning skill")
 check(parse("washing machine repair")["intent"] == "SEARCH_WEB", "extended product skill")
@@ -1082,6 +1104,11 @@ check(parse("kal 9 tay calendar event create title meeting")["intent"] == "CREAT
 check(parse("facebook post draft je hello")["intent"] == "COMPOSE_SOCIAL_POST", "social post draft")
 check(parse("mms compose 01712345678 photo attachment je hello")["intent"] == "COMPOSE_MMS", "MMS attachment draft")
 check(parse("voicemail khulo")["intent"] == "OPEN_VOICEMAIL", "voicemail dialer")
+check(parse("navigate to dhaka walking")["action"]["mode"] == "WALKING", "walking navigation")
+map_route=parse("from sylhet to dhaka public transport")["action"]
+check(map_route["origin"]=="sylhet" and map_route["destination"]=="dhaka" and map_route["mode"]=="TRANSIT", "transit directions")
+check(parse("nearby pharmacy")["action"]["request_type"] == "NEARBY", "nearby maps")
+check(parse("street view 24.8949,91.8687")["action"]["request_type"] == "STREET_VIEW", "street view")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

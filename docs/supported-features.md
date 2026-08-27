@@ -1,4 +1,4 @@
-# NUVA — Supported features (v3.1)
+# NUVA — Supported features (v3.2)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -87,6 +87,12 @@ services × 5 tasks (100), 20 learning subjects × 5 tasks (100), and 20 househo
 tasks (100). An entity and task must both match, while location/model/error details are preserved.
 All skills are read-only live searches; transaction and credential policies run first.
 Lists: [`100-daily-skills.md`](100-daily-skills.md) · [`500-extended-skills.md`](500-extended-skills.md).
+
+## Maps, routes & navigation — SUPPORTED USER-HANDOFF
+v3.2 opens user-visible maps for directions, turn-by-turn navigation, nearby searches and street-view
+coordinates. Dynamic origin/destination are preserved; driving/walking/bicycling/transit modes map to
+official Google Maps URLs or native geo/navigation intents with browser fallback. NUVA itself reads
+no device location; Maps applies its own user-granted location permission.
 
 ## Device utilities & current information — SUPPORTED
 Torch, battery/time/date/network/storage answers read from the phone at execution time (offline;

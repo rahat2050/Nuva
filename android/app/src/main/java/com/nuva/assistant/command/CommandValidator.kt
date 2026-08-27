@@ -145,7 +145,18 @@ object CommandValidator {
             NuvaIntent.COMPOSE_SOCIAL_POST -> validateSocialPost(actionJson)
             NuvaIntent.COMPOSE_MMS -> validateMms(actionJson)
             NuvaIntent.OPEN_VOICEMAIL -> ValidatedAction.Valid(NuvaAction.OpenVoicemail)
+            NuvaIntent.MAP_NAVIGATION -> validateMapNavigation(actionJson)
         }
+    }
+
+    private fun validateMapNavigation(json: JsonObject): ValidatedAction {
+        val requestType = MapRequestType.fromWire(json.str("request_type"))
+            ?: return ValidatedAction.Invalid(listOf("MAP_NAVIGATION requires request_type"))
+        val destination = json.str("destination")?.takeIf { it.length in 1..300 }
+            ?: return ValidatedAction.Invalid(listOf("MAP_NAVIGATION requires destination"))
+        val origin = json.str("origin")?.takeIf { it.isNotEmpty() && it.length <= 300 }
+        val mode = TravelMode.fromWire(json.str("travel_mode")) ?: TravelMode.DRIVING
+        return ValidatedAction.Valid(NuvaAction.MapNavigation(requestType, destination, origin, mode))
     }
 
     private fun validateSocialPost(json: JsonObject): ValidatedAction {

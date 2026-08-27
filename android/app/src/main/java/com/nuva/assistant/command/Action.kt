@@ -285,6 +285,15 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_VOICEMAIL
     }
 
+    data class MapNavigation(
+        val requestType: MapRequestType,
+        val destination: String,
+        val origin: String?,
+        val travelMode: TravelMode,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.MAP_NAVIGATION
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -436,6 +445,30 @@ enum class CaptureMode(val wireName: String) {
     companion object {
         fun fromWire(value: String?): CaptureMode? =
             entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class MapRequestType(val wireName: String) {
+    DIRECTIONS("directions"),
+    NAVIGATION("navigation"),
+    NEARBY("nearby"),
+    STREET_VIEW("street_view"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): MapRequestType? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class TravelMode(val wireName: String, val navigationCode: String) {
+    DRIVING("driving", "d"),
+    WALKING("walking", "w"),
+    BICYCLING("bicycling", "b"),
+    TRANSIT("transit", "d"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): TravelMode? = entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }
 

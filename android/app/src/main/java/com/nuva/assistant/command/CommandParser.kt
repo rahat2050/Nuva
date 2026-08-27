@@ -208,6 +208,7 @@ object CommandParser {
         ?: parseUserPresentFile(text)
         ?: parseProductivityHandoff(text)
         ?: parseCommunicationCompose(text)
+        ?: parseMapNavigation(text)
         ?: parseUniversal(text)
         ?: parseScreenReading(text)
         ?: parseDailyUtility(text)
@@ -876,6 +877,70 @@ object CommandParser {
             "Email composer khulbo${recipient?.let { " — recipient $it" } ?: ""}${if (attachmentRequested) "; age attachment beche nin" else ""}; Send apni chapben.",
             NuvaRisk.MEDIUM,
         )
+    }
+
+    // --- 2e. Maps directions/navigation (v3.2) -----------------------------------------
+
+    private fun parseMapNavigation(t: String): CommandDecision? {
+        val street = listOf("street view", "রাস্তার ছবি", "স্ট্রিট ভিউ").any { t.contains(it) }
+        val nearby = listOf("nearby ", "near me", "kacher ", "কাছের ", "আশেপাশের ").any { t.contains(it) }
+        val navigationMarker = listOf(
+            "navigate to", "navigation to", "start navigation", "niye jao", "নেভিগেট করো", "নিয়ে যাও", "নিয়ে যাও",
+        ).firstOrNull { t.contains(it) }
+        val directionsMarker = listOf(
+            "directions to", "direction to", "route to", "rasta dekhao", "jawar rasta", "kivabe jabo", "কীভাবে যাব", "কিভাবে যাব", "রাস্তা দেখাও",
+        ).firstOrNull { t.contains(it) }
+        val requestType = when {
+            street -> MapRequestType.STREET_VIEW
+            nearby -> MapRequestType.NEARBY
+            navigationMarker != null -> MapRequestType.NAVIGATION
+            directionsMarker != null || Regex("""\bfrom\s+.+\s+to\s+.+""").containsMatchIn(t) -> MapRequestType.DIRECTIONS
+            else -> return null
+        }
+        val mode = when {
+            listOf("walking", "walk", "hete", "হেঁটে", "পায়ে", "পায়ে").any { t.contains(it) } -> TravelMode.WALKING
+            listOf("bicycle", "cycling", "cycle", "সাইকেল").any { t.contains(it) } -> TravelMode.BICYCLING
+            listOf("transit", "bus e", "train e", "public transport", "বাসে", "ট্রেনে").any { t.contains(it) } -> TravelMode.TRANSIT
+            else -> TravelMode.DRIVING
+        }
+
+        var origin: String? = null
+        var destination: String? = null
+        Regex("""\bfrom\s+(.{1,150}?)\s+to\s+(.{1,150})$""").find(t)?.let { match ->
+            origin = cleanMapPlace(match.groupValues[1])
+            destination = cleanMapPlace(match.groupValues[2])
+        }
+        if (destination == null) {
+            val marker = when (requestType) {
+                MapRequestType.NAVIGATION -> navigationMarker
+                MapRequestType.DIRECTIONS -> directionsMarker
+                MapRequestType.NEARBY -> listOf("nearby ", "kacher ", "কাছের ", "আশেপাশের ").firstOrNull { t.contains(it) }
+                MapRequestType.STREET_VIEW -> listOf("street view", "রাস্তার ছবি", "স্ট্রিট ভিউ").firstOrNull { t.contains(it) }
+            }
+            destination = marker?.let { found ->
+                val after = t.substringAfter(found).trim()
+                if (after.isNotBlank()) cleanMapPlace(after) else cleanMapPlace(t.substringBefore(found))
+            }
+        }
+        if (destination == null && navigationMarker != null && t.contains(navigationMarker)) {
+            destination = cleanMapPlace(t.substringBefore(navigationMarker))
+        }
+        val finalDestination = destination?.takeIf { it.isNotBlank() }?.take(300)
+            ?: return unsupported("Maps-e kothay jaben ba ki khujben, destination bolun.")
+        return ok(
+            NuvaAction.MapNavigation(requestType, finalDestination, origin?.take(300), mode),
+            "Maps-e $finalDestination ${requestType.wireName} khulchi.",
+        )
+    }
+
+    private fun cleanMapPlace(raw: String): String {
+        var value = raw
+        listOf(
+            "walking", "walk", "driving", "drive", "bicycle", "cycling", "transit", "public transport",
+            "hete", "হেঁটে", "পায়ে", "পায়ে", "car e", "গাড়িতে", "গাড়িতে", "dekhao", "show", "please",
+        ).forEach { value = value.replace(it, " ") }
+        TAIL_VERBS.forEach { value = swapWord(value, it) }
+        return value.replace(Regex("""\s+"""), " ").trim(' ', ',', '.', ':', '?', '!')
     }
 
     // --- 3. Device status ---------------------------------------------------------------

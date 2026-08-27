@@ -170,6 +170,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   monitoring, and rich Calendar insert drafts with user-controlled final Save.
 * **v3.1 visible communication**: text-only social compose handoffs, MMS/message compose with one
   picker attachment, and voicemail dialer; final Post/Send/call always user-controlled.
+* **v3.2 maps/navigation**: dynamic origin/destination, route modes, nearby search and coordinate
+  Street View through visible native/web map handoffs; NUVA reads no device location.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

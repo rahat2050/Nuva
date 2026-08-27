@@ -130,6 +130,22 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `map summary exposes origin destination and privacy boundary`() {
+        val summary = ConfirmationSummary.build(
+            NuvaAction.MapNavigation(
+                com.nuva.assistant.command.MapRequestType.DIRECTIONS,
+                "Dhaka",
+                "Sylhet",
+                com.nuva.assistant.command.TravelMode.TRANSIT,
+            ),
+            NuvaRisk.LOW,
+        )
+        assertTrue(summary.lines.any { it.value == "Dhaka" })
+        assertTrue(summary.lines.any { it.value == "Sylhet" })
+        assertTrue(summary.detail.contains("location"))
+    }
+
+    @Test
     fun `social and mms summaries keep final publish user controlled`() {
         val social = ConfirmationSummary.build(
             NuvaAction.ComposeSocialPost(com.nuva.assistant.command.SocialPlatform.FACEBOOK, "hello"),

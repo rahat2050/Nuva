@@ -175,6 +175,11 @@ object ActionJson {
             if (action.attachmentRequested) put("attachment_requested", true)
         }
         is NuvaAction.OpenVoicemail -> buildJsonObject { put("type", "OPEN_VOICEMAIL") }
+        is NuvaAction.MapNavigation -> buildJsonObject {
+            put("type", "MAP_NAVIGATION"); put("request_type", action.requestType.wireName)
+            put("destination", action.destination); put("travel_mode", action.travelMode.wireName)
+            action.origin?.let { put("origin", it) }
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }
