@@ -154,6 +154,17 @@ object ActionJson {
         is NuvaAction.OpenAppManagement -> buildJsonObject {
             put("type", "OPEN_APP_MANAGEMENT"); put("app", action.app); put("panel", action.panel.wireName)
         }
+        is NuvaAction.ClipboardAction -> buildJsonObject {
+            put("type", "CLIPBOARD_ACTION"); put("operation", action.operation.wireName)
+            action.text?.let { put("text", it) }
+        }
+        is NuvaAction.CreateCalendarEvent -> buildJsonObject {
+            put("type", "CREATE_CALENDAR_EVENT"); put("title", action.title)
+            put("begin_at", action.beginAt); put("end_at", action.endAt)
+            action.location?.let { put("location", it) }
+            action.description?.let { put("description", it) }
+            action.attendeeEmail?.let { put("attendee_email", it) }
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

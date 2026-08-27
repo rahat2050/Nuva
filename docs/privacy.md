@@ -10,6 +10,9 @@ no ad SDKs**.
 * Command history, notes, to-dos, memories, settings — local Room/DataStore only.
 * Scheduled email/SMS **draft reminders** (recipient, subject/body, trigger and recurrence) — local Room only;
   AlarmManager carries only the local row id. They are never uploaded or automatically sent.
+* Clipboard access happens only on an explicit foreground copy/read/clear command; NUVA stores no
+  clipboard history and never registers a clipboard-change monitor.
+* Rich calendar event fields are passed to the visible Calendar insert screen and not saved by NUVA.
 * Screen snapshots (`ScreenStateModel`) — transient, in RAM, never persisted or
   uploaded. Password fields are never captured; OTP-like codes are redacted even
   in memory before display.

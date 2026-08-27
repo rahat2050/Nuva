@@ -130,6 +130,23 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `clipboard and calendar summaries expose exact user data`() {
+        val clipboard = ConfirmationSummary.build(
+            NuvaAction.ClipboardAction(com.nuva.assistant.command.ClipboardOperation.COPY, "hello"),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(clipboard.lines.any { it.value.contains("hello") })
+        assertTrue(clipboard.detail.contains("monitoring"))
+
+        val event = ConfirmationSummary.build(
+            NuvaAction.CreateCalendarEvent("meeting", 1_800_000_000_000L, 1_800_003_600_000L, "Khulna", null, null),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(event.lines.any { it.value == "Khulna" })
+        assertTrue(event.detail.contains("Save"))
+    }
+
+    @Test
     fun `file mutation summary promises exact target second confirmation`() {
         val summary = ConfirmationSummary.build(
             NuvaAction.UserFile(UserFileOperation.RENAME_FILE, "report.pdf"),

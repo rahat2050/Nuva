@@ -50,6 +50,8 @@ val SUPPORTED_FEATURES = listOf(
     "Generic text share, new contact draft এবং exact contact picker view/edit — destination/Save user-controlled",
     "Passport/NID/birth/driving/visa/admission/job/doctor/hotel/flight/courier local form draft + official portal handoff",
     "Persistent email/SMS draft reminder — once/daily/weekly, reboot restore, voice list/cancel; tap করলে draft, auto-Send নয়",
+    "Explicit clipboard copy/read/clear — confirmation, bounded/redacted text; কোনো monitoring/history নয়",
+    "Rich calendar event draft — title/time/duration/location/description/attendee; final Save user",
     "কন্টাক্ট খোঁজা — একাধিক মিল হলে আপনি বেছে নেবেন",
     "অ্যালার্ম ও টাইমার (বাংলা/বাংলিশ/ইংরেজি সময়)",
     "ক্যালেন্ডারে রিমাইন্ডার (কনফার্মেশনসহ, Save আপনি চাপবেন)",

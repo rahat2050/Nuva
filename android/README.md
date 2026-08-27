@@ -166,6 +166,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   picker view/edit, and Android-confirmed uninstall for dynamically resolved non-financial apps.
 * **v2.9 settings/app management**: 16 additional official settings screens/panels plus dynamically
   resolved App Info, app-notification and Play Store pages; no secure setting bypass.
+* **v3.0 explicit productivity**: confirmation-gated bounded clipboard copy/read/clear with no
+  monitoring, and rich Calendar insert drafts with user-controlled final Save.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

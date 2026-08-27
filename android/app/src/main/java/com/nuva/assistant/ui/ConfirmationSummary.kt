@@ -137,6 +137,24 @@ object ConfirmationSummary {
                 confirmLabelOverride = "CANCEL DRAFT"
             }
 
+            is NuvaAction.ClipboardAction -> {
+                title = "Clipboard action"
+                lines += Line("কাজ", action.operation.wireName)
+                action.text?.let { lines += Line("লেখা", "“${it.take(500)}”") }
+                detail = "শুধু এই explicit foreground command-এ clipboard access হবে; monitoring/history রাখা হবে না।"
+                confirmLabelOverride = "CONFIRM"
+            }
+
+            is NuvaAction.CreateCalendarEvent -> {
+                title = "Rich calendar event draft"
+                lines += Line("শিরোনাম", action.title)
+                lines += Line("শুরু", java.text.SimpleDateFormat("d MMM, h:mm a", java.util.Locale.ENGLISH).format(java.util.Date(action.beginAt)))
+                action.location?.let { lines += Line("স্থান", it) }
+                action.attendeeEmail?.let { lines += Line("Attendee", it) }
+                detail = "Calendar app-এ prefilled event খুলবে; final Save আপনি চাপবেন।"
+                confirmLabelOverride = "CONTINUE"
+            }
+
             is NuvaAction.ShareText -> {
                 title = "Text share sheet খুলবে"
                 lines += Line("লেখা", "“${action.text.take(500)}”")

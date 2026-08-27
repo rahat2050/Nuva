@@ -140,7 +140,39 @@ object CommandValidator {
             NuvaIntent.CONTACT_HANDOFF -> validateContactHandoff(actionJson)
             NuvaIntent.UNINSTALL_APP -> validateUninstallApp(actionJson)
             NuvaIntent.OPEN_APP_MANAGEMENT -> validateOpenAppManagement(actionJson)
+            NuvaIntent.CLIPBOARD_ACTION -> validateClipboardAction(actionJson)
+            NuvaIntent.CREATE_CALENDAR_EVENT -> validateCalendarEvent(actionJson)
         }
+    }
+
+    private fun validateClipboardAction(json: JsonObject): ValidatedAction {
+        val operation = ClipboardOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("CLIPBOARD_ACTION requires operation"))
+        val text = json.str("text")
+        if (operation == ClipboardOperation.COPY && (text.isNullOrEmpty() || text.length > 5_000)) {
+            return ValidatedAction.Invalid(listOf("clipboard copy requires text"))
+        }
+        if (operation != ClipboardOperation.COPY && text != null) {
+            return ValidatedAction.Invalid(listOf("clipboard text is only allowed for copy"))
+        }
+        return ValidatedAction.Valid(NuvaAction.ClipboardAction(operation, text))
+    }
+
+    private fun validateCalendarEvent(json: JsonObject): ValidatedAction {
+        val title = json.str("title")?.takeIf { it.length in 1..200 }
+            ?: return ValidatedAction.Invalid(listOf("calendar event requires title"))
+        val begin = json.long("begin_at")?.takeIf { it in 1..4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("calendar event requires begin_at"))
+        val end = json.long("end_at")?.takeIf { it > begin && it <= 4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("calendar event requires end_at after begin_at"))
+        val location = json.str("location")?.takeIf { it.isNotEmpty() && it.length <= 300 }
+        val description = json.str("description")?.takeIf { it.isNotEmpty() && it.length <= 2_000 }
+        val rawAttendee = json.str("attendee_email")
+        val attendee = rawAttendee?.takeIf { EMAIL_PATTERN.matches(it) }
+        if (rawAttendee != null && attendee == null) {
+            return ValidatedAction.Invalid(listOf("calendar attendee email is invalid"))
+        }
+        return ValidatedAction.Valid(NuvaAction.CreateCalendarEvent(title, begin, end, location, description, attendee))
     }
 
     private fun validateOpenAppManagement(json: JsonObject): ValidatedAction {

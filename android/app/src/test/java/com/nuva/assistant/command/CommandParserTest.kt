@@ -345,6 +345,33 @@ class CommandParserTest {
     }
 
     @Test
+    fun `clipboard operations are explicit bounded and confirmation gated`() {
+        val copy = CommandParser.parse("clipboard e copy koro je meeting kal 9 tay")!!
+        val copyAction = copy.action as NuvaAction.ClipboardAction
+        assertEquals(ClipboardOperation.COPY, copyAction.operation)
+        assertEquals("meeting kal 9 tay", copyAction.text)
+        assertTrue(copy.requiresConfirmation)
+
+        assertEquals(ClipboardOperation.READ, (CommandParser.parse("clipboard poro")!!.action as NuvaAction.ClipboardAction).operation)
+        assertEquals(ClipboardOperation.CLEAR, (CommandParser.parse("clipboard clear koro")!!.action as NuvaAction.ClipboardAction).operation)
+        assertTrue(CommandParser.parse("copy to clipboard")!!.unsupported)
+    }
+
+    @Test
+    fun `rich calendar event parses title duration location description and attendee`() {
+        val decision = CommandParser.parse(
+            "kal 9 tay 2 hour calendar event create title project meeting location khulna description roadmap attendee user@example.com",
+        )!!
+        val event = decision.action as NuvaAction.CreateCalendarEvent
+        assertEquals("project meeting", event.title)
+        assertEquals("khulna", event.location)
+        assertEquals("roadmap", event.description)
+        assertEquals("user@example.com", event.attendeeEmail)
+        assertEquals(7_200_000L, event.endAt - event.beginAt)
+        assertTrue(decision.requiresConfirmation)
+    }
+
+    @Test
     fun `one safe notification can be dismissed or marked read after confirmation`() {
         val dismiss = CommandParser.parse("2 number notification dismiss koro")!!
         val dismissAction = dismiss.action as NuvaAction.ManageNotification

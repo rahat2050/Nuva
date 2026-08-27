@@ -45,6 +45,8 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("CONTACT_HANDOFF"))
         assertNull(NuvaIntent.fromWire("UNINSTALL_APP"))
         assertNull(NuvaIntent.fromWire("OPEN_APP_MANAGEMENT"))
+        assertNull(NuvaIntent.fromWire("CLIPBOARD_ACTION"))
+        assertNull(NuvaIntent.fromWire("CREATE_CALENDAR_EVENT"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -87,6 +89,11 @@ class ActionJsonTest {
             NuvaAction.ContactHandoff(ContactHandoffOperation.EDIT),
             NuvaAction.UninstallApp("facebook"),
             NuvaAction.OpenAppManagement("whatsapp", AppManagementPanel.NOTIFICATIONS),
+            NuvaAction.ClipboardAction(ClipboardOperation.COPY, "hello"),
+            NuvaAction.ClipboardAction(ClipboardOperation.READ),
+            NuvaAction.CreateCalendarEvent(
+                "meeting", 1_800_000_000_000L, 1_800_003_600_000L, "Khulna", "project", "user@example.com",
+            ),
             NuvaAction.OpenSettingScreen(SettingTarget.AIRPLANE_MODE),
             NuvaAction.OpenSettingScreen(SettingTarget.VPN),
             NuvaAction.OpenSettingScreen(SettingTarget.DEFAULT_APPS),
@@ -246,6 +253,19 @@ class ActionJsonTest {
             },
         )
         assertTrue(badAppPanel is CommandValidator.ValidatedAction.Invalid)
+
+        val emptyClipboardCopy = CommandValidator.validateAction(
+            buildJsonObject { put("type", "CLIPBOARD_ACTION"); put("operation", "copy") },
+        )
+        assertTrue(emptyClipboardCopy is CommandValidator.ValidatedAction.Invalid)
+
+        val badCalendar = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "CREATE_CALENDAR_EVENT"); put("title", "meeting")
+                put("begin_at", 2_000L); put("end_at", 1_000L)
+            },
+        )
+        assertTrue(badCalendar is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test
@@ -263,6 +283,8 @@ class ActionJsonTest {
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.MANAGE_NOTIFICATION))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CONTACT_HANDOFF))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.UNINSTALL_APP))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CLIPBOARD_ACTION))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CREATE_CALENDAR_EVENT))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.LIST_SCHEDULED_DRAFTS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.DEVICE_STATUS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CREATE_NOTE))

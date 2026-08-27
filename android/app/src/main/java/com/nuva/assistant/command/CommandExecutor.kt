@@ -607,6 +607,30 @@ class CommandExecutor(
                 }
             }
 
+            is NuvaAction.ClipboardAction -> when (
+                val result = com.nuva.assistant.automation.ClipboardController.execute(context, action)
+            ) {
+                is com.nuva.assistant.automation.ClipboardController.Result.Done ->
+                    ExecutionOutcome("completed", result.speech, screenText = result.content)
+                com.nuva.assistant.automation.ClipboardController.Result.Empty ->
+                    ExecutionOutcome("completed", "Clipboard ekhon khali.")
+                com.nuva.assistant.automation.ClipboardController.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive/financial clipboard content handle korbo na.", "sensitive clipboard blocked")
+                is com.nuva.assistant.automation.ClipboardController.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.CreateCalendarEvent -> when (
+                val result = com.nuva.assistant.automation.CalendarEventHandoff.open(context, action)
+            ) {
+                com.nuva.assistant.automation.CalendarEventHandoff.Result.Opened ->
+                    ExecutionOutcome("completed", "Calendar event draft khulechi — final Save apni chapun.")
+                com.nuva.assistant.automation.CalendarEventHandoff.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive ba financial event details blocked.", "sensitive calendar event blocked")
+                is com.nuva.assistant.automation.CalendarEventHandoff.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.ShareText -> when (val result = com.nuva.assistant.automation.ProductivityHandoff.shareText(context, action)) {
                 is com.nuva.assistant.automation.ProductivityHandoff.Result.Opened ->
                     ExecutionOutcome("completed", result.speech)

@@ -254,6 +254,21 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_APP_MANAGEMENT
     }
 
+    data class ClipboardAction(val operation: ClipboardOperation, val text: String? = null) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CLIPBOARD_ACTION
+    }
+
+    data class CreateCalendarEvent(
+        val title: String,
+        val beginAt: Long,
+        val endAt: Long,
+        val location: String?,
+        val description: String?,
+        val attendeeEmail: String?,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CREATE_CALENDAR_EVENT
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -404,6 +419,18 @@ enum class CaptureMode(val wireName: String) {
 
     companion object {
         fun fromWire(value: String?): CaptureMode? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class ClipboardOperation(val wireName: String) {
+    COPY("copy"),
+    READ("read"),
+    CLEAR("clear"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): ClipboardOperation? =
             entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }

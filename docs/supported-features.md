@@ -1,4 +1,4 @@
-# NUVA — Supported features (v2.9)
+# NUVA — Supported features (v3.0)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -40,6 +40,12 @@ user-controlled. Email can include one picker-selected attachment. Email/SMS com
 persist in Room, support once/daily/weekly schedules, restore after reboot/app update, and can be
 listed/cancelled by voice. Tapping a notification opens a prefilled draft and never auto-sends.
 Notification permission is required. Details: [`persistent-scheduled-drafts.md`](persistent-scheduled-drafts.md).
+
+## Clipboard & rich calendar — EXPLICIT/USER-REVIEWED SUPPORTED
+v3.0 supports explicit foreground clipboard copy/read/clear with blocking confirmation, bounded text,
+OTP-like redaction and runtime credential/financial checks. There is no clipboard monitoring/history.
+Rich Calendar insert drafts support title, begin/end duration, location, description and one attendee
+email; the visible Calendar app owns final Save. Sensitive/financial event details are refused.
 
 ## Media & camera — SUPPORTED / ANDROID-LIMITED
 YouTube search/play, Spotify fallback, pause/resume/next/previous (active MediaSession —

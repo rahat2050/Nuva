@@ -326,6 +326,22 @@ def parse_user_file(t):
     return None
 
 def parse_productivity(t):
+    if any(w in t for w in ["clipboard poro","read clipboard","clipboard e ki ache"]):
+        return ok({"kind":"clipboard","operation":"READ"},"CLIPBOARD_ACTION",risk="MEDIUM",base="MEDIUM")
+    if any(w in t for w in ["clipboard clear","clear clipboard","clipboard muchhe"]):
+        return ok({"kind":"clipboard","operation":"CLEAR"},"CLIPBOARD_ACTION",risk="MEDIUM",base="MEDIUM")
+    clip_marker=next((w for w in ["clipboard e copy koro","copy to clipboard","copy text","clipboard e rakho"] if w in t),None)
+    if clip_marker:
+        text=content_after(t,clip_marker)
+        if text: text=re.sub(r"^(je|যে)\s+","",text).strip()
+        if not text: return unsupported("Clipboard text bolun")
+        return ok({"kind":"clipboard","operation":"COPY","text":text},"CLIPBOARD_ACTION",risk="MEDIUM",base="MEDIUM")
+    if any(w in t for w in ["calendar event create","calendar event add","meeting create","event draft"]):
+        tm=parse_time(t)
+        if not tm: return unsupported("Event time bolun")
+        m=re.search(r"\s(?:title|name)\s+(.+?)(?=\s+(?:location|description|attendee|email)\s|$)",t)
+        if not m: return unsupported("Event title bolun")
+        return ok({"kind":"calendarevent","title":m.group(1).strip(),"time":tm},"CREATE_CALENDAR_EVENT",risk="MEDIUM",base="MEDIUM")
     panel=None
     if any(w in t for w in ["app info","application info","app details"]): panel="APP_INFO"
     elif any(w in t for w in ["notification setting","notification settings"]): panel="NOTIFICATIONS"
@@ -878,8 +894,8 @@ def parse_knowledge(t):
     return None
 
 def rule_table(t):
-    return (parse_grammar(t) or parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_user_file(t)
-            or parse_productivity(t) or parse_communication(t) or parse_daily(t) or parse_realtime(t)
+    return (parse_nav(t) or parse_user_file(t) or parse_productivity(t) or parse_communication(t)
+            or parse_grammar(t) or parse_universal(t) or parse_screen(t) or parse_daily(t) or parse_realtime(t)
             or parse_status(t) or parse_help(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
@@ -1041,6 +1057,10 @@ check(parse("airplane mode setting khulo")["action"]["kind"] == "AIRPLANE_MODE",
 check(parse("vpn setting khulo")["action"]["kind"] == "VPN", "vpn settings")
 check(parse("battery saver setting khulo")["action"]["kind"] == "BATTERY_SAVER", "battery saver settings")
 check(parse("storage setting khulo")["action"]["kind"] == "STORAGE_SETTINGS", "storage settings")
+check(parse("clipboard e copy koro je hello")["action"]["operation"] == "COPY", "clipboard copy")
+check(parse("clipboard poro")["action"]["operation"] == "READ", "clipboard read")
+check(parse("clipboard clear koro")["action"]["operation"] == "CLEAR", "clipboard clear")
+check(parse("kal 9 tay calendar event create title meeting")["intent"] == "CREATE_CALENDAR_EVENT", "rich calendar event")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

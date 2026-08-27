@@ -205,11 +205,11 @@ object CommandParser {
     }
 
     private fun ruleTable(text: String): CommandDecision? = parseNavigation(text)
-        ?: parseUniversal(text)
-        ?: parseScreenReading(text)
         ?: parseUserPresentFile(text)
         ?: parseProductivityHandoff(text)
         ?: parseCommunicationCompose(text)
+        ?: parseUniversal(text)
+        ?: parseScreenReading(text)
         ?: parseDailyUtility(text)
         ?: parseRealtimeInfo(text)
         ?: parseDeviceStatus(text)
@@ -538,6 +538,55 @@ object CommandParser {
     // --- 2c. Forms/productivity handoff + scheduled compose reminder (v2.4) ------------
 
     private fun parseProductivityHandoff(t: String): CommandDecision? {
+        if (listOf("clipboard poro", "read clipboard", "clipboard e ki ache", "ক্লিপবোর্ড পড়ো", "ক্লিপবোর্ডে কী আছে")
+                .any { t.contains(it) }
+        ) {
+            return ok(NuvaAction.ClipboardAction(ClipboardOperation.READ), "Clipboard porbo — nishchit korun.", NuvaRisk.MEDIUM)
+        }
+        if (listOf("clipboard clear", "clear clipboard", "clipboard muchhe", "ক্লিপবোর্ড মুছো", "ক্লিপবোর্ড পরিষ্কার")
+                .any { t.contains(it) }
+        ) {
+            return ok(NuvaAction.ClipboardAction(ClipboardOperation.CLEAR), "Clipboard clear korbo — nishchit korun.", NuvaRisk.MEDIUM)
+        }
+        val clipboardCopyMarker = listOf(
+            "clipboard e copy koro", "copy to clipboard", "copy text", "clipboard e rakho", "ক্লিপবোর্ডে কপি", "ক্লিপবোর্ডে রাখো",
+        ).firstOrNull { t.contains(it) }
+        if (clipboardCopyMarker != null) {
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            var text = quoted ?: contentAfter(t, clipboardCopyMarker)
+            text = text?.removePrefix("je ")?.removePrefix("যে ")?.trim()
+            if (text.isNullOrBlank()) return unsupported("Clipboard-e kon text copy korbo?")
+            return ok(NuvaAction.ClipboardAction(ClipboardOperation.COPY, text.take(5_000)), "Text copy korbo — nishchit korun.", NuvaRisk.MEDIUM)
+        }
+
+        val calendarRequested = listOf(
+            "calendar event create", "calendar event add", "meeting create", "event draft", "ক্যালেন্ডার ইভেন্ট", "মিটিং তৈরি",
+        ).any { t.contains(it) }
+        if (calendarRequested) {
+            val parsedTime = NuvaDateTimeParser.parseTime(t)
+                ?: return unsupported("Calendar event-er time bolun.")
+            val begin = com.nuva.assistant.automation.ScheduledComposeScheduler.nextTrigger(t, parsedTime.hour, parsedTime.minute)
+            val durationSeconds = NuvaDateTimeParser.parseDuration(t)?.takeIf { it in 60..86_400 } ?: 3_600L
+            val titleMarker = listOf(" title ", " name ", " শিরোনাম ", " নাম ").firstOrNull { t.contains(it) }
+            val eventTitle = titleMarker?.let { marker ->
+                t.substringAfter(marker)
+                    .substringBefore(" location ").substringBefore(" description ").substringBefore(" attendee ")
+                    .substringBefore(" email ").substringBefore(" স্থান ").substringBefore(" বিবরণ ")
+                    .trim(' ', ',', '.', ':')
+            }?.takeIf { it.isNotBlank() }?.take(200)
+                ?: return unsupported("Calendar event-er title bolun.")
+            val location = listOf(" location ", " স্থান ").firstOrNull { t.contains(it) }
+                ?.let { marker -> t.substringAfter(marker).substringBefore(" description ").substringBefore(" attendee ").substringBefore(" email ").trim(' ', ',', '.', ':').take(300) }
+            val description = listOf(" description ", " বিবরণ ").firstOrNull { t.contains(it) }
+                ?.let { marker -> t.substringAfter(marker).substringBefore(" attendee ").substringBefore(" email ").trim(' ', ',', '.', ':').take(2_000) }
+            val attendee = EMAIL_ADDRESS.find(t)?.value
+            return ok(
+                NuvaAction.CreateCalendarEvent(eventTitle, begin, begin + durationSeconds * 1_000, location, description, attendee),
+                "Rich calendar event draft khulbo — final Save apni chapben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
         val managementPanel = when {
             listOf("app info", "application info", "app details", "অ্যাপ ইনফো").any { t.contains(it) } ->
                 AppManagementPanel.APP_INFO
