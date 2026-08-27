@@ -93,7 +93,12 @@ class ConfirmationSummaryTest {
             NuvaRisk.MEDIUM,
         )
         assertTrue(schedule.detail.contains("automatic Send"))
+        assertTrue(schedule.lines.any { it.label == "Repeat" && it.value == "once" })
         assertEquals("SCHEDULE", schedule.confirmLabel)
+
+        val cancel = ConfirmationSummary.build(NuvaAction.CancelScheduledDraft(2), NuvaRisk.MEDIUM)
+        assertTrue(cancel.lines.any { it.value.contains("2") })
+        assertEquals("CANCEL DRAFT", cancel.confirmLabel)
     }
 
     @Test

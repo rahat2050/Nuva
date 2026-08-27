@@ -527,6 +527,24 @@ object CommandParser {
     // --- 2c. Forms/productivity handoff + scheduled compose reminder (v2.4) ------------
 
     private fun parseProductivityHandoff(t: String): CommandDecision? {
+        val scheduledDraftWords = listOf("scheduled draft", "scheduled email", "scheduled sms", "compose reminder", "শিডিউল ড্রাফট")
+        if (scheduledDraftWords.any { t.contains(it) } &&
+            listOf("list", "dekhao", "poro", "show", "দেখাও", "পড়ো").any { t.contains(it) }
+        ) {
+            return ok(NuvaAction.ListScheduledDrafts, "Scheduled draft list porchi.")
+        }
+        if (scheduledDraftWords.any { t.contains(it) } &&
+            listOf("cancel", "batil", "বাতিল", "remove").any { t.contains(it) }
+        ) {
+            val ordinal = Regex("""(\d+)\s*(number|no|tomo|তম)?""").find(t)
+                ?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(1, 100) ?: 1
+            return ok(
+                NuvaAction.CancelScheduledDraft(ordinal),
+                "$ordinal number scheduled draft cancel korbo — nishchit korun.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
         val scheduled = listOf(
             "schedule email", "scheduled email", "email reminder", "schedule sms", "scheduled sms",
             "message compose reminder", "ইমেইল রিমাইন্ডার", "এসএমএস রিমাইন্ডার",
@@ -546,8 +564,15 @@ object CommandParser {
             val bodyMarker = listOf(" body ", " message ", " je ", " যে ").firstOrNull { t.contains(it) }
             val body = quoted ?: bodyMarker?.let { t.substringAfter(it).trim(' ', ',', '.', ':') }
             if (body.isNullOrBlank()) return unsupported("Reminder-er compose body/message ta bolun.")
+            val recurrence = when {
+                listOf("protidin", "pratidin", "daily", "every day", "প্রতিদিন", "রোজ").any { t.contains(it) } ->
+                    ComposeRecurrence.DAILY
+                listOf("weekly", "every week", "proti shoptaho", "প্রতি সপ্তাহ").any { t.contains(it) } ||
+                    NuvaDateTimeParser.weekday(t) != null -> ComposeRecurrence.WEEKLY
+                else -> ComposeRecurrence.ONCE
+            }
             return ok(
-                NuvaAction.ScheduleCompose(channel, recipient, subject, body.take(2_000), triggerAt),
+                NuvaAction.ScheduleCompose(channel, recipient, subject, body.take(2_000), triggerAt, recurrence),
                 "Compose reminder schedule korbo — notification tap korle draft khulbe; Send apni chapben.",
                 NuvaRisk.MEDIUM,
             )

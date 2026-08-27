@@ -158,6 +158,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   with sourced portal handoff, and one-shot email/SMS compose reminders that open drafts on tap.
 * **v2.5 target-aware files**: selected-file rename/delete and source+destination copy/move with a
   second target-aware confirmation; selected-photo `ACTION_EDIT` handoff with user-controlled Save.
+* **v2.6 persistent drafts**: Room-backed once/daily/weekly email/SMS compose reminders, pending-list
+  and confirmed cancellation commands, plus BOOT_COMPLETED/app-update restoration.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

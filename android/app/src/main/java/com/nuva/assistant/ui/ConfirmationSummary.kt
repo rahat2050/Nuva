@@ -120,8 +120,16 @@ object ConfirmationSummary {
                 action.recipient?.let { lines += Line("প্রাপক", it) }
                 action.subject?.let { lines += Line("বিষয়", it) }
                 lines += Line("Draft", action.body.take(500))
-                detail = "সময় হলে notification আসবে; tap করলে draft খুলবে, automatic Send হবে না।"
+                lines += Line("Repeat", action.recurrence.wireName)
+                detail = "সময় হলে notification আসবে; tap করলে draft খুলবে, automatic Send হবে না। Reboot/app update-এর পর pending alarm restore হবে।"
                 confirmLabelOverride = "SCHEDULE"
+            }
+
+            is NuvaAction.CancelScheduledDraft -> {
+                title = "Scheduled draft বাতিল হবে"
+                lines += Line("Draft", "${action.ordinal} নম্বর")
+                detail = "Pending local alarm ও draft status cancel করা হবে।"
+                confirmLabelOverride = "CANCEL DRAFT"
             }
 
             is NuvaAction.ReplyNotification -> {

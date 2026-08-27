@@ -1,5 +1,6 @@
 package com.nuva.assistant.automation
 
+import com.nuva.assistant.command.ComposeRecurrence
 import java.util.Calendar
 import java.util.TimeZone
 import org.junit.Assert.assertEquals
@@ -33,6 +34,13 @@ class ScheduledComposeSchedulerTest {
         }
         assertEquals(26, future.get(Calendar.DAY_OF_MONTH))
         assertEquals(22, future.get(Calendar.HOUR_OF_DAY))
+    }
+
+    @Test
+    fun `recurring trigger advances past missed periods`() {
+        val day = 86_400_000L
+        assertEquals(4 * day, ScheduledComposeScheduler.nextRecurringTrigger(day, ComposeRecurrence.DAILY, 3 * day))
+        assertEquals(8 * day, ScheduledComposeScheduler.nextRecurringTrigger(day, ComposeRecurrence.WEEKLY, 3 * day))
     }
 
     @Test

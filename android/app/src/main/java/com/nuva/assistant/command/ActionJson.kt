@@ -127,7 +127,11 @@ object ActionJson {
             put("type", "SCHEDULE_COMPOSE"); put("channel", action.channel.wireName)
             action.recipient?.let { put("recipient", it) }
             action.subject?.let { put("subject", it) }
-            put("body", action.body); put("trigger_at", action.triggerAt)
+            put("body", action.body); put("trigger_at", action.triggerAt); put("recurrence", action.recurrence.wireName)
+        }
+        is NuvaAction.ListScheduledDrafts -> buildJsonObject { put("type", "LIST_SCHEDULED_DRAFTS") }
+        is NuvaAction.CancelScheduledDraft -> buildJsonObject {
+            put("type", "CANCEL_SCHEDULED_DRAFT"); put("ordinal", action.ordinal)
         }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)

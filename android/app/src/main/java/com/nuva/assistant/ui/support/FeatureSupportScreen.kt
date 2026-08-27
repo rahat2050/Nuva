@@ -48,7 +48,7 @@ val SUPPORTED_FEATURES = listOf(
     "Telegram / Messenger / Signal / Viber / IMO — মেসেজ লেখা বসিয়ে অ্যাপ খোলে, Send আপনি চাপবেন",
     "Email recipient/subject/body prefill; চাইলে Android picker থেকে এক attachment — final Send আপনি চাপবেন",
     "Passport/NID/birth/driving/visa/admission/job/doctor/hotel/flight/courier local form draft + official portal handoff",
-    "Email/SMS scheduled compose reminder — সময় হলে notification, tap করলে draft; automatic Send নয়",
+    "Persistent email/SMS draft reminder — once/daily/weekly, reboot restore, voice list/cancel; tap করলে draft, auto-Send নয়",
     "কন্টাক্ট খোঁজা — একাধিক মিল হলে আপনি বেছে নেবেন",
     "অ্যালার্ম ও টাইমার (বাংলা/বাংলিশ/ইংরেজি সময়)",
     "ক্যালেন্ডারে রিমাইন্ডার (কনফার্মেশনসহ, Save আপনি চাপবেন)",

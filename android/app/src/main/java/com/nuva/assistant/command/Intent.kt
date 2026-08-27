@@ -54,6 +54,8 @@ enum class NuvaIntent(val wireName: String, val localOnly: Boolean = false) {
     REPLY_NOTIFICATION("REPLY_NOTIFICATION", localOnly = true),
     PREPARE_FORM("PREPARE_FORM", localOnly = true),
     SCHEDULE_COMPOSE("SCHEDULE_COMPOSE", localOnly = true),
+    LIST_SCHEDULED_DRAFTS("LIST_SCHEDULED_DRAFTS", localOnly = true),
+    CANCEL_SCHEDULED_DRAFT("CANCEL_SCHEDULED_DRAFT", localOnly = true),
     ;
 
     companion object {
@@ -87,6 +89,7 @@ fun baselineRisk(intent: NuvaIntent): NuvaRisk = when (intent) {
     NuvaIntent.REPLY_NOTIFICATION,
     NuvaIntent.PREPARE_FORM,
     NuvaIntent.SCHEDULE_COMPOSE,
+    NuvaIntent.CANCEL_SCHEDULED_DRAFT,
     // Policy §37: calendar edits always confirm (we prefill, the user saves).
     NuvaIntent.SET_REMINDER,
     -> NuvaRisk.MEDIUM

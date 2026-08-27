@@ -1,4 +1,4 @@
-# NUVA — Supported features (v2.5)
+# NUVA — Supported features (v2.6)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -32,9 +32,10 @@ Email recipient/subject/body compose is **SUPPORTED user-reviewed**: email app o
 v2.4 can store an explicitly dictated local draft and open a sourced official-portal search for
 passport, NID, birth registration, driving licence, visa, admission, job, doctor, hotel, flight and
 courier forms. Personal details are never placed in the web query; final form entry/upload/Submit is
-user-controlled. Email can now include one picker-selected attachment. Email/SMS compose reminders
-schedule a local alarm notification; tapping it opens a prefilled draft and never auto-sends. These
-reminders require notification permission and do not survive a device reboot.
+user-controlled. Email can include one picker-selected attachment. Email/SMS compose reminders
+persist in Room, support once/daily/weekly schedules, restore after reboot/app update, and can be
+listed/cancelled by voice. Tapping a notification opens a prefilled draft and never auto-sends.
+Notification permission is required. Details: [`persistent-scheduled-drafts.md`](persistent-scheduled-drafts.md).
 
 ## Media & camera — SUPPORTED / ANDROID-LIMITED
 YouTube search/play, Spotify fallback, pause/resume/next/previous (active MediaSession —

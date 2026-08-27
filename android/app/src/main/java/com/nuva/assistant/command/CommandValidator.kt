@@ -132,7 +132,14 @@ object CommandValidator {
             NuvaIntent.REPLY_NOTIFICATION -> validateReplyNotification(actionJson)
             NuvaIntent.PREPARE_FORM -> validatePrepareForm(actionJson)
             NuvaIntent.SCHEDULE_COMPOSE -> validateScheduleCompose(actionJson)
+            NuvaIntent.LIST_SCHEDULED_DRAFTS -> ValidatedAction.Valid(NuvaAction.ListScheduledDrafts)
+            NuvaIntent.CANCEL_SCHEDULED_DRAFT -> validateCancelScheduledDraft(actionJson)
         }
+    }
+
+    private fun validateCancelScheduledDraft(json: JsonObject): ValidatedAction {
+        val ordinal = json.int("ordinal")?.takeIf { it in 1..100 } ?: 1
+        return ValidatedAction.Valid(NuvaAction.CancelScheduledDraft(ordinal))
     }
 
     private fun validatePrepareForm(json: JsonObject): ValidatedAction {
@@ -158,7 +165,12 @@ object CommandValidator {
             ?: return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE requires body"))
         val triggerAt = json.long("trigger_at")?.takeIf { it in 1..4_102_444_800_000L }
             ?: return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE requires valid trigger_at"))
-        return ValidatedAction.Valid(NuvaAction.ScheduleCompose(channel, recipient, subject, body, triggerAt))
+        val rawRecurrence = json.str("recurrence")
+        val recurrence = ComposeRecurrence.fromWire(rawRecurrence) ?: ComposeRecurrence.ONCE
+        if (rawRecurrence != null && ComposeRecurrence.fromWire(rawRecurrence) == null) {
+            return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE recurrence is invalid"))
+        }
+        return ValidatedAction.Valid(NuvaAction.ScheduleCompose(channel, recipient, subject, body, triggerAt, recurrence))
     }
 
     private fun validateComposeEmail(json: JsonObject): ValidatedAction {

@@ -37,6 +37,8 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("REPLY_NOTIFICATION"))
         assertNull(NuvaIntent.fromWire("PREPARE_FORM"))
         assertNull(NuvaIntent.fromWire("SCHEDULE_COMPOSE"))
+        assertNull(NuvaIntent.fromWire("LIST_SCHEDULED_DRAFTS"))
+        assertNull(NuvaIntent.fromWire("CANCEL_SCHEDULED_DRAFT"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -62,7 +64,16 @@ class ActionJsonTest {
             NuvaAction.ComposeEmail(null, null, null, attachmentRequested = true),
             NuvaAction.ReplyNotification(2, "ami ashchi"),
             NuvaAction.PrepareForm(FormKind.PASSPORT, "name and address draft"),
-            NuvaAction.ScheduleCompose(ComposeChannel.EMAIL, "user@example.com", "meeting", "kal ashben", 1_800_000_000_000L),
+            NuvaAction.ScheduleCompose(
+                ComposeChannel.EMAIL,
+                "user@example.com",
+                "meeting",
+                "kal ashben",
+                1_800_000_000_000L,
+                ComposeRecurrence.WEEKLY,
+            ),
+            NuvaAction.ListScheduledDrafts,
+            NuvaAction.CancelScheduledDraft(2),
             NuvaAction.OpenSettingScreen(SettingTarget.TORCH),
             NuvaAction.ReadNotifications,
             NuvaAction.SetReminder("medicine", 1_770_000_000_000L, "kal"),
@@ -166,6 +177,17 @@ class ActionJsonTest {
             },
         )
         assertTrue(badSchedule is CommandValidator.ValidatedAction.Invalid)
+
+        val badRecurrence = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "SCHEDULE_COMPOSE")
+                put("channel", "email")
+                put("body", "hello")
+                put("trigger_at", 1_800_000_000_000L)
+                put("recurrence", "every_second")
+            },
+        )
+        assertTrue(badRecurrence is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test
@@ -177,6 +199,8 @@ class ActionJsonTest {
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.REPLY_NOTIFICATION))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.PREPARE_FORM))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SCHEDULE_COMPOSE))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CANCEL_SCHEDULED_DRAFT))
+        assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.LIST_SCHEDULED_DRAFTS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.DEVICE_STATUS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CREATE_NOTE))
     }

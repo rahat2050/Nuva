@@ -209,8 +209,17 @@ sealed interface NuvaAction {
         val subject: String?,
         val body: String,
         val triggerAt: Long,
+        val recurrence: ComposeRecurrence = ComposeRecurrence.ONCE,
     ) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.SCHEDULE_COMPOSE
+    }
+
+    data object ListScheduledDrafts : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.LIST_SCHEDULED_DRAFTS
+    }
+
+    data class CancelScheduledDraft(val ordinal: Int) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CANCEL_SCHEDULED_DRAFT
     }
 
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
@@ -374,6 +383,17 @@ enum class ComposeChannel(val wireName: String) {
 
     companion object {
         fun fromWire(value: String?): ComposeChannel? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class ComposeRecurrence(val wireName: String, val days: Int) {
+    ONCE("once", 0),
+    DAILY("daily", 1),
+    WEEKLY("weekly", 7),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): ComposeRecurrence? = entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }
 

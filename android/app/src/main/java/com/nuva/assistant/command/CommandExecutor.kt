@@ -635,10 +635,26 @@ class CommandExecutor(
                 val result = com.nuva.assistant.automation.ScheduledComposeScheduler.schedule(context, action)
             ) {
                 is com.nuva.assistant.automation.ScheduledComposeScheduler.Result.Scheduled ->
-                    ExecutionOutcome("completed", "Compose reminder schedule hoyeche — notification tap korle draft khulbe.")
+                    ExecutionOutcome("completed", "Compose reminder #${result.id} schedule hoyeche — notification tap korle draft khulbe.")
                 com.nuva.assistant.automation.ScheduledComposeScheduler.Result.NotificationPermissionMissing ->
                     ExecutionOutcome("failed", "Scheduled draft-er jonno notification permission lagbe.", "notification permission missing")
                 is com.nuva.assistant.automation.ScheduledComposeScheduler.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ListScheduledDrafts -> {
+                val (speech, screen) = com.nuva.assistant.automation.ScheduledComposeScheduler.pendingSpeech()
+                ExecutionOutcome("completed", speech, screenText = screen)
+            }
+
+            is NuvaAction.CancelScheduledDraft -> when (
+                val result = com.nuva.assistant.automation.ScheduledComposeScheduler.cancelByOrdinal(context, action.ordinal)
+            ) {
+                is com.nuva.assistant.automation.ScheduledComposeScheduler.CancelResult.Cancelled ->
+                    ExecutionOutcome("completed", "Scheduled draft cancel korechi.")
+                com.nuva.assistant.automation.ScheduledComposeScheduler.CancelResult.Missing ->
+                    ExecutionOutcome("failed", "Oi number-er pending draft paini.", "scheduled draft missing")
+                is com.nuva.assistant.automation.ScheduledComposeScheduler.CancelResult.Failed ->
                     ExecutionOutcome("failed", result.reason, result.reason)
             }
 

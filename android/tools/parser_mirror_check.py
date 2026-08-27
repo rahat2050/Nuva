@@ -319,6 +319,12 @@ def parse_user_file(t):
     return None
 
 def parse_productivity(t):
+    draft_words=["scheduled draft","scheduled email","scheduled sms","compose reminder"]
+    if any(w in t for w in draft_words) and any(w in t for w in ["list","dekhao","poro","show"]):
+        return ok({"kind":"listdrafts"},"LIST_SCHEDULED_DRAFTS")
+    if any(w in t for w in draft_words) and any(w in t for w in ["cancel","batil","remove"]):
+        m=re.search(r"(\d+)",t); ordinal=int(m.group(1)) if m else 1
+        return ok({"kind":"canceldraft","ordinal":ordinal},"CANCEL_SCHEDULED_DRAFT",risk="MEDIUM",base="MEDIUM")
     scheduled=any(w in t for w in ["schedule email","scheduled email","email reminder","schedule sms","scheduled sms","message compose reminder"])
     if scheduled:
         tm=parse_time(t)
@@ -327,7 +333,9 @@ def parse_productivity(t):
         body=t.split(body_marker,1)[1].strip(" ,.:") if body_marker else None
         if not body: return unsupported("Compose body bolun")
         channel="SMS" if "sms" in t else "EMAIL"
-        return ok({"kind":"schedulecompose","channel":channel,"body":body,"time":tm},"SCHEDULE_COMPOSE",risk="MEDIUM",base="MEDIUM")
+        recurrence="DAILY" if any(w in t for w in ["protidin","daily","every day","প্রতিদিন"]) else \
+            ("WEEKLY" if any(w in t for w in ["weekly","every week","proti shoptaho","প্রতি সপ্তাহ"]) or weekday(t) else "ONCE")
+        return ok({"kind":"schedulecompose","channel":channel,"body":body,"time":tm,"recurrence":recurrence},"SCHEDULE_COMPOSE",risk="MEDIUM",base="MEDIUM")
     form_requested=any(w in t for w in ["form prepare","application prepare","application form kholo","booking prepare","form draft"])
     if not form_requested: return None
     kinds=[("passport","PASSPORT"),("nid","NID"),("birth","BIRTH_REGISTRATION"),("driving","DRIVING_LICENSE"),
@@ -955,6 +963,10 @@ check(parse("file rename koro new name report.pdf")["action"]["new_name"] == "re
 check(parse("file copy koro")["action"]["operation"] == "COPY_FILE", "picker copy")
 check(parse("file move koro")["action"]["operation"] == "MOVE_FILE", "picker move")
 check(parse("photo crop koro")["action"]["operation"] == "EDIT_PHOTO", "photo editor handoff")
+check(parse("protidin 8 tay schedule sms message update")["action"]["recurrence"] == "DAILY", "daily draft")
+check(parse("shukrobar 9 tay schedule email je report")["action"]["recurrence"] == "WEEKLY", "weekly draft")
+check(parse("scheduled draft list dekhao")["intent"] == "LIST_SCHEDULED_DRAFTS", "list drafts")
+check(parse("2 number scheduled draft cancel koro")["action"]["ordinal"] == 2, "cancel draft")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

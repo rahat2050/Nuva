@@ -43,7 +43,8 @@ kal 8 tay schedule sms 01712345678 message ami ashchi
 
 NUVA schedules an `AlarmManager.setAndAllowWhileIdle` reminder. At the chosen time a local
 notification appears. Tapping it opens an email or SMS draft; no message is automatically sent.
-Notification permission is required. Reminders are currently one-shot and do not survive reboot.
+Notification permission is required. v2.6 stores reminders in Room, restores them after reboot/app
+update, supports daily/weekly recurrence, and provides list/cancel voice commands.
 
 ## Still unsupported
 

@@ -1,6 +1,6 @@
 # NUVA Privacy
 
-Last updated: v1.6 (2026-08-26). The app contains **no analytics, no trackers,
+Last updated: v2.6 (2026-08-27). The app contains **no analytics, no trackers,
 no ad SDKs**.
 
 ## What stays on your phone
@@ -8,6 +8,8 @@ no ad SDKs**.
 * **Voice audio** — never uploaded. Android SpeechRecognizer transcribes on
   device/service; only the resulting TEXT is used.
 * Command history, notes, to-dos, memories, settings — local Room/DataStore only.
+* Scheduled email/SMS **draft reminders** (recipient, subject/body, trigger and recurrence) — local Room only;
+  AlarmManager carries only the local row id. They are never uploaded or automatically sent.
 * Screen snapshots (`ScreenStateModel`) — transient, in RAM, never persisted or
   uploaded. Password fields are never captured; OTP-like codes are redacted even
   in memory before display.

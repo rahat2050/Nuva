@@ -15,6 +15,8 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Restore user-created local draft reminders after reboot/app update. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- CALL_CONTACT: ACTION_DIAL needs no permission; ACTION_CALL is used only
          when the user explicitly enabled direct calling in Settings. -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
@@ -95,6 +97,14 @@
         <receiver
             android:name=".automation.ScheduledComposeReceiver"
             android:exported="false" />
+        <receiver
+            android:name=".automation.ScheduledComposeBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".service.NuvaNotificationListener"

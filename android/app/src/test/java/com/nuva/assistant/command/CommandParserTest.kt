@@ -313,6 +313,18 @@ class CommandParserTest {
         assertEquals(ComposeChannel.SMS, sms.channel)
         assertEquals("01712345678", sms.recipient)
 
+        val daily = CommandParser.parse("protidin 8 tay schedule sms message standup update")!!
+            .action as NuvaAction.ScheduleCompose
+        assertEquals(ComposeRecurrence.DAILY, daily.recurrence)
+        val weekly = CommandParser.parse("shukrobar 9 tay schedule email je weekly report")!!
+            .action as NuvaAction.ScheduleCompose
+        assertEquals(ComposeRecurrence.WEEKLY, weekly.recurrence)
+
+        assertEquals(NuvaIntent.LIST_SCHEDULED_DRAFTS, CommandParser.parse("scheduled draft list dekhao")!!.intent)
+        val cancel = CommandParser.parse("2 number scheduled draft cancel koro")!!
+        assertEquals(2, (cancel.action as NuvaAction.CancelScheduledDraft).ordinal)
+        assertTrue(cancel.requiresConfirmation)
+
         assertTrue(CommandParser.parse("schedule email kal 9 tay")!!.unsupported)
     }
 
