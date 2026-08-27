@@ -1,4 +1,4 @@
-# NUVA — Supported features (v2.6)
+# NUVA — Supported features (v2.7)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -27,6 +27,8 @@ hyphenated. Calls (dialer or opt-in direct). SMS send-after-confirmation. WhatsA
 send-after-confirmation with package + recipient verification. Chat open (wa.me).
 Telegram/Messenger/Signal/Viber/IMO — **ANDROID-LIMITED**: message pre-filled, user taps Send.
 Email recipient/subject/body compose is **SUPPORTED user-reviewed**: email app opens and user taps Send.
+v2.7 adds confirmed generic text-share chooser and Contacts-app insert drafts (name/phone/email); the
+user chooses the destination/final share or taps final Save.
 
 ## Forms & productivity — USER-REVIEWED SUPPORTED
 v2.4 can store an explicitly dictated local draft and open a sourced official-portal search for
@@ -92,7 +94,9 @@ direct where permitted).
 Read/summarize (OTP redacted, banking skipped), open source app and shade open. v2.3 uses an app's
 official free-form RemoteInput action for a reply only after blocking confirmation. Banking apps,
 credential-bearing replies, missing/expired actions and apps with no RemoteInput are refused; NUVA
-never guesses a reply button through accessibility.
+never guesses a reply button through accessibility. v2.7 can dismiss one explicitly selected safe
+notification or invoke an exact allowlisted app-provided `Mark as read` action, both after blocking
+confirmation. Financial notifications and bulk clear remain unavailable.
 
 ## Screen understanding & automation — SUPPORTED (semantic only)
 Read visible/focused text, UI summary (buttons/inputs/lists), tap/long-press/type/clear/

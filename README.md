@@ -26,6 +26,9 @@ you say into a validated action, asks before doing anything risky, and carries i
 "photo crop koro"                     → picker + visible editor; user saves
 "protidin 8 tay schedule sms message update" → persistent recurring draft reminder
 "scheduled draft list dekhao"         → lists pending local drafts
+"text share koro je ami ashchi"       → confirmed Android share chooser
+"new contact add koro name Rahim number 01712345678" → user-reviewed contact draft
+"2 number notification dismiss koro" → confirmed exact notification dismissal
 ```
 
 ## Project status
@@ -34,7 +37,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v2.6 passes** — practical assistant → target-aware files → persistent productivity | ✅ Implemented in code (real-device QA still pending): safe phone control, offline utilities, sourced skills, reviewed communication/file mutations, and reboot-restored recurring draft reminders; see [`docs/supported-features.md`](docs/supported-features.md) |
+| **v1.1–v2.7 passes** — practical assistant → persistent productivity → safe handoffs | ✅ Implemented in code (real-device QA still pending): reviewed files/communication/forms, recurring drafts, text-share/contact drafts, and exact single-notification management; see [`docs/supported-features.md`](docs/supported-features.md) |
 
 `backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
@@ -163,6 +166,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [forms-productivity.md](docs/forms-productivity.md) | v2.4 attachments, local form drafts and scheduled compose reminders |
 | [target-aware-file-mutations.md](docs/target-aware-file-mutations.md) | v2.5 rename/copy/move/delete and photo-editor safety flow |
 | [persistent-scheduled-drafts.md](docs/persistent-scheduled-drafts.md) | v2.6 Room persistence, recurrence, reboot restore and cancellation |
+| [safe-share-contact-notifications.md](docs/safe-share-contact-notifications.md) | v2.7 reviewed share/contact and exact notification actions |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |

@@ -607,6 +607,26 @@ class CommandExecutor(
                 }
             }
 
+            is NuvaAction.ShareText -> when (val result = com.nuva.assistant.automation.ProductivityHandoff.shareText(context, action)) {
+                is com.nuva.assistant.automation.ProductivityHandoff.Result.Opened ->
+                    ExecutionOutcome("completed", result.speech)
+                is com.nuva.assistant.automation.ProductivityHandoff.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+                com.nuva.assistant.automation.ProductivityHandoff.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive ba financial text share korbo na.", "sensitive share blocked")
+            }
+
+            is NuvaAction.CreateContactDraft -> when (
+                val result = com.nuva.assistant.automation.ProductivityHandoff.createContactDraft(context, action)
+            ) {
+                is com.nuva.assistant.automation.ProductivityHandoff.Result.Opened ->
+                    ExecutionOutcome("completed", result.speech)
+                is com.nuva.assistant.automation.ProductivityHandoff.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+                com.nuva.assistant.automation.ProductivityHandoff.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive contact draft blocked.", "sensitive contact blocked")
+            }
+
             is NuvaAction.PrepareForm -> {
                 if (action.details?.let {
                         com.nuva.assistant.core.security.SensitiveAppPolicy.mentionsCredentials(it) ||
@@ -655,6 +675,25 @@ class CommandExecutor(
                 com.nuva.assistant.automation.ScheduledComposeScheduler.CancelResult.Missing ->
                     ExecutionOutcome("failed", "Oi number-er pending draft paini.", "scheduled draft missing")
                 is com.nuva.assistant.automation.ScheduledComposeScheduler.CancelResult.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ManageNotification -> when (
+                val result = NuvaNotificationListener.manage(action.ordinal, action.operation)
+            ) {
+                is NuvaNotificationListener.ManageResult.Done ->
+                    ExecutionOutcome("completed", "${result.appLabel} notification ${result.operation.wireName} complete.")
+                NuvaNotificationListener.ManageResult.NeedsAccess -> {
+                    NuvaNotificationListener.openAccessSettings(context)
+                    ExecutionOutcome("failed", "Notification access lagbe — setting khulchi.", "notification access missing")
+                }
+                NuvaNotificationListener.ManageResult.NotificationMissing ->
+                    ExecutionOutcome("failed", "Oi notification ta ar paini.", "notification missing")
+                NuvaNotificationListener.ManageResult.ActionUnavailable ->
+                    ExecutionOutcome("failed", "Ei notification-e requested official action available nei.", "notification action unavailable")
+                NuvaNotificationListener.ManageResult.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive app-er notification manage korbo na.", "sensitive notification blocked")
+                is NuvaNotificationListener.ManageResult.Failed ->
                     ExecutionOutcome("failed", result.reason, result.reason)
             }
 

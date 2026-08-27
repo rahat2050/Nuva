@@ -47,6 +47,7 @@ val SUPPORTED_FEATURES = listOf(
     "SMS ও WhatsApp — কনফার্মেশনের পর সরাসরি পাঠানো",
     "Telegram / Messenger / Signal / Viber / IMO — মেসেজ লেখা বসিয়ে অ্যাপ খোলে, Send আপনি চাপবেন",
     "Email recipient/subject/body prefill; চাইলে Android picker থেকে এক attachment — final Send আপনি চাপবেন",
+    "Generic text share sheet ও new contact draft (name/phone/email) — destination/Save user-controlled",
     "Passport/NID/birth/driving/visa/admission/job/doctor/hotel/flight/courier local form draft + official portal handoff",
     "Persistent email/SMS draft reminder — once/daily/weekly, reboot restore, voice list/cancel; tap করলে draft, auto-Send নয়",
     "কন্টাক্ট খোঁজা — একাধিক মিল হলে আপনি বেছে নেবেন",
@@ -60,7 +61,7 @@ val SUPPORTED_FEATURES = listOf(
     "ব্যাটারি, সময়, তারিখ, নেটওয়ার্ক, স্টোরেজ জিজ্ঞাসা — ফোন থেকেই তাৎক্ষণিক উত্তর, ইন্টারনেট/AI লাগে না",
     "টর্চ টগল; ব্রাইটনেস/সাউন্ড/DND/ওয়াইফাই/ব্লুটুথ সেটিং স্ক্রিন",
     "স্ক্রিন পড়া, ফোকাসড এলিমেন্ট পড়া (অ্যাক্সেসিবিলিটি লাগবে)",
-    "নোটিফিকেশন সারসংক্ষেপ/অ্যাপ খোলা; official RemoteInput থাকলে confirmation-এর পর reply",
+    "নোটিফিকেশন summary/app/reply; confirmation-এর পর এক safe notification dismiss বা exact official Mark as read",
     "স্ক্রল/সোয়াইপ — শুধু নির্দিষ্ট লক্ষ্যে, অন্ধ ট্যাপ নয়",
 )
 

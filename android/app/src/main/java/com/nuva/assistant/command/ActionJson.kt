@@ -133,6 +133,17 @@ object ActionJson {
         is NuvaAction.CancelScheduledDraft -> buildJsonObject {
             put("type", "CANCEL_SCHEDULED_DRAFT"); put("ordinal", action.ordinal)
         }
+        is NuvaAction.ShareText -> buildJsonObject {
+            put("type", "SHARE_TEXT"); put("text", action.text)
+        }
+        is NuvaAction.CreateContactDraft -> buildJsonObject {
+            put("type", "CREATE_CONTACT_DRAFT"); put("name", action.name)
+            action.phone?.let { put("phone", it) }
+            action.email?.let { put("email", it) }
+        }
+        is NuvaAction.ManageNotification -> buildJsonObject {
+            put("type", "MANAGE_NOTIFICATION"); put("ordinal", action.ordinal); put("operation", action.operation.wireName)
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

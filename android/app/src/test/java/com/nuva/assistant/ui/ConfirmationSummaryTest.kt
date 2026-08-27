@@ -102,6 +102,25 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `share contact and notification summaries keep final action visible`() {
+        val share = ConfirmationSummary.build(NuvaAction.ShareText("ami ashchi"), NuvaRisk.MEDIUM)
+        assertTrue(share.lines.any { it.value.contains("ami ashchi") })
+        assertTrue(share.detail.contains("share sheet"))
+
+        val contact = ConfirmationSummary.build(
+            NuvaAction.CreateContactDraft("Rahim", "01712345678", null),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(contact.detail.contains("Save"))
+
+        val notification = ConfirmationSummary.build(
+            NuvaAction.ManageNotification(2, com.nuva.assistant.command.NotificationManageOperation.DISMISS),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(notification.lines.any { it.value.contains("dismiss") })
+    }
+
+    @Test
     fun `file mutation summary promises exact target second confirmation`() {
         val summary = ConfirmationSummary.build(
             NuvaAction.UserFile(UserFileOperation.RENAME_FILE, "report.pdf"),

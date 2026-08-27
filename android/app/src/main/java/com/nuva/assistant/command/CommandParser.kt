@@ -527,6 +527,39 @@ object CommandParser {
     // --- 2c. Forms/productivity handoff + scheduled compose reminder (v2.4) ------------
 
     private fun parseProductivityHandoff(t: String): CommandDecision? {
+        val contactDraft = listOf(
+            "new contact add", "contact create", "contact draft", "contact save screen", "নতুন কন্টাক্ট", "কন্টাক্ট যোগ",
+        ).any { t.contains(it) }
+        if (contactDraft) {
+            val phone = PHONE_NUMBER.find(t)?.value?.let { digitsOnly(it) }
+            val email = EMAIL_ADDRESS.find(t)?.value
+            val nameMarker = listOf(" name ", " nam ", " নাম ").firstOrNull { t.contains(it) }
+            val name = nameMarker?.let { marker ->
+                var rawName = t.substringAfter(marker)
+                    .substringBefore(" number ").substringBefore(" phone ").substringBefore(" email ")
+                phone?.let { rawName = rawName.substringBefore(it) }
+                email?.let { rawName = rawName.substringBefore(it) }
+                rawName.trim(' ', ',', '.', ':')
+            }
+            if (name.isNullOrBlank()) return unsupported("Notun contact-er name bolun.")
+            return ok(
+                NuvaAction.CreateContactDraft(name.take(120), phone, email),
+                "Contact draft khulbo — review kore final Save apni chapben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val textShareMarker = listOf(
+            "text share koro", "lekha share koro", "share text", "ei lekha share", "লেখা শেয়ার", "টেক্সট শেয়ার",
+        ).firstOrNull { t.contains(it) }
+        if (textShareMarker != null) {
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            var text = quoted ?: contentAfter(t, textShareMarker)
+            text = text?.removePrefix("je ")?.removePrefix("যে ")?.trim()
+            if (text.isNullOrBlank()) return unsupported("Kon text share korbo? Lekhata bolun.")
+            return ok(NuvaAction.ShareText(text.take(5_000)), "Text share korbo — nishchit korun.", NuvaRisk.MEDIUM)
+        }
+
         val scheduledDraftWords = listOf("scheduled draft", "scheduled email", "scheduled sms", "compose reminder", "শিডিউল ড্রাফট")
         if (scheduledDraftWords.any { t.contains(it) } &&
             listOf("list", "dekhao", "poro", "show", "দেখাও", "পড়ো").any { t.contains(it) }
@@ -610,6 +643,30 @@ object CommandParser {
     // --- 2d. User-reviewed email + official notification reply (v2.3) ------------------
 
     private fun parseCommunicationCompose(t: String): CommandDecision? {
+        val mentionsNotification = t.contains("notification") || t.contains("নোটিফিকেশন")
+        if (mentionsNotification && listOf("dismiss", "clear notification", "notification muchhe", "সরাও", "মুছে দাও")
+                .any { t.contains(it) }
+        ) {
+            val ordinal = Regex("""(\d+)\s*(number|no|tomo|তম)?""").find(t)
+                ?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(1, 30) ?: 1
+            return ok(
+                NuvaAction.ManageNotification(ordinal, NotificationManageOperation.DISMISS),
+                "$ordinal number notification dismiss korbo — nishchit korun.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+        if (mentionsNotification && listOf("mark as read", "mark read", "পঠিত", "পড়া হয়েছে", "পড়া হয়েছে")
+                .any { t.contains(it) }
+        ) {
+            val ordinal = Regex("""(\d+)\s*(number|no|tomo|তম)?""").find(t)
+                ?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(1, 30) ?: 1
+            return ok(
+                NuvaAction.ManageNotification(ordinal, NotificationManageOperation.MARK_READ),
+                "$ordinal number notification app-er official Mark as read action diye mark korbo — nishchit korun.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
         val replyMarker = listOf(
             "notification e reply dao", "notification reply dao", "notification reply koro",
             "reply to notification", "নোটিফিকেশনে রিপ্লাই দাও", "নোটিফিকেশনের উত্তর দাও",

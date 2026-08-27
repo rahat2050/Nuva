@@ -134,7 +134,35 @@ object CommandValidator {
             NuvaIntent.SCHEDULE_COMPOSE -> validateScheduleCompose(actionJson)
             NuvaIntent.LIST_SCHEDULED_DRAFTS -> ValidatedAction.Valid(NuvaAction.ListScheduledDrafts)
             NuvaIntent.CANCEL_SCHEDULED_DRAFT -> validateCancelScheduledDraft(actionJson)
+            NuvaIntent.SHARE_TEXT -> validateShareText(actionJson)
+            NuvaIntent.CREATE_CONTACT_DRAFT -> validateCreateContactDraft(actionJson)
+            NuvaIntent.MANAGE_NOTIFICATION -> validateManageNotification(actionJson)
         }
+    }
+
+    private fun validateShareText(json: JsonObject): ValidatedAction {
+        val text = json.str("text")?.takeIf { it.isNotEmpty() && it.length <= 5_000 }
+            ?: return ValidatedAction.Invalid(listOf("SHARE_TEXT requires text"))
+        return ValidatedAction.Valid(NuvaAction.ShareText(text))
+    }
+
+    private fun validateCreateContactDraft(json: JsonObject): ValidatedAction {
+        val name = json.str("name")?.takeIf { it.length in 1..120 }
+            ?: return ValidatedAction.Invalid(listOf("CREATE_CONTACT_DRAFT requires name"))
+        val rawPhone = json.str("phone")
+        val phone = rawPhone?.takeIf { PHONE_PATTERN.matches(it) }
+        if (rawPhone != null && phone == null) return ValidatedAction.Invalid(listOf("contact phone is invalid"))
+        val rawEmail = json.str("email")
+        val email = rawEmail?.takeIf { EMAIL_PATTERN.matches(it) }
+        if (rawEmail != null && email == null) return ValidatedAction.Invalid(listOf("contact email is invalid"))
+        return ValidatedAction.Valid(NuvaAction.CreateContactDraft(name, phone, email))
+    }
+
+    private fun validateManageNotification(json: JsonObject): ValidatedAction {
+        val ordinal = json.int("ordinal")?.takeIf { it in 1..30 } ?: 1
+        val operation = NotificationManageOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("MANAGE_NOTIFICATION requires operation"))
+        return ValidatedAction.Valid(NuvaAction.ManageNotification(ordinal, operation))
     }
 
     private fun validateCancelScheduledDraft(json: JsonObject): ValidatedAction {

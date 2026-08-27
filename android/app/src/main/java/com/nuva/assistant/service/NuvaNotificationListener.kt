@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import com.nuva.assistant.command.NotificationManageOperation
 import com.nuva.assistant.core.security.SensitiveAppPolicy
 
 /**
@@ -73,8 +74,14 @@ class NuvaNotificationListener : NotificationListenerService() {
         val remoteInputs: Array<RemoteInput>,
     )
 
+    data class SemanticActionHandle(
+        val title: String,
+        val pendingIntent: PendingIntent,
+    )
+
     data class NuvaNotification(
         val key: String,
+        val systemKey: String?,
         val packageName: String,
         val appLabel: String,
         val title: String?,
@@ -82,6 +89,7 @@ class NuvaNotificationListener : NotificationListenerService() {
         val postedAt: Long,
         val mediaSessionToken: android.media.session.MediaSession.Token? = null,
         val replyHandle: ReplyHandle? = null,
+        val markReadHandle: SemanticActionHandle? = null,
     )
 
     private fun parse(sbn: StatusBarNotification): NuvaNotification? {
@@ -91,12 +99,15 @@ class NuvaNotificationListener : NotificationListenerService() {
         val text = extras.getCharSequence("android.text")?.toString()
         if (title.isNullOrBlank() && text.isNullOrBlank()) return null
         val token = mediaToken(extras)
-        val replyHandle = findReplyHandle(sbn.notification?.actions)
+        val actions = sbn.notification?.actions
+        val replyHandle = findReplyHandle(actions)
+        val markReadHandle = findMarkReadHandle(actions)
         val label = runCatching {
             packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName, 0)).toString()
         }.getOrDefault(sbn.packageName.substringAfterLast('.'))
         return NuvaNotification(
             key = "${sbn.packageName}:${sbn.key ?: sbn.id}",
+            systemKey = sbn.key,
             packageName = sbn.packageName,
             appLabel = label,
             title = title,
@@ -104,7 +115,20 @@ class NuvaNotificationListener : NotificationListenerService() {
             postedAt = sbn.postTime,
             mediaSessionToken = token,
             replyHandle = replyHandle,
+            markReadHandle = markReadHandle,
         )
+    }
+
+    private fun findMarkReadHandle(actions: Array<android.app.Notification.Action>?): SemanticActionHandle? {
+        return actions.orEmpty().firstNotNullOfOrNull { action ->
+            val title = action.title?.toString().orEmpty()
+            val allowed = isAllowedMarkReadTitle(title)
+            if (allowed && action.remoteInputs.isNullOrEmpty()) {
+                action.actionIntent?.let { SemanticActionHandle(title, it) }
+            } else {
+                null
+            }
+        }
     }
 
     private fun findReplyHandle(actions: Array<android.app.Notification.Action>?): ReplyHandle? {
@@ -135,6 +159,15 @@ class NuvaNotificationListener : NotificationListenerService() {
         data object ReplyUnavailable : ReplyResult
         data object SensitiveBlocked : ReplyResult
         data class Failed(val reason: String) : ReplyResult
+    }
+
+    sealed interface ManageResult {
+        data class Done(val appLabel: String, val operation: NotificationManageOperation) : ManageResult
+        data object NeedsAccess : ManageResult
+        data object NotificationMissing : ManageResult
+        data object ActionUnavailable : ManageResult
+        data object SensitiveBlocked : ManageResult
+        data class Failed(val reason: String) : ManageResult
     }
 
     companion object {
@@ -191,6 +224,10 @@ class NuvaNotificationListener : NotificationListenerService() {
                 .take(limit)
         }
 
+        fun isAllowedMarkReadTitle(title: String): Boolean = title.lowercase().trim() in setOf(
+            "mark as read", "mark read", "read", "পঠিত", "পড়া হয়েছে", "পড়া হয়েছে",
+        )
+
         /** Selects an already-valid free-form action, preferring an explicit Reply label. */
         fun preferredReplyIndex(titles: List<String>): Int? {
             if (titles.isEmpty()) return null
@@ -226,6 +263,30 @@ class NuvaNotificationListener : NotificationListenerService() {
 
         fun canReply(ordinal: Int = 1): Boolean =
             safeSnapshot(limit = 30).getOrNull(ordinal.coerceIn(1, 30) - 1)?.replyHandle != null
+
+        fun manage(ordinal: Int, operation: NotificationManageOperation): ManageResult {
+            val service = companionInstance ?: return ManageResult.NeedsAccess
+            val notification = safeSnapshot(limit = 30).getOrNull(ordinal.coerceIn(1, 30) - 1)
+                ?: return ManageResult.NotificationMissing
+            if (SensitiveAppPolicy.isSensitivePackage(notification.packageName)) return ManageResult.SensitiveBlocked
+            return try {
+                when (operation) {
+                    NotificationManageOperation.DISMISS -> {
+                        val key = notification.systemKey ?: return ManageResult.ActionUnavailable
+                        service.cancelNotification(key)
+                    }
+                    NotificationManageOperation.MARK_READ -> {
+                        val handle = notification.markReadHandle ?: return ManageResult.ActionUnavailable
+                        handle.pendingIntent.send(service, 0, Intent())
+                    }
+                }
+                ManageResult.Done(notification.appLabel, operation)
+            } catch (error: PendingIntent.CanceledException) {
+                ManageResult.Failed("Notification action expire hoye geche.")
+            } catch (error: Exception) {
+                ManageResult.Failed(error.message ?: "notification action failed")
+            }
+        }
 
         /**
          * The newest active MediaSession token (from the media notification),

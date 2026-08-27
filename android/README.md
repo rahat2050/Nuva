@@ -160,6 +160,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   second target-aware confirmation; selected-photo `ACTION_EDIT` handoff with user-controlled Save.
 * **v2.6 persistent drafts**: Room-backed once/daily/weekly email/SMS compose reminders, pending-list
   and confirmed cancellation commands, plus BOOT_COMPLETED/app-update restoration.
+* **v2.7 safe handoffs**: confirmed generic text share, Contacts-app insert drafts, and single safe
+  notification dismiss/exact allowlisted Mark-as-read actions; no bulk or guessed action.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

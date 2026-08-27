@@ -284,6 +284,39 @@ class CommandParserTest {
         assertNull(credential.action)
     }
 
+    // --- Share, contact draft & notification management -------------------------------
+
+    @Test
+    fun `text share and contact creation stay user finalized`() {
+        val share = CommandParser.parse("text share koro je ami ashchi")!!
+        assertEquals("ami ashchi", (share.action as NuvaAction.ShareText).text)
+        assertTrue(share.requiresConfirmation)
+
+        val contact = CommandParser.parse(
+            "new contact add koro name Rahim number 01712345678 email rahim@example.com",
+        )!!
+        val draft = contact.action as NuvaAction.CreateContactDraft
+        assertEquals("rahim", draft.name.lowercase())
+        assertEquals("01712345678", draft.phone)
+        assertEquals("rahim@example.com", draft.email)
+        assertTrue(contact.requiresConfirmation)
+    }
+
+    @Test
+    fun `one safe notification can be dismissed or marked read after confirmation`() {
+        val dismiss = CommandParser.parse("2 number notification dismiss koro")!!
+        val dismissAction = dismiss.action as NuvaAction.ManageNotification
+        assertEquals(2, dismissAction.ordinal)
+        assertEquals(NotificationManageOperation.DISMISS, dismissAction.operation)
+        assertTrue(dismiss.requiresConfirmation)
+
+        val markRead = CommandParser.parse("notification mark as read koro")!!
+        assertEquals(
+            NotificationManageOperation.MARK_READ,
+            (markRead.action as NuvaAction.ManageNotification).operation,
+        )
+    }
+
     // --- Forms & scheduled compose -----------------------------------------------------
 
     @Test

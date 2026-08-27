@@ -19,6 +19,14 @@ class NotificationReplyPolicyTest {
     }
 
     @Test
+    fun `mark read allowlist rejects ambiguous unread or archive labels`() {
+        assertEquals(true, NuvaNotificationListener.isAllowedMarkReadTitle("Mark as read"))
+        assertEquals(true, NuvaNotificationListener.isAllowedMarkReadTitle("পঠিত"))
+        assertEquals(false, NuvaNotificationListener.isAllowedMarkReadTitle("Mark unread"))
+        assertEquals(false, NuvaNotificationListener.isAllowedMarkReadTitle("Archive"))
+    }
+
+    @Test
     fun `first valid free form action is fallback and empty list is unsupported`() {
         assertEquals(0, NuvaNotificationListener.preferredReplyIndex(listOf("Quick response", "Other")))
         assertNull(NuvaNotificationListener.preferredReplyIndex(emptyList()))

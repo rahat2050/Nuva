@@ -319,6 +319,16 @@ def parse_user_file(t):
     return None
 
 def parse_productivity(t):
+    if any(w in t for w in ["new contact add","contact create","contact draft","নতুন কন্টাক্ট"]):
+        m=re.search(r"\s(?:name|nam|নাম)\s+(.+?)(?=\s+(?:number|phone|email)\s|$)",t)
+        if not m: return unsupported("Contact name bolun")
+        return ok({"kind":"contactdraft","name":m.group(1).strip()},"CREATE_CONTACT_DRAFT",risk="MEDIUM",base="MEDIUM")
+    share_marker=next((w for w in ["text share koro","lekha share koro","share text","ei lekha share"] if w in t),None)
+    if share_marker:
+        text=content_after(t,share_marker)
+        if text: text=re.sub(r"^(je|যে)\s+","",text).strip()
+        if not text: return unsupported("Text bolun")
+        return ok({"kind":"sharetext","text":text},"SHARE_TEXT",risk="MEDIUM",base="MEDIUM")
     draft_words=["scheduled draft","scheduled email","scheduled sms","compose reminder"]
     if any(w in t for w in draft_words) and any(w in t for w in ["list","dekhao","poro","show"]):
         return ok({"kind":"listdrafts"},"LIST_SCHEDULED_DRAFTS")
@@ -347,6 +357,13 @@ def parse_productivity(t):
     return ok({"kind":"prepareform","form_kind":kind,"details":details},"PREPARE_FORM",risk="MEDIUM",base="MEDIUM")
 
 def parse_communication(t):
+    mentions_notification="notification" in t or "নোটিফিকেশন" in t
+    if mentions_notification and any(w in t for w in ["dismiss","clear notification","notification muchhe","সরাও","মুছে দাও"]):
+        m=re.search(r"(\d+)",t); ordinal=int(m.group(1)) if m else 1
+        return ok({"kind":"managenotif","ordinal":ordinal,"operation":"DISMISS"},"MANAGE_NOTIFICATION",risk="MEDIUM",base="MEDIUM")
+    if mentions_notification and any(w in t for w in ["mark as read","mark read","পঠিত","পড়া হয়েছে"]):
+        m=re.search(r"(\d+)",t); ordinal=int(m.group(1)) if m else 1
+        return ok({"kind":"managenotif","ordinal":ordinal,"operation":"MARK_READ"},"MANAGE_NOTIFICATION",risk="MEDIUM",base="MEDIUM")
     reply_marker=next((w for w in ["notification e reply dao","notification reply dao","notification reply koro",
         "reply to notification","নোটিফিকেশনে রিপ্লাই দাও","reply dao","reply koro"] if w in t),None)
     if reply_marker and ("notification" in t or "নোটিফিকেশন" in t):
@@ -967,6 +984,10 @@ check(parse("protidin 8 tay schedule sms message update")["action"]["recurrence"
 check(parse("shukrobar 9 tay schedule email je report")["action"]["recurrence"] == "WEEKLY", "weekly draft")
 check(parse("scheduled draft list dekhao")["intent"] == "LIST_SCHEDULED_DRAFTS", "list drafts")
 check(parse("2 number scheduled draft cancel koro")["action"]["ordinal"] == 2, "cancel draft")
+check(parse("text share koro je ami ashchi")["intent"] == "SHARE_TEXT", "text share handoff")
+check(parse("new contact add koro name Rahim number 01712345678")["intent"] == "CREATE_CONTACT_DRAFT", "contact draft")
+check(parse("2 number notification dismiss koro")["action"]["operation"] == "DISMISS", "notification dismiss")
+check(parse("notification mark as read koro")["action"]["operation"] == "MARK_READ", "notification mark read")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

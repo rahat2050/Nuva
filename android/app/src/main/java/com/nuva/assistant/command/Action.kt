@@ -222,6 +222,25 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.CANCEL_SCHEDULED_DRAFT
     }
 
+    data class ShareText(val text: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.SHARE_TEXT
+    }
+
+    data class CreateContactDraft(
+        val name: String,
+        val phone: String?,
+        val email: String?,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CREATE_CONTACT_DRAFT
+    }
+
+    data class ManageNotification(
+        val ordinal: Int,
+        val operation: NotificationManageOperation,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.MANAGE_NOTIFICATION
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -372,6 +391,17 @@ enum class CaptureMode(val wireName: String) {
 
     companion object {
         fun fromWire(value: String?): CaptureMode? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class NotificationManageOperation(val wireName: String) {
+    DISMISS("dismiss"),
+    MARK_READ("mark_read"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): NotificationManageOperation? =
             entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }

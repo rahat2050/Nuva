@@ -132,6 +132,34 @@ object ConfirmationSummary {
                 confirmLabelOverride = "CANCEL DRAFT"
             }
 
+            is NuvaAction.ShareText -> {
+                title = "Text share sheet খুলবে"
+                lines += Line("লেখা", "“${action.text.take(500)}”")
+                detail = "Android share sheet-এ app/recipient ও final action আপনি বেছে নেবেন।"
+                confirmLabelOverride = "CONTINUE"
+            }
+
+            is NuvaAction.CreateContactDraft -> {
+                title = "নতুন contact draft"
+                lines += Line("নাম", action.name)
+                action.phone?.let { lines += Line("ফোন", it) }
+                action.email?.let { lines += Line("Email", it) }
+                detail = "Contacts app-এ draft খুলবে; final Save আপনি চাপবেন।"
+                confirmLabelOverride = "CONTINUE"
+            }
+
+            is NuvaAction.ManageNotification -> {
+                title = "Notification action"
+                lines += Line("নোটিফিকেশন", "${action.ordinal} নম্বর")
+                lines += Line("কাজ", action.operation.wireName)
+                detail = if (action.operation == com.nuva.assistant.command.NotificationManageOperation.MARK_READ) {
+                    "শুধু app-provided exact Mark as read action চালানো হবে।"
+                } else {
+                    "শুধু selected non-financial notification dismiss করা হবে।"
+                }
+                confirmLabelOverride = "CONFIRM"
+            }
+
             is NuvaAction.ReplyNotification -> {
                 title = "Notification reply পাঠানো হবে"
                 lines += Line("নোটিফিকেশন", "${action.ordinal} নম্বর")

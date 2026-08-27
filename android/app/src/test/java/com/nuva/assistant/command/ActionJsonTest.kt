@@ -39,6 +39,9 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("SCHEDULE_COMPOSE"))
         assertNull(NuvaIntent.fromWire("LIST_SCHEDULED_DRAFTS"))
         assertNull(NuvaIntent.fromWire("CANCEL_SCHEDULED_DRAFT"))
+        assertNull(NuvaIntent.fromWire("SHARE_TEXT"))
+        assertNull(NuvaIntent.fromWire("CREATE_CONTACT_DRAFT"))
+        assertNull(NuvaIntent.fromWire("MANAGE_NOTIFICATION"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -74,6 +77,10 @@ class ActionJsonTest {
             ),
             NuvaAction.ListScheduledDrafts,
             NuvaAction.CancelScheduledDraft(2),
+            NuvaAction.ShareText("ami ashchi"),
+            NuvaAction.CreateContactDraft("Rahim", "01712345678", "rahim@example.com"),
+            NuvaAction.ManageNotification(2, NotificationManageOperation.DISMISS),
+            NuvaAction.ManageNotification(1, NotificationManageOperation.MARK_READ),
             NuvaAction.OpenSettingScreen(SettingTarget.TORCH),
             NuvaAction.ReadNotifications,
             NuvaAction.SetReminder("medicine", 1_770_000_000_000L, "kal"),
@@ -188,6 +195,18 @@ class ActionJsonTest {
             },
         )
         assertTrue(badRecurrence is CommandValidator.ValidatedAction.Invalid)
+
+        val emptyShare = CommandValidator.validateAction(
+            buildJsonObject { put("type", "SHARE_TEXT"); put("text", "") },
+        )
+        assertTrue(emptyShare is CommandValidator.ValidatedAction.Invalid)
+
+        val badContact = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "CREATE_CONTACT_DRAFT"); put("name", "Rahim"); put("email", "bad")
+            },
+        )
+        assertTrue(badContact is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test
@@ -200,6 +219,9 @@ class ActionJsonTest {
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.PREPARE_FORM))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SCHEDULE_COMPOSE))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CANCEL_SCHEDULED_DRAFT))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SHARE_TEXT))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CREATE_CONTACT_DRAFT))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.MANAGE_NOTIFICATION))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.LIST_SCHEDULED_DRAFTS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.DEVICE_STATUS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CREATE_NOTE))
