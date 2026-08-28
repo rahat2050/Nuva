@@ -44,7 +44,8 @@ Google Assistant or another default programmatically.
 - Removed spoken “Listening” feedback before command capture so NUVA cannot recognize its own TTS.
 - Added live listener state plus explicit restart/test controls.
 - The recognizer bridge rejects NUVA itself and deterministically selects only an installed external
-  recognizer, preventing recursive binding after NUVA becomes the system assistant.
+  recognizer, preventing recursive binding after NUVA becomes the system assistant. On Android 12+
+  it also forwards the caller attribution chain when delegating microphone recognition.
 
 ## Honest Android limitation
 

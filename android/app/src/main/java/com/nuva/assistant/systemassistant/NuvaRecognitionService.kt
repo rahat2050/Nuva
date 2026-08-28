@@ -1,7 +1,10 @@
 package com.nuva.assistant.systemassistant
 
 import android.content.ComponentName
+import android.content.Context
+import android.content.ContextParams
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.speech.RecognitionListener
@@ -33,7 +36,10 @@ class NuvaRecognitionService : RecognitionService() {
         }
 
         val created = runCatching {
-            SpeechRecognizer.createSpeechRecognizer(this, provider)
+            SpeechRecognizer.createSpeechRecognizer(
+                recognitionContext(callback),
+                provider,
+            )
         }.getOrElse {
             runCatching { callback.error(SpeechRecognizer.ERROR_CLIENT) }
             return
@@ -65,6 +71,17 @@ class NuvaRecognitionService : RecognitionService() {
     override fun onDestroy() {
         destroyRecognizer()
         super.onDestroy()
+    }
+
+    private fun recognitionContext(callback: Callback): Context {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return this
+        return runCatching {
+            createContext(
+                ContextParams.Builder()
+                    .setNextAttributionSource(callback.callingAttributionSource)
+                    .build(),
+            )
+        }.getOrDefault(this)
     }
 
     private fun externalRecognitionProvider(): ComponentName? {

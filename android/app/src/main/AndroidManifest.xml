@@ -100,8 +100,7 @@
         <service
             android:name=".systemassistant.NuvaRecognitionService"
             android:exported="true"
-            android:label="@string/system_recognition_label"
-            android:permission="android.permission.BIND_SPEECH_RECOGNITION">
+            android:label="@string/system_recognition_label">
             <intent-filter>
                 <action android:name="android.speech.RecognitionService" />
                 <category android:name="android.intent.category.DEFAULT" />
