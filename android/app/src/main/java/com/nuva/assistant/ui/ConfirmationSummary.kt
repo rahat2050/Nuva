@@ -137,6 +137,13 @@ object ConfirmationSummary {
                 confirmLabelOverride = "CANCEL DRAFT"
             }
 
+            is NuvaAction.ClockControl -> {
+                title = "Clock action"
+                lines += Line("কাজ", action.operation.wireName)
+                detail = "Official AlarmClock intent ব্যবহার হবে; unsupported হলে Clock app খুলে final action আপনি করবেন।"
+                if (action.operation.changesActiveClock) confirmLabelOverride = "CONFIRM"
+            }
+
             is NuvaAction.MediaControl -> {
                 title = "Media control"
                 lines += Line("কাজ", action.command.wireName)

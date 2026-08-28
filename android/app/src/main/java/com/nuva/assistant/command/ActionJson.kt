@@ -183,6 +183,9 @@ object ActionJson {
         is NuvaAction.EmergencyDialer -> buildJsonObject {
             put("type", "EMERGENCY_DIALER"); put("service", action.service.wireName)
         }
+        is NuvaAction.ClockControl -> buildJsonObject {
+            put("type", "CLOCK_CONTROL"); put("operation", action.operation.wireName)
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

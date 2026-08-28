@@ -46,6 +46,8 @@ you say into a validated action, asks before doing anything risky, and carries i
 "sos message draft je amar help dorkar" → confirmed share draft
 "music 30 second forward"             → bounded MediaSession seek
 "volume 55 percent"                   → exact bounded media volume
+"show alarms"                         → official alarm list
+"alarm bondho koro"                   → confirmed active-alarm dismiss request
 ```
 
 ## Project status
@@ -54,7 +56,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v3.5 passes** — practical assistant → advanced media control | ✅ Implemented in code (real-device QA still pending): reviewed Android handoffs plus official MediaSession stop/seek and exact bounded media-volume control; see [`docs/supported-features.md`](docs/supported-features.md) |
+| **v1.1–v3.6 passes** — practical assistant → clock management | ✅ Implemented in code (real-device QA still pending): reviewed Android controls plus official alarm/timer list, snooze and dismiss intents with confirmation and honest Clock-app fallback; see [`docs/supported-features.md`](docs/supported-features.md) |
 
 `backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
@@ -192,6 +194,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [device-diagnostics.md](docs/device-diagnostics.md) | v3.3 local diagnostics and persistent-identifier exclusions |
 | [emergency-sos.md](docs/emergency-sos.md) | v3.4 Bangladesh 999, SOS share and emergency settings handoff |
 | [advanced-media-audio.md](docs/advanced-media-audio.md) | v3.5 MediaSession seek/stop and exact volume controls |
+| [clock-management.md](docs/clock-management.md) | v3.6 AlarmClock list/snooze/dismiss and fallback rules |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |

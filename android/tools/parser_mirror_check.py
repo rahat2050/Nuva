@@ -683,6 +683,17 @@ def parse_settings(t):
         return ok({"kind":"GENERAL"}, "OPEN_SETTING")
     return None
 
+def parse_clock_control(t):
+    operation=None
+    if any(w in t for w in ["show alarms","alarm list","alarms dekhao"]): operation="SHOW_ALARMS"
+    elif any(w in t for w in ["show timers","timer list","timers dekhao"]): operation="SHOW_TIMERS"
+    elif any(w in t for w in ["snooze alarm","alarm snooze"]): operation="SNOOZE_ALARM"
+    elif any(w in t for w in ["dismiss alarm","alarm dismiss","alarm bondho"]): operation="DISMISS_ALARM"
+    elif any(w in t for w in ["dismiss timer","timer dismiss","timer bondho"]): operation="DISMISS_TIMER"
+    if not operation: return None
+    changes=operation in ["SNOOZE_ALARM","DISMISS_ALARM","DISMISS_TIMER"]
+    return ok({"kind":"clock","operation":operation},"CLOCK_CONTROL",risk="MEDIUM" if changes else "LOW")
+
 def parse_alarm(t):
     if not any(w in t for w in ["alarm","আলার্ম","অ্যালার্ম","ghum theke"]): return None
     time = parse_time(t)
@@ -978,7 +989,7 @@ def rule_table(t):
     return (parse_nav(t) or parse_emergency(t) or parse_user_file(t) or parse_productivity(t) or parse_communication(t)
             or parse_map_navigation(t) or parse_grammar(t) or parse_universal(t) or parse_screen(t) or parse_daily(t) or parse_realtime(t)
             or parse_status(t) or parse_help(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
-            or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
+            or parse_clock_control(t) or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
             or parse_scroll(t) or parse_close(t) or parse_open(t) or parse_daily_skill(t)
             or parse_extended_daily_skill(t) or parse_knowledge(t))
@@ -1073,6 +1084,11 @@ check(parse("nuva music pause koro")["intent"] == "MEDIA_CONTROL", "pause")
 check(parse("music 30 second forward")["action"]["offset"] == 30, "media forward")
 check(parse("video 15 second rewind")["action"]["kind"] == "REWIND", "media rewind")
 check(parse("music stop koro")["action"]["kind"] == "STOP", "media stop")
+check(parse("show alarms")["action"]["operation"] == "SHOW_ALARMS", "show alarms")
+check(parse("timer list dekhao")["action"]["operation"] == "SHOW_TIMERS", "show timers")
+check(parse("snooze alarm")["confirm"], "snooze confirms")
+check(parse("alarm bondho koro")["action"]["operation"] == "DISMISS_ALARM", "dismiss alarm")
+check(parse("timer bondho koro")["action"]["operation"] == "DISMISS_TIMER", "dismiss timer")
 check(parse("nuva chobi tolo")["action"]["kind"] == "CAPTURE", "chobi tolo")
 check(parse("nuva torch jalo")["action"]["kind"] == "TORCH", "torch")
 check(parse("nuva google e dhaka weather khujho")["action"]["query"] == "dhaka weather", "web search")

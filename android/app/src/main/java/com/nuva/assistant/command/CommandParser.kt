@@ -220,6 +220,7 @@ object CommandParser {
         ?: parseVolumeControl(text)
         ?: parseCamera(text)
         ?: parseSettings(text)
+        ?: parseClockControl(text)
         ?: parseAlarm(text)
         ?: parseTimer(text)
         ?: parseReminder(text)
@@ -1278,6 +1279,29 @@ object CommandParser {
             return ok(NuvaAction.OpenSettingScreen(SettingTarget.GENERAL_SETTINGS), "Settings khulchi.")
         }
         return null
+    }
+
+    // --- 4b. Existing alarm/timer management (v3.6) ------------------------------------
+
+    private fun parseClockControl(t: String): CommandDecision? {
+        val operation = when {
+            listOf("show alarms", "alarm list", "alarms dekhao", "অ্যালার্ম লিস্ট", "অ্যালার্ম দেখাও")
+                .any { t.contains(it) } -> ClockOperation.SHOW_ALARMS
+            listOf("show timers", "timer list", "timers dekhao", "টাইমার লিস্ট", "টাইমার দেখাও")
+                .any { t.contains(it) } -> ClockOperation.SHOW_TIMERS
+            listOf("snooze alarm", "alarm snooze", "অ্যালার্ম স্নুজ").any { t.contains(it) } ->
+                ClockOperation.SNOOZE_ALARM
+            listOf("dismiss alarm", "alarm dismiss", "alarm bondho", "অ্যালার্ম ডিসমিস", "অ্যালার্ম বন্ধ")
+                .any { t.contains(it) } -> ClockOperation.DISMISS_ALARM
+            listOf("dismiss timer", "timer dismiss", "timer bondho", "টাইমার ডিসমিস", "টাইমার বন্ধ")
+                .any { t.contains(it) } -> ClockOperation.DISMISS_TIMER
+            else -> null
+        } ?: return null
+        return ok(
+            NuvaAction.ClockControl(operation),
+            "${operation.wireName} request korchi.",
+            if (operation.changesActiveClock) NuvaRisk.MEDIUM else NuvaRisk.LOW,
+        )
     }
 
     // --- 5. Alarm / timer ------------------------------------------------------------------

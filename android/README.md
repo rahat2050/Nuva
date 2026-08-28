@@ -178,6 +178,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   settings; no automatic call/message or location collection.
 * **v3.5 media/audio**: official MediaSession stop and bounded seek, plus exact 0–100 media volume
   and mute/unmute through AudioManager; OEM safe-volume rules remain authoritative.
+* **v3.6 clock management**: official AlarmClock list/snooze/dismiss requests with blocking
+  confirmation for active changes and honest Clock-app fallback on unsupported OEMs.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

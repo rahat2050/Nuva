@@ -1,4 +1,4 @@
-# NUVA — Supported features (v3.5)
+# NUVA — Supported features (v3.6)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -101,6 +101,12 @@ v3.2 opens user-visible maps for directions, turn-by-turn navigation, nearby sea
 coordinates. Dynamic origin/destination are preserved; driving/walking/bicycling/transit modes map to
 official Google Maps URLs or native geo/navigation intents with browser fallback. NUVA itself reads
 no device location; Maps applies its own user-granted location permission.
+
+## Clock management — SYSTEM-INTENT SUPPORTED / APP-LIMITED
+v3.6 can show alarm/timer lists and request snooze/dismiss for the active alarm/timer through official
+AlarmClock intents. Snooze/dismiss are blocking-confirmation actions. If the device Clock app does
+not implement an action, NUVA opens the Clock app and explicitly asks the user to finish manually.
+Creating alarms/timers remains supported; deleting arbitrary saved alarms is not guessed.
 
 ## Device utilities & current information — SUPPORTED
 Torch, battery/time/date/network/storage answers read from the phone at execution time (offline;

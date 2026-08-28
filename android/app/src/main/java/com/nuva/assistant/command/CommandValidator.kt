@@ -147,7 +147,14 @@ object CommandValidator {
             NuvaIntent.OPEN_VOICEMAIL -> ValidatedAction.Valid(NuvaAction.OpenVoicemail)
             NuvaIntent.MAP_NAVIGATION -> validateMapNavigation(actionJson)
             NuvaIntent.EMERGENCY_DIALER -> validateEmergencyDialer(actionJson)
+            NuvaIntent.CLOCK_CONTROL -> validateClockControl(actionJson)
         }
+    }
+
+    private fun validateClockControl(json: JsonObject): ValidatedAction {
+        val operation = ClockOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("CLOCK_CONTROL requires operation"))
+        return ValidatedAction.Valid(NuvaAction.ClockControl(operation))
     }
 
     private fun validateEmergencyDialer(json: JsonObject): ValidatedAction {

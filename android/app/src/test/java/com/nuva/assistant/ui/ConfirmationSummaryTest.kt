@@ -130,6 +130,16 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `clock summary distinguishes active changes`() {
+        val summary = ConfirmationSummary.build(
+            NuvaAction.ClockControl(com.nuva.assistant.command.ClockOperation.DISMISS_ALARM),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(summary.lines.any { it.value == "dismiss_alarm" })
+        assertEquals("CONFIRM", summary.confirmLabel)
+    }
+
+    @Test
     fun `advanced media summaries expose seek and exact volume`() {
         val seek = ConfirmationSummary.build(
             NuvaAction.MediaControl(com.nuva.assistant.command.MediaCommand.FAST_FORWARD, 30),

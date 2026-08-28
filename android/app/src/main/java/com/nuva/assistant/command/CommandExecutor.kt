@@ -815,6 +815,17 @@ class CommandExecutor(
                     ExecutionOutcome("failed", result.reason, result.reason)
             }
 
+            is NuvaAction.ClockControl -> when (
+                val result = com.nuva.assistant.automation.ClockController.execute(context, action.operation)
+            ) {
+                is com.nuva.assistant.automation.ClockController.Result.Requested ->
+                    ExecutionOutcome("completed", result.speech)
+                is com.nuva.assistant.automation.ClockController.Result.ClockOpened ->
+                    ExecutionOutcome("completed", result.speech)
+                is com.nuva.assistant.automation.ClockController.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.DeviceStatusQuery ->
                 ExecutionOutcome(
                     "completed",

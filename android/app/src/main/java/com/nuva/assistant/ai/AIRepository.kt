@@ -204,7 +204,7 @@ class AIRepository(
     private data class StageEventDto(val stage: String = "", val source: String? = null)
 
     companion object {
-        const val APP_VERSION = "3.5.0"
+        const val APP_VERSION = "3.6.0"
         const val DEFAULT_BASE_URL = "https://nuva-backend.vercel.app/"
 
         /** Accepts missing scheme and missing trailing slash. */

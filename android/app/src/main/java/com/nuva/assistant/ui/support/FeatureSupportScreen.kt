@@ -57,7 +57,7 @@ val SUPPORTED_FEATURES = listOf(
     "Explicit clipboard copy/read/clear — confirmation, bounded/redacted text; কোনো monitoring/history নয়",
     "Rich calendar event draft — title/time/duration/location/description/attendee; final Save user",
     "কন্টাক্ট খোঁজা — একাধিক মিল হলে আপনি বেছে নেবেন",
-    "অ্যালার্ম ও টাইমার (বাংলা/বাংলিশ/ইংরেজি সময়)",
+    "অ্যালার্ম/টাইমার create ও list; confirmation-এর পর active snooze/dismiss official intent, fallback Clock app",
     "ক্যালেন্ডারে রিমাইন্ডার (কনফার্মেশনসহ, Save আপনি চাপবেন)",
     "নোট, টু-ডু, শপিং/বাজারের তালিকা ও খরচের নোট ভয়েসে লেখা এবং আবার পড়ে শোনানো (শুধু ফোনে থাকে)",
     "অফলাইন হিসাব — +, −, ×, ÷, bracket, power, square root, factorial, percentage, discount, VAT/tip, bill split",

@@ -553,7 +553,26 @@ class CommandParserTest {
         }
     }
 
-    // --- Alarm / timer --------------------------------------------------------------------
+    // --- Clock management, alarm & timer -------------------------------------------------
+
+    @Test
+    fun `existing alarm and timer actions parse with risk gates`() {
+        val showAlarms = CommandParser.parse("show alarms")!!
+        assertEquals(ClockOperation.SHOW_ALARMS, (showAlarms.action as NuvaAction.ClockControl).operation)
+        assertFalse(showAlarms.requiresConfirmation)
+
+        val showTimers = CommandParser.parse("timer list dekhao")!!
+        assertEquals(ClockOperation.SHOW_TIMERS, (showTimers.action as NuvaAction.ClockControl).operation)
+
+        val snooze = CommandParser.parse("snooze alarm")!!
+        assertEquals(ClockOperation.SNOOZE_ALARM, (snooze.action as NuvaAction.ClockControl).operation)
+        assertTrue(snooze.requiresConfirmation)
+
+        val dismiss = CommandParser.parse("alarm bondho koro")!!
+        assertEquals(ClockOperation.DISMISS_ALARM, (dismiss.action as NuvaAction.ClockControl).operation)
+        assertTrue(dismiss.requiresConfirmation)
+        assertEquals(ClockOperation.DISMISS_TIMER, (CommandParser.parse("timer bondho koro")!!.action as NuvaAction.ClockControl).operation)
+    }
 
     @Test
     fun `alarm parses banglish morning time`() {

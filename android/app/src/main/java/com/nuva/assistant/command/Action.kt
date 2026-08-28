@@ -298,6 +298,10 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.EMERGENCY_DIALER
     }
 
+    data class ClockControl(val operation: ClockOperation) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CLOCK_CONTROL
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -454,6 +458,22 @@ enum class CaptureMode(val wireName: String) {
     companion object {
         fun fromWire(value: String?): CaptureMode? =
             entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class ClockOperation(val wireName: String) {
+    SHOW_ALARMS("show_alarms"),
+    SHOW_TIMERS("show_timers"),
+    SNOOZE_ALARM("snooze_alarm"),
+    DISMISS_ALARM("dismiss_alarm"),
+    DISMISS_TIMER("dismiss_timer"),
+    ;
+
+    val changesActiveClock: Boolean
+        get() = this == SNOOZE_ALARM || this == DISMISS_ALARM || this == DISMISS_TIMER
+
+    companion object {
+        fun fromWire(value: String?): ClockOperation? = entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }
 
