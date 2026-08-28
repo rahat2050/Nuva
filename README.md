@@ -62,7 +62,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v4.1 passes** — practical assistant → explicit provider data | ✅ Implemented in code (real-device QA still pending): encrypted Home Assistant plus optional bounded Calendar agenda read and exact visible event view/edit with no direct write/delete; see [`docs/supported-features.md`](docs/supported-features.md) |
+| **v1.1–v4.2 passes** — practical assistant → system assistant | ✅ Implemented in code (real-device QA still pending): user-selectable Android default-assistant entry, visible “Hey Nuva” fallback hardening, encrypted Home Assistant and bounded Calendar provider access; see [`docs/supported-features.md`](docs/supported-features.md) |
 
 `backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
@@ -71,7 +71,7 @@ full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)
 ## Architecture
 
 ```
-USER ─▶ HEY NUVA ─▶ FLOATING POPUP ─▶ VOICE ENGINE ─▶ COMMAND ENGINE ─▶ VERCEL API ─▶ GROQ AI
+USER ─▶ HEY NUVA / ANDROID ASSIST ─▶ NUVA UI ─▶ VOICE ENGINE ─▶ COMMAND ENGINE ─▶ VERCEL API ─▶ GROQ AI
                                                                           │
                                                               STRUCTURED ACTION JSON
                                                                           │
@@ -204,6 +204,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [pdf-print-calendar-view.md](docs/pdf-print-calendar-view.md) | v3.7 selected PDF printing and no-read Calendar views |
 | [home-assistant.md](docs/home-assistant.md) | v4.0 encrypted configuration and physical-control allowlist |
 | [calendar-provider.md](docs/calendar-provider.md) | v4.1 optional bounded agenda read and exact event handoff |
+| [hey-nuva-system-assistant.md](docs/hey-nuva-system-assistant.md) | v4.2 default-assistant registration and visible wake fallback |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |

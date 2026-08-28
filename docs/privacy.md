@@ -1,12 +1,14 @@
 # NUVA Privacy
 
-Last updated: v2.6 (2026-08-27). The app contains **no analytics, no trackers,
+Last updated: v4.2 (2026-08-28). The app contains **no analytics, no trackers,
 no ad SDKs**.
 
 ## What stays on your phone
 
-* **Voice audio** — never uploaded. Android SpeechRecognizer transcribes on
-  device/service; only the resulting TEXT is used.
+* **Voice audio** — NUVA never stores raw audio or sends it to NUVA backend/Groq/Vercel/Supabase.
+  Android's user-selected `SpeechRecognizer` provider converts audio to text under that provider's
+  own privacy terms; only the resulting transcript enters NUVA's command pipeline. Idle wake-loop
+  transcripts are matched locally and are not sent to NUVA's backend.
 * Command history, notes, to-dos, memories, settings — local Room/DataStore only.
 * Scheduled email/SMS **draft reminders** (recipient, subject/body, trigger and recurrence) — local Room only;
   AlarmManager carries only the local row id. They are never uploaded or automatically sent.
@@ -46,9 +48,9 @@ the public anon key.
 * OTP / PIN / password / CVV / card numbers are never read, stored, typed or
   sent (policy LEVEL 2). Banking screens are never read.
 * Financial transactions are never automated (LEVEL 3).
-* No hidden recording: the microphone runs only in a foreground session with a
-  visible notification, and only while the listening indicator is active.
-* No raw microphone stream ever goes to Groq/Vercel.
+* No hidden recording: active command listening has visible UI; optional “Hey Nuva” waiting always
+  has a visible ongoing microphone foreground-service notification and pauses while the screen is off.
+* No raw microphone stream ever goes to NUVA backend, Groq, Vercel or Supabase.
 
 ## In-app privacy screen
 

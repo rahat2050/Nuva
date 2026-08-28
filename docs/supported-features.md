@@ -1,13 +1,19 @@
-# NUVA — Supported features (v4.1)
+# NUVA — Supported features (v4.2)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
 **BLOCKED** (policy refusal)
 
-## Voice & conversation — SUPPORTED
-Wake "Hey Nuva" (opt-in service, visible session, one wake = command + ≤2 follow-ups),
-Bangla/Banglish/English/mixed parsing, typed fallback, Bangla-first replies, stuck-session
-timeout recovery (15 s), conversational context (5-min TTL, pronoun "ওকে" resolution).
+## Voice & conversation — SUPPORTED / ANDROID-LIMITED
+v4.2 registers NUVA as a user-selectable Android default digital assistant: the assistant gesture or
+configured power shortcut opens NUVA and starts listening. The opt-in foreground “Hey Nuva” fallback
+uses a visible ongoing microphone notification, works while the screen is interactive, opens the full
+app when NUVA is selected as default, and retains one wake = command + ≤2 follow-ups. Android 11+
+recognizer discovery, first-enable race recovery, 12-second wake-cycle recovery, ASR name variants and
+self-TTS rejection are included. Google's screen-off low-power DSP hotword path requires OEM/system
+keyphrase support unavailable to an ordinary APK. Bangla/Banglish/English/mixed parsing, typed fallback,
+Bangla-first replies, 15-second command timeout recovery and 5-minute conversational context remain.
+Details: [`hey-nuva-system-assistant.md`](hey-nuva-system-assistant.md).
 
 ## Natural command grammar — SUPPORTED
 A data-audited grammar accepts **12,250 concrete static command forms** (50 families × 5 aliases ×

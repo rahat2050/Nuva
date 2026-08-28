@@ -24,6 +24,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.nuva.assistant.MainActivity
 import com.nuva.assistant.R
 import com.nuva.assistant.automation.UserPresentContactWorkflow
 import com.nuva.assistant.automation.UserPresentFileWorkflow
@@ -45,7 +46,10 @@ private val TABS = listOf(
 )
 
 @Composable
-fun NuvaApp() {
+fun NuvaApp(
+    assistantInvocation: MainActivity.AssistantInvocation? = null,
+    onAssistantInvocationConsumed: (Long) -> Unit = {},
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -58,10 +62,11 @@ fun NuvaApp() {
     val startDestination = if (onboardingDone!!) "home" else "onboarding"
     val fileWorkflow by UserPresentFileWorkflow.state.collectAsState()
     val contactWorkflow by UserPresentContactWorkflow.state.collectAsState()
-    LaunchedEffect(fileWorkflow, contactWorkflow, onboardingDone) {
+    LaunchedEffect(fileWorkflow, contactWorkflow, onboardingDone, assistantInvocation?.id) {
         val pickerPending = fileWorkflow is UserPresentFileWorkflow.State.Pending ||
             contactWorkflow is UserPresentContactWorkflow.State.Pending
-        if (onboardingDone == true && pickerPending && currentDestination?.route != "home") {
+        val assistantPending = assistantInvocation != null
+        if (onboardingDone == true && (pickerPending || assistantPending) && currentDestination?.route != "home") {
             navController.navigate("home") { launchSingleTop = true }
         }
     }
@@ -104,7 +109,12 @@ fun NuvaApp() {
                     onShowFeatures = { navController.navigate("support") },
                 )
             }
-            composable("home") { HomeScreen() }
+            composable("home") {
+                HomeScreen(
+                    assistantInvocation = assistantInvocation,
+                    onAssistantInvocationConsumed = onAssistantInvocationConsumed,
+                )
+            }
             composable("history") { HistoryScreen() }
             composable("memory") { MemoryScreen() }
             composable("settings") {

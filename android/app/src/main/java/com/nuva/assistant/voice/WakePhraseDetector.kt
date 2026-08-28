@@ -14,14 +14,25 @@ object WakePhraseDetector {
         val commandAfterWake: String?,
     )
 
+    /*
+     * Speech engines commonly render the made-up name "Nuva" as Nova/Niva.
+     * Variants stay anchored at the beginning and still require either the
+     * greeting or assistant name, keeping ordinary conversation from waking it.
+     */
     private val latinWakePatterns = listOf(
-        Regex("\\b(hey|hi)\\s+(nuva|nova|nuba)\\b", RegexOption.IGNORE_CASE),
-        Regex("^\\s*(nuva|nova|nuba)\\b", RegexOption.IGNORE_CASE),
+        Regex(
+            "^\\s*(hey|hi|hai|hay)\\s+(nuva|nova|nuba|neva|niva|noova|newva)\\b",
+            RegexOption.IGNORE_CASE,
+        ),
+        Regex(
+            "^\\s*(nuva|nova|nuba|neva|niva|noova|newva)\\b",
+            RegexOption.IGNORE_CASE,
+        ),
     )
 
     private val banglaWakePatterns = listOf(
-        Regex("(হে|এই)?\\s*নুভা"),
-        Regex("(হে|এই)?\\s*নুভো"),
+        Regex("^\\s*(?:(হে|হেই|এই)\\s*)?(নুভা|নোভা|নুবা|নিভা)"),
+        Regex("^\\s*(?:(হে|হেই|এই)\\s*)?নুভো"),
     )
 
     fun detect(raw: String): Match? {
@@ -29,12 +40,12 @@ object WakePhraseDetector {
         if (text.isBlank()) return null
 
         val latin = latinWakePatterns.firstNotNullOfOrNull { pattern ->
-            pattern.find(text)?.let { it.value to it.range }
+            pattern.find(text)?.let { it.value.trim() to it.range }
         }
         if (latin != null) return latin.toMatch(text)
 
         val bangla = banglaWakePatterns.firstNotNullOfOrNull { pattern ->
-            pattern.find(text)?.let { it.value to it.range }
+            pattern.find(text)?.let { it.value.trim() to it.range }
         }
         return bangla?.toMatch(text)
     }

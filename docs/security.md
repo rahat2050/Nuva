@@ -88,7 +88,8 @@ to `/api/*`).
 ## 7. Privacy (§26)
 
 Stored: command text, the derived action, risk, status, and preferences the user asks NUVA to
-remember. Not stored: audio (never uploaded in PHASE 1), contact lists, location, screen contents.
+remember. Not stored by NUVA: raw audio, contact lists, location, screen contents. The selected Android
+speech provider may process audio under its own terms, but NUVA backend receives transcript text only.
 Screen context sent with a command is used for that request only and is never persisted.
 
 `/api/memory` actively refuses credential-like keys, so a buggy or malicious client cannot turn
@@ -109,6 +110,19 @@ NUVA's memory into a password store.
 - Queries are explicit, transient and capped to 31 days/100 instances.
 - Credential-like event titles are excluded and ambiguous title matches stop.
 - Event edit opens the visible Calendar app; NUVA never silently updates/deletes events.
+
+## System assistant / wake boundary (v4.2)
+
+- Android's visible Default apps picker is the only way to select NUVA; it never replaces another
+  assistant programmatically.
+- AssistStructure and screenshot delivery are disabled for ordinary NUVA invocation.
+- Custom wake mode is opt-in, screen-on only and always carries an ongoing microphone notification.
+- No hidden/system `CAPTURE_AUDIO_HOTWORD`, boot-time microphone start or privacy-indicator bypass.
+- Wake transcripts stay local until a verified command; raw audio never reaches NUVA backend/Groq.
+- The required RecognitionService bridge rejects its own package to prevent recursive binding and
+  delegates only to an installed external provider.
+- Assistant invocation changes only the entry point; all normal validation, risk and confirmation
+  gates still run.
 
 ## 8. Known limitations (honest list)
 

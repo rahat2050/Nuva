@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Required metadata for the RecognitionService referenced by the VIA. -->
+<recognition-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.nuva.assistant.MainActivity" />

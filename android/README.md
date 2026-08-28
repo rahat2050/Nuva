@@ -72,13 +72,15 @@ com.nuva.assistant/
    For local backend testing on an emulator use `http://10.0.2.2:3000/`. Tap Save — it checks `/api/health`.
 2. **Microphone + notification** — grant when prompted. A visible foreground notification is shown
    whenever NUVA is listening or waiting for the wake phrase.
-3. **Floating popup** — Settings → System assistant mode → enable **Display over other apps** when
-   Android asks. The overlay is shown only after activation and auto-dismisses after results.
-4. **Accessibility** — Settings → Accessibility → NUVA Automation → On. This is required for
+3. **Default assistant** — Settings → Hey NUVA & default assistant → **Choose NUVA as default**,
+   then select NUVA in Android's visible Digital assistant app picker.
+4. **Floating popup** — enable **Display over other apps** when Android asks. It is used as the
+   fallback when an OEM does not route the official assistant surface.
+5. **Accessibility** — Settings → Accessibility → NUVA Automation → On. This is required for
    tap/type/swipe/scroll/read-screen; app open, alarms, timers, dialer and browser work without it.
-5. Toggle **Wake word “Hey Nuva”** in NUVA Settings. Leave the app, use another app, say “Hey Nuva”,
-   then speak the command in the floating popup.
-6. Optional: Supabase URL + anon key + sign-in to enable cloud memory/history sync.
+6. Toggle **Wake word “Hey Nuva”**. Confirm `waiting for wake`, leave the app, keep the screen on and
+   say “Hey Nuva”. `Restart listener` and `Test voice` diagnose stale OEM recognizers.
+7. Optional: Supabase URL + anon key + sign-in to enable cloud memory/history sync.
 
 ## The safety model (client half)
 
@@ -93,14 +95,18 @@ com.nuva.assistant/
   anon key.
 - Pending actions are persisted and re-validated on decode, so nothing stale can execute.
 
-## Wake word status
+## Wake word and default-assistant status
 
-`WakeWordService` now provides the Android-compliant fallback for “Hey Nuva”: an explicit Settings
-toggle starts a visible foreground microphone service, checks wake-loop transcripts locally, then
-shows a small overlay popup for the actual command. NUVA does **not** send idle/wake-loop audio or
-transcripts to the backend/Groq. The fallback uses Android's `SpeechRecognizer`, so the device's
-recognizer policy still applies; for strict offline hotwording, a future DSP/on-device keyword engine
-can replace it without changing the command engine.
+v4.2 adds Android's official `VoiceInteractionService`/session/recognizer contract, so the user can
+select NUVA as the default digital assistant and invoke it with the device's configured assistant
+gesture or power shortcut. `WakeWordService` remains an opt-in foreground fallback for the custom
+“Hey Nuva” phrase: its microphone notification is always visible, it runs only while the screen is
+interactive and it promotes verified wakes to the official NUVA surface when available.
+
+Idle/wake transcripts are checked locally and never sent to NUVA backend/Groq. Raw audio is not
+stored or sent to NUVA backend; the selected Android speech provider may process it under that
+provider's terms. A normal APK cannot use Google's/OEM's screen-off DSP model or hidden
+`CAPTURE_AUDIO_HOTWORD` path. See [`../docs/hey-nuva-system-assistant.md`](../docs/hey-nuva-system-assistant.md).
 
 ## Test matrix (§2.19 essentials)
 
@@ -186,6 +192,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   and confirmed light/switch/fan/climate allowlist; locks/security/high-consequence domains excluded.
 * **v4.1 Calendar provider**: optional bounded agenda reads and exact title-matched event view/edit
   handoff; credential events excluded, ambiguity stops, no WRITE_CALENDAR/direct delete.
+* **v4.2 system assistant**: complete default-assistant registration, gesture/power invocation,
+  visible custom wake fallback, recognizer-discovery/race/timeout fixes and live diagnostics.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

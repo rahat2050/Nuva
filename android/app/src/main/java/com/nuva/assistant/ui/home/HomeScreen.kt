@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nuva.assistant.MainActivity
 import com.nuva.assistant.R
 import com.nuva.assistant.accessibility.NuvaAccessibilityService
 import com.nuva.assistant.automation.UserPresentContactWorkflow
@@ -165,7 +166,11 @@ class HomeViewModel : ViewModel() {
 }
 
 @Composable
-fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(
+    viewModel: HomeViewModel = viewModel(),
+    assistantInvocation: MainActivity.AssistantInvocation? = null,
+    onAssistantInvocationConsumed: (Long) -> Unit = {},
+) {
     val context = LocalContext.current
     val micPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -184,6 +189,19 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     val contactPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickContact(),
     ) { uri -> viewModel.onContactWorkflowUri(uri) }
+
+    LaunchedEffect(assistantInvocation?.id) {
+        val invocation = assistantInvocation ?: return@LaunchedEffect
+        if (invocation.listenInApp) {
+            val command = invocation.inlineCommand
+            when {
+                !command.isNullOrBlank() -> viewModel.submitTyped(command)
+                NuvaPermissions.hasRecordAudio(context) -> viewModel.startListening()
+                else -> micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+        onAssistantInvocationConsumed(invocation.id)
+    }
 
     val state by viewModel.state.collectAsState(initial = VoiceController.State.Idle)
     val pending by viewModel.pending.collectAsState()

@@ -1,6 +1,6 @@
 # NUVA Architecture
 
-> Status: **PHASE 1 (Vercel Backend Foundation) implemented.** PHASE 2 Android app is implemented, including the opt-in foreground wake-word fallback and floating popup; real-device build/release verification is still pending.
+> Status: **PHASE 1 (Vercel Backend Foundation) implemented.** PHASE 2 Android app is implemented, including user-selectable default-assistant registration plus the opt-in visible foreground wake-word fallback; real-device build/release verification is still pending.
 
 ## 1. The engineering model (§29)
 
@@ -21,7 +21,7 @@ Every command follows exactly this path. Steps marked **[BE]** live in `backend/
 **[APP]** live in the Kotlin Android app under `android/`.
 
 ```
-WAKE WORD                 [APP]  opt-in WakeWordService fallback detects "Hey Nuva"
+ASSIST / WAKE             [APP]  Android VoiceInteractionService or visible WakeWordService
    ↓
 FLOATING UI               [APP]  overlay shows listening/processing/confirmation/result
    ↓
@@ -80,7 +80,8 @@ NUVA/
 ├── android/        PHASE 2 — Kotlin + Compose assistant app
 │   └── app/src/main/java/com/nuva/assistant/
 │       ├── voice/          SpeechRecognizer, TTS, wake phrase detector
-│       ├── service/        foreground listening + wake-word service
+│       ├── systemassistant/ default-assistant/session/recognizer bridge
+│       ├── service/        foreground listening + visible wake-word service
 │       ├── ui/floating/    small overlay assistant popup
 │       └── accessibility/  Android AccessibilityService automation
 ├── backend/        PHASE 1 — Vercel serverless API  (implemented)

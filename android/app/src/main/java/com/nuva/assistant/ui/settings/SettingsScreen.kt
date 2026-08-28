@@ -40,8 +40,10 @@ import com.nuva.assistant.R
 import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.core.permissions.NuvaPermissions
 import com.nuva.assistant.service.WakeWordService
+import com.nuva.assistant.systemassistant.SystemAssistantController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -158,12 +160,35 @@ class SettingsViewModel : ViewModel() {
         CoroutineScope(Dispatchers.IO).launch {
             preferences.setWakeWordEnabled(enabled)
             if (enabled) {
-                WakeWordService.start(NuvaContainer.appContext)
-                message.value = "NUVA active — leave the app and say “Hey Nuva”."
+                val started = WakeWordService.start(NuvaContainer.appContext)
+                message.value = if (started) {
+                    "Wake listener starting — keep its visible notification on."
+                } else {
+                    "Android wake listener start করতে দেয়নি; app foreground থেকে আবার চেষ্টা করুন।"
+                }
             } else {
                 WakeWordService.stop(NuvaContainer.appContext)
                 message.value = "Wake word stopped."
             }
+        }
+    }
+
+    fun restartWakeWord() {
+        CoroutineScope(Dispatchers.IO).launch {
+            preferences.setWakeWordEnabled(true)
+            WakeWordService.stop(NuvaContainer.appContext)
+            delay(300)
+            val started = WakeWordService.start(NuvaContainer.appContext)
+            message.value = if (started) "Wake listener restarted." else "Wake listener restart failed."
+        }
+    }
+
+    fun testVoiceSurface() {
+        val started = WakeWordService.trigger(NuvaContainer.appContext)
+        message.value = if (started) {
+            "Voice surface test started — এখন একটি command বলুন।"
+        } else {
+            "Android voice surface start করতে দেয়নি।"
         }
     }
 }
@@ -194,6 +219,7 @@ fun SettingsScreen(
     val voiceEnabled by preferences.voiceEnabled.collectAsState(initial = true)
     val confirmationAlways by preferences.confirmationAlways.collectAsState(initial = false)
     val wakeWordEnabled by preferences.wakeWordEnabled.collectAsState(initial = false)
+    val wakeRuntimeStatus by WakeWordService.runtimeStatus.collectAsState()
     val directCall by preferences.directCall.collectAsState(initial = false)
     val signedIn by viewModel.signedIn.collectAsState(initial = false)
     val message by viewModel.message
@@ -212,6 +238,9 @@ fun SettingsScreen(
     val runtimeMissing = remember(permissionRefresh) { NuvaPermissions.missingWakeWordRuntimePermissions(context) }
     val notificationGranted = remember(permissionRefresh) { NuvaPermissions.hasNotifications(context) }
     val micGranted = remember(permissionRefresh) { NuvaPermissions.hasRecordAudio(context) }
+    val nuvaIsDefaultAssistant = remember(permissionRefresh) {
+        SystemAssistantController.isNuvaDefault(context)
+    }
 
     val wakePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -414,16 +443,49 @@ fun SettingsScreen(
 
         HorizontalDivider()
 
-        Text("System assistant mode", style = MaterialTheme.typography.titleMedium)
+        Text("Hey NUVA & default assistant", style = MaterialTheme.typography.titleMedium)
+        Text(
+            if (nuvaIsDefaultAssistant) {
+                "Default digital assistant: NUVA ✓"
+            } else {
+                "Step 1: Android Default apps থেকে NUVA-কে digital assistant হিসেবে বেছে নিন।"
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (nuvaIsDefaultAssistant) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
+        )
+        OutlinedButton(
+            onClick = {
+                val opened = SystemAssistantController.openAssistantPicker(context)
+                viewModel.setMessage(
+                    if (opened) "Digital assistant app খুলে NUVA select করুন, তারপর ফিরে আসুন।"
+                    else "এই ফোনে default assistant settings খোলা যায়নি।",
+                )
+            },
+        ) {
+            Text(if (nuvaIsDefaultAssistant) "Check default assistant" else "Choose NUVA as default")
+        }
+
         ToggleRow(
-            label = stringResource(R.string.settings_wake_word),
+            label = "Step 2: " + stringResource(R.string.settings_wake_word),
             checked = wakeWordEnabled,
             onChange = { enabled ->
                 if (enabled) enableWakeWord() else viewModel.setWakeWord(false)
             },
         )
         Text(
-            "After this is on, leave NUVA open no longer: use any app, say “Hey Nuva”, then give the command in the floating popup.",
+            "Listener: ${wakeRuntimeStatus.state.name.lowercase().replace('_', ' ')} · ${wakeRuntimeStatus.detail}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = when (wakeRuntimeStatus.state) {
+                WakeWordService.RuntimeState.WAITING_FOR_WAKE,
+                WakeWordService.RuntimeState.WAKE_DETECTED,
+                WakeWordService.RuntimeState.LISTENING_FOR_COMMAND,
+                WakeWordService.RuntimeState.PROCESSING -> MaterialTheme.colorScheme.secondary
+                WakeWordService.RuntimeState.ERROR -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+        Text(
+            "Screen on থাকলে verified “Hey Nuva” NUVA খুলবে। Google/Gemini-এর screen-off low-power DSP hotword OEM/system-only; normal APK সেটি দখল করতে পারে না।",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -433,16 +495,26 @@ fun SettingsScreen(
             color = if (runtimeMissing.isEmpty() && overlayGranted) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { viewModel.restartWakeWord() },
+                enabled = wakeWordEnabled && runtimeMissing.isEmpty() && overlayGranted,
+            ) { Text("Restart listener") }
+            OutlinedButton(
+                onClick = { viewModel.testVoiceSurface() },
+                enabled = runtimeMissing.isEmpty() && overlayGranted,
+            ) { Text("Test voice") }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!overlayGranted) {
                 OutlinedButton(onClick = { NuvaPermissions.openOverlaySettings(context) }) {
                     Text("Overlay permission")
                 }
             }
-            OutlinedButton(onClick = { NuvaPermissions.openAccessibilitySettings(context) }) {
-                Text("Accessibility")
-            }
             OutlinedButton(onClick = { NuvaPermissions.openBatteryOptimizationSettings(context) }) {
                 Text("Battery")
+            }
+            OutlinedButton(onClick = { NuvaPermissions.openAccessibilitySettings(context) }) {
+                Text("Accessibility")
             }
         }
 
