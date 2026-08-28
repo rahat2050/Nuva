@@ -8,6 +8,7 @@ npm install
 npm run build     # tsc --noEmit  (the PHASE 1 "TypeScript builds" gate)
 npm test          # vitest run    (190 tests)
 npm run verify    # build + test
+npm audit          # dependency advisories; current expected result: 0
 npm run dev       # local server on :3000 with a manual test console at /
 ```
 

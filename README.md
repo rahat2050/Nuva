@@ -207,6 +207,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [hey-nuva-system-assistant.md](docs/hey-nuva-system-assistant.md) | v4.2 default-assistant registration and visible wake fallback |
 | [3d-ui-ux.md](docs/3d-ui-ux.md) | v4.3 accessible native 3D/glass interface system |
 | [quick-access-text-handoff.md](docs/quick-access-text-handoff.md) | v4.4 Quick Settings/launcher voice entry and selected-text drafts |
+| [v4.4-full-code-audit.md](docs/v4.4-full-code-audit.md) | Full source audit, fixes, passing gates and remaining build blocker |
 | [v4.2-apk-build-qa.md](docs/v4.2-apk-build-qa.md) | Reproducible contract/API checks and real-device release gate |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |

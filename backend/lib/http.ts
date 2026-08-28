@@ -18,7 +18,7 @@ import { clientIp, headerValue } from './auth.js';
 import { detectLanguage } from './normalize.js';
 import { LANGUAGES, type Language } from '../types/action.js';
 import type { ApiErrorBody } from '../types/api.js';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../types/vercel.js';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 

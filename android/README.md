@@ -55,8 +55,8 @@ com.nuva.assistant/
 ## Build & run
 
 1. Open the **`android/`** folder in Android Studio (Koala or newer, AGP 8.7.3 / Gradle 8.9).
-   The wrapper JAR is not committed — Android Studio regenerates it on first sync, or run
-   `gradle wrapper --gradle-version 8.9` once if you prefer the CLI.
+   The official Gradle 8.9 wrapper JAR is committed and checksum-audited, so a fresh clone can
+   bootstrap with `./gradlew` without requiring a system Gradle installation.
 2. `./gradlew :app:assembleDebug` (or the Run ▶ button).
 3. Unit tests (pure JVM, no emulator): `./gradlew :app:testDebugUnitTest`
 

@@ -11,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -254,6 +255,17 @@ def main() -> None:
             re.search(rf"\b{local_intent}\([^\n]+localOnly\s*=\s*true", intent_source) is not None,
             f"{local_intent} must remain local-only",
         )
+
+    # A fresh clone must be able to bootstrap the exact Gradle release.
+    wrapper_jar = ANDROID_DIR / "gradle/wrapper/gradle-wrapper.jar"
+    require(wrapper_jar.is_file(), "Gradle wrapper JAR missing from fresh clone")
+    wrapper_sha = hashlib.sha256(wrapper_jar.read_bytes()).hexdigest()
+    require(
+        wrapper_sha == "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17",
+        "Gradle 8.9 wrapper JAR checksum mismatch",
+    )
+    wrapper_properties = (ANDROID_DIR / "gradle/wrapper/gradle-wrapper.properties").read_text()
+    require("gradle-8.9-bin.zip" in wrapper_properties, "Gradle wrapper version drifted from 8.9")
 
     # Version is one source of release truth across Android build + client header + docs.
     gradle = (APP / "build.gradle.kts").read_text()

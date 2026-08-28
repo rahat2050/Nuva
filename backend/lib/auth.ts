@@ -17,7 +17,7 @@
 import { getEnv, supabaseConfigured, type NuvaEnv } from './env.js';
 import { NuvaError } from './errors.js';
 import type { Logger } from './logger.js';
-import type { VercelRequest } from '@vercel/node';
+import type { VercelRequest } from '../types/vercel.js';
 
 export interface Identity {
   userId: string | null;
