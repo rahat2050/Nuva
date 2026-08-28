@@ -36,6 +36,7 @@ val SUPPORTED_FEATURES = listOf(
     "১২,২৫০টি audited natural command form — polite/ASR/Bangla/Banglish/English variant ও ৬-step multi-command plan",
     "অ্যাপ খোলা/Play Store suggestion; non-financial app-এর system uninstall prompt (final decision user); financial/NUVA blocked",
     "অ্যাপ বন্ধ, হোম, ব্যাক, রিসেন্ট অ্যাপ; ফাইন্যান্সিয়াল অ্যাপেও স্ক্রল/নেভিগেশন",
+    "Bangladesh 999 police/fire/ambulance dialer, confirmed SOS text share এবং emergency-info settings — final Call/Send user",
     "ব্রাউজারে URL/search এবং Maps directions/navigation/nearby/street-view coordinate; drive/walk/cycle/transit mode",
     "আবহাওয়া/খবর/live score/traffic/rate/prayer/AQI-এর current sourced lookup",
     "YouTube-এ গান/ভিডিও সার্চ ও প্লে; Spotify থাকলে খোলা",

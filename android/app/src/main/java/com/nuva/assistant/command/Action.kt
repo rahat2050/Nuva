@@ -294,6 +294,10 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.MAP_NAVIGATION
     }
 
+    data class EmergencyDialer(val service: EmergencyService) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.EMERGENCY_DIALER
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -445,6 +449,18 @@ enum class CaptureMode(val wireName: String) {
     companion object {
         fun fromWire(value: String?): CaptureMode? =
             entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class EmergencyService(val wireName: String, val dialNumber: String) {
+    NATIONAL("national", "999"),
+    POLICE("police", "999"),
+    FIRE("fire", "999"),
+    AMBULANCE("ambulance", "999"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): EmergencyService? = entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }
 
@@ -691,6 +707,7 @@ enum class SettingTarget(val wireName: String) {
     CAST("cast"),
     PRINT("print"),
     CAPTIONS("captions"),
+    EMERGENCY_INFO("emergency_info"),
     ;
 
     companion object {

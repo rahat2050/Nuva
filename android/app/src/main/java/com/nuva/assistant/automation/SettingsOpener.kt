@@ -84,6 +84,16 @@ object SettingsOpener {
         SettingTarget.CAST -> start(context, "android.settings.CAST_SETTINGS", "Cast settings khulchi.")
         SettingTarget.PRINT -> start(context, Settings.ACTION_PRINT_SETTINGS, "Print settings khulchi.")
         SettingTarget.CAPTIONS -> start(context, Settings.ACTION_CAPTIONING_SETTINGS, "Caption settings khulchi.")
+        SettingTarget.EMERGENCY_INFO -> when (
+            val result = start(
+                context,
+                "android.settings.EMERGENCY_ASSISTANCE_SETTINGS",
+                "Emergency information settings khulchi.",
+            )
+        ) {
+            is Result.Failed -> start(context, Settings.ACTION_SECURITY_SETTINGS, "Emergency screen paini; security settings khulchi.")
+            else -> result
+        }
     }
 
     // --- Torch --------------------------------------------------------------------

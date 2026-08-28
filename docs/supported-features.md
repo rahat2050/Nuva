@@ -1,4 +1,4 @@
-# NUVA — Supported features (v3.3)
+# NUVA — Supported features (v3.4)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -87,6 +87,13 @@ services × 5 tasks (100), 20 learning subjects × 5 tasks (100), and 20 househo
 tasks (100). An entity and task must both match, while location/model/error details are preserved.
 All skills are read-only live searches; transaction and credential policies run first.
 Lists: [`100-daily-skills.md`](100-daily-skills.md) · [`500-extended-skills.md`](500-extended-skills.md).
+
+## Emergency & SOS — USER-FINALIZED SUPPORTED
+v3.4 maps national/police/fire/ambulance emergency requests to Bangladesh `999` and opens only the
+visible dialer; NUVA never places the call. SOS text opens the normal confirmed share sheet without
+collecting location. Emergency/medical-info settings open through the official Android settings
+action with security-settings fallback. Other helpline numbers remain sourced lookups rather than
+hard-coded potentially stale numbers.
 
 ## Maps, routes & navigation — SUPPORTED USER-HANDOFF
 v3.2 opens user-visible maps for directions, turn-by-turn navigation, nearby searches and street-view

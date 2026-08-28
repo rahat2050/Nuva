@@ -233,6 +233,19 @@ def parse(raw):
     if not text: return None
     return parse_prepared(text)
 
+def parse_emergency(t):
+    if any(w in t for w in ["emergency info setting","medical info setting","emergency profile"]):
+        return ok({"kind":"EMERGENCY_INFO"},"OPEN_SETTING")
+    marker=next((w for w in ["sos message draft","emergency message draft","help message share"] if w in t),None)
+    if marker:
+        text=content_after(t,marker) or "amar joruri shahajjo dorkar"
+        text=re.sub(r"^(je|যে)\s+","",text).strip()
+        return ok({"kind":"sharetext","text":text},"SHARE_TEXT",risk="MEDIUM",base="MEDIUM")
+    if not any(w in t for w in ["emergency call","emergency dialer","999 dial","police call","ambulance call","fire service call"]):
+        return None
+    service="POLICE" if "police" in t else ("AMBULANCE" if "ambulance" in t else ("FIRE" if "fire" in t else "NATIONAL"))
+    return ok({"kind":"emergency","service":service,"number":"999"},"EMERGENCY_DIALER")
+
 def parse_nav(t):
     if any(w in t for w in ["home e jao","go home","home e cholo","home e firi jao","হোমে যাও","হোম স্ক্রিনে যাও"]):
         return ok({"kind":"GoHome"}, "GO_HOME")
@@ -948,7 +961,7 @@ def parse_knowledge(t):
     return None
 
 def rule_table(t):
-    return (parse_nav(t) or parse_user_file(t) or parse_productivity(t) or parse_communication(t)
+    return (parse_nav(t) or parse_emergency(t) or parse_user_file(t) or parse_productivity(t) or parse_communication(t)
             or parse_map_navigation(t) or parse_grammar(t) or parse_universal(t) or parse_screen(t) or parse_daily(t) or parse_realtime(t)
             or parse_status(t) or parse_help(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
@@ -1055,6 +1068,10 @@ check(parse("volume koto")["action"]["kind"] == "AUDIO", "audio info")
 check(parse("timezone ki")["action"]["kind"] == "TIMEZONE", "timezone info")
 check(parse("koyta app installed")["action"]["kind"] == "INSTALLED_APPS", "app count")
 check(parse("phone e ki sensor ache")["action"]["kind"] == "SENSORS", "sensor info")
+check(parse("ambulance call koro")["action"]["number"] == "999", "ambulance dialer")
+check(parse("fire service call")["action"]["service"] == "FIRE", "fire dialer")
+check(parse("sos message draft je help dorkar")["intent"] == "SHARE_TEXT", "SOS share draft")
+check(parse("emergency info setting khulo")["action"]["kind"] == "EMERGENCY_INFO", "emergency info settings")
 check(parse("latest news ki")["intent"] == "SEARCH_WEB", "latest info web search")
 check(parse("2 + 3 * 4 koto")["intent"] == "LOCAL_ANSWER", "offline arithmetic")
 check(parse("500 er 20 percent discount")["intent"] == "LOCAL_ANSWER", "offline percentage")

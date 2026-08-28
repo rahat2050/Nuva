@@ -205,6 +205,7 @@ object CommandParser {
     }
 
     private fun ruleTable(text: String): CommandDecision? = parseNavigation(text)
+        ?: parseEmergency(text)
         ?: parseUserPresentFile(text)
         ?: parseProductivityHandoff(text)
         ?: parseCommunicationCompose(text)
@@ -357,6 +358,46 @@ object CommandParser {
                 step
             }
         }
+    }
+
+    // --- 0c. Emergency/SOS user-finalized handoffs (v3.4) ------------------------------
+
+    private fun parseEmergency(t: String): CommandDecision? {
+        if (listOf("emergency info setting", "medical info setting", "emergency profile", "জরুরি তথ্য সেটিং", "মেডিকেল তথ্য সেটিং")
+                .any { t.contains(it) }
+        ) {
+            return ok(NuvaAction.OpenSettingScreen(SettingTarget.EMERGENCY_INFO), "Emergency information settings khulchi.")
+        }
+
+        val sosMarker = listOf("sos message draft", "emergency message draft", "help message share", "জরুরি মেসেজ ড্রাফট")
+            .firstOrNull { t.contains(it) }
+        if (sosMarker != null) {
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            var text = quoted ?: contentAfter(t, sosMarker)
+            text = text?.removePrefix("je ")?.removePrefix("যে ")?.trim()
+            val message = text?.takeIf { it.isNotBlank() } ?: "আমার জরুরি সাহায্য দরকার।"
+            return ok(
+                NuvaAction.ShareText(message.take(1_000)),
+                "SOS text share sheet khulbo — recipient o final Send apni korben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val asksDialer = listOf(
+            "emergency call", "emergency dialer", "999 dial", "police call", "ambulance call", "fire service call",
+            "জরুরি কল", "পুলিশ কল", "অ্যাম্বুলেন্স কল", "ফায়ার সার্ভিস কল", "ফায়ার সার্ভিস কল",
+        ).any { t.contains(it) }
+        if (!asksDialer) return null
+        val service = when {
+            t.contains("police") || t.contains("পুলিশ") -> EmergencyService.POLICE
+            t.contains("ambulance") || t.contains("অ্যাম্বুলেন্স") -> EmergencyService.AMBULANCE
+            t.contains("fire") || t.contains("ফায়ার") || t.contains("ফায়ার") -> EmergencyService.FIRE
+            else -> EmergencyService.NATIONAL
+        }
+        return ok(
+            NuvaAction.EmergencyDialer(service),
+            "Bangladesh 999 dialer khulchi — final Call apni chapun.",
+        )
     }
 
     // --- 1. Navigation ------------------------------------------------------------

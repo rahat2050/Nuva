@@ -806,6 +806,15 @@ class CommandExecutor(
                     ExecutionOutcome("failed", result.reason, result.reason)
             }
 
+            is NuvaAction.EmergencyDialer -> when (
+                val result = com.nuva.assistant.automation.EmergencyHandoff.openDialer(context, action.service)
+            ) {
+                com.nuva.assistant.automation.EmergencyHandoff.Result.Opened ->
+                    ExecutionOutcome("completed", "${action.service.wireName} emergency dialer 999-e ready — final Call apni chapun.")
+                is com.nuva.assistant.automation.EmergencyHandoff.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.DeviceStatusQuery ->
                 ExecutionOutcome(
                     "completed",

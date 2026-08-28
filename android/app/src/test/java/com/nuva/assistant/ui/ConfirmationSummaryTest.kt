@@ -130,6 +130,16 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `emergency summary says dialer only and shows 999`() {
+        val summary = ConfirmationSummary.build(
+            NuvaAction.EmergencyDialer(com.nuva.assistant.command.EmergencyService.AMBULANCE),
+            NuvaRisk.LOW,
+        )
+        assertTrue(summary.lines.any { it.value == "999" })
+        assertTrue(summary.detail.contains("final Call"))
+    }
+
+    @Test
     fun `map summary exposes origin destination and privacy boundary`() {
         val summary = ConfirmationSummary.build(
             NuvaAction.MapNavigation(

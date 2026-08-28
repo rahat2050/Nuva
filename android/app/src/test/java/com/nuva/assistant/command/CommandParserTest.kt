@@ -59,6 +59,25 @@ class CommandParserTest {
         assertEquals(NuvaIntent.SHOW_RECENTS, CommandParser.parse("nuva recent apps dekhao")!!.intent)
     }
 
+    // --- Emergency handoffs ------------------------------------------------------------
+
+    @Test
+    fun `emergency commands open user finalized dialer or share draft`() {
+        val ambulance = CommandParser.parse("ambulance call koro")!!.action as NuvaAction.EmergencyDialer
+        assertEquals(EmergencyService.AMBULANCE, ambulance.service)
+        assertEquals("999", ambulance.service.dialNumber)
+
+        val fire = CommandParser.parse("fire service call")!!.action as NuvaAction.EmergencyDialer
+        assertEquals(EmergencyService.FIRE, fire.service)
+
+        val sos = CommandParser.parse("sos message draft je amar help dorkar")!!
+        assertEquals("amar help dorkar", (sos.action as NuvaAction.ShareText).text)
+        assertTrue(sos.requiresConfirmation)
+
+        val info = CommandParser.parse("emergency info setting khulo")!!.action as NuvaAction.OpenSettingScreen
+        assertEquals(SettingTarget.EMERGENCY_INFO, info.target)
+    }
+
     // --- Device status ----------------------------------------------------------------
 
     @Test

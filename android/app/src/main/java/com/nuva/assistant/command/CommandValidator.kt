@@ -146,7 +146,14 @@ object CommandValidator {
             NuvaIntent.COMPOSE_MMS -> validateMms(actionJson)
             NuvaIntent.OPEN_VOICEMAIL -> ValidatedAction.Valid(NuvaAction.OpenVoicemail)
             NuvaIntent.MAP_NAVIGATION -> validateMapNavigation(actionJson)
+            NuvaIntent.EMERGENCY_DIALER -> validateEmergencyDialer(actionJson)
         }
+    }
+
+    private fun validateEmergencyDialer(json: JsonObject): ValidatedAction {
+        val service = EmergencyService.fromWire(json.str("service"))
+            ?: return ValidatedAction.Invalid(listOf("EMERGENCY_DIALER requires service"))
+        return ValidatedAction.Valid(NuvaAction.EmergencyDialer(service))
     }
 
     private fun validateMapNavigation(json: JsonObject): ValidatedAction {

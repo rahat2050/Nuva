@@ -174,6 +174,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   Street View through visible native/web map handoffs; NUVA reads no device location.
 * **v3.3 diagnostics**: local device/Android/RAM/uptime/display/audio/timezone/locale/app-count/sensor
   answers with no IMEI/serial/Android-ID/MAC/location or additional permission.
+* **v3.4 emergency handoffs**: Bangladesh 999 dialer, confirmed SOS share draft and emergency-info
+  settings; no automatic call/message or location collection.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

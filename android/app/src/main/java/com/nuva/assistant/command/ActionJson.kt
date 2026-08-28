@@ -180,6 +180,9 @@ object ActionJson {
             put("destination", action.destination); put("travel_mode", action.travelMode.wireName)
             action.origin?.let { put("origin", it) }
         }
+        is NuvaAction.EmergencyDialer -> buildJsonObject {
+            put("type", "EMERGENCY_DIALER"); put("service", action.service.wireName)
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

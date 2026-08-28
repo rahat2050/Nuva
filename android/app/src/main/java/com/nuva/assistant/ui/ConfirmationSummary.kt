@@ -137,6 +137,14 @@ object ConfirmationSummary {
                 confirmLabelOverride = "CANCEL DRAFT"
             }
 
+            is NuvaAction.EmergencyDialer -> {
+                title = "Emergency dialer"
+                lines += Line("সেবা", action.service.wireName)
+                lines += Line("নম্বর", action.service.dialNumber)
+                detail = "শুধু dialer খুলবে; final Call আপনি চাপবেন।"
+                confirmLabelOverride = "OPEN DIALER"
+            }
+
             is NuvaAction.MapNavigation -> {
                 title = "Maps handoff"
                 action.origin?.let { lines += Line("শুরু", it) }

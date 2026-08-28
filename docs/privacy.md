@@ -19,6 +19,7 @@ no ad SDKs**.
   does not read current coordinates; the selected Maps app manages its own location access.
 * Device diagnostics stay local and omit IMEI, serial, Android ID, ad ID, SIM identity, MAC, account
   list, exact IP/location and other persistent identifiers.
+* SOS drafts never auto-append current location; the user chooses text, recipient and final Send.
 * Screen snapshots (`ScreenStateModel`) — transient, in RAM, never persisted or
   uploaded. Password fields are never captured; OTP-like codes are redacted even
   in memory before display.

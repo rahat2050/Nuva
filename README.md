@@ -42,6 +42,8 @@ you say into a validated action, asks before doing anything risky, and carries i
 "navigate to dhaka walking"           → visible walking navigation handoff
 "ram koto"                            → local total/available RAM answer
 "phone uptime koto"                   → local time-since-boot answer
+"ambulance call koro"                 → Bangladesh 999 dialer; user calls
+"sos message draft je amar help dorkar" → confirmed share draft
 ```
 
 ## Project status
@@ -50,7 +52,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v3.3 passes** — practical assistant → privacy-safe diagnostics | ✅ Implemented in code (real-device QA still pending): reviewed Android controls plus local model/Android/RAM/uptime/display/audio/timezone/locale/app-count/sensor diagnostics without persistent identifiers; see [`docs/supported-features.md`](docs/supported-features.md) |
+| **v1.1–v3.4 passes** — practical assistant → emergency handoffs | ✅ Implemented in code (real-device QA still pending): reviewed Android controls plus Bangladesh 999 dialer, confirmed SOS share and emergency-info settings with no automatic call/message/location collection; see [`docs/supported-features.md`](docs/supported-features.md) |
 
 `backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
@@ -186,6 +188,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [social-mms-voicemail-handoffs.md](docs/social-mms-voicemail-handoffs.md) | v3.1 visible social/MMS/voicemail handoffs |
 | [maps-navigation.md](docs/maps-navigation.md) | v3.2 dynamic directions, navigation, nearby and street-view handoffs |
 | [device-diagnostics.md](docs/device-diagnostics.md) | v3.3 local diagnostics and persistent-identifier exclusions |
+| [emergency-sos.md](docs/emergency-sos.md) | v3.4 Bangladesh 999, SOS share and emergency settings handoff |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |
