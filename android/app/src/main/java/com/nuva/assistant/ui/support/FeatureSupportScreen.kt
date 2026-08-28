@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.nuva.assistant.R
+import com.nuva.assistant.ui.theme.NuvaGlassPanel
+import com.nuva.assistant.ui.theme.NuvaScreenHeader
 
 /**
  * Supported / unsupported feature list (v1.1). NUVA never pretends: what is
@@ -33,6 +34,7 @@ import com.nuva.assistant.R
 data class FeatureRow(val name: String, val supported: Boolean, val reason: String? = null)
 
 val SUPPORTED_FEATURES = listOf(
+    "Accessible native 3D UI — aurora background, raised glass cards, voice orb, floating labeled navigation; no heavy 3D engine বা decorative infinite animation",
     "Home Assistant: encrypted HTTPS config + confirmed light/switch/fan on/off/toggle ও climate ১০–৩২°C",
     "১২,২৫০টি audited natural command form — polite/ASR/Bangla/Banglish/English variant ও ৬-step multi-command plan",
     "অ্যাপ খোলা/Play Store suggestion; non-financial app-এর system uninstall prompt (final decision user); financial/NUVA blocked",
@@ -93,11 +95,10 @@ fun FeatureSupportScreen() {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            Text(stringResource(R.string.support_title), style = MaterialTheme.typography.headlineSmall)
-            Text(
-                stringResource(R.string.support_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            NuvaScreenHeader(
+                eyebrow = "CAPABILITY MAP",
+                title = stringResource(R.string.support_title),
+                subtitle = stringResource(R.string.support_subtitle),
             )
             Spacer(Modifier.height(8.dp))
         }
@@ -107,9 +108,12 @@ fun FeatureSupportScreen() {
             Spacer(Modifier.height(4.dp))
         }
         items(SUPPORTED_FEATURES) { feature ->
-            Card(Modifier.fillMaxWidth()) {
+            NuvaGlassPanel(
+                modifier = Modifier.fillMaxWidth(),
+                accent = MaterialTheme.colorScheme.secondary,
+                contentPadding = 13.dp,
+            ) {
                 Row(
-                    modifier = Modifier.padding(12.dp),
                     verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
@@ -129,9 +133,12 @@ fun FeatureSupportScreen() {
             Spacer(Modifier.height(4.dp))
         }
         items(UNSUPPORTED_FEATURES) { row ->
-            Card(Modifier.fillMaxWidth()) {
+            NuvaGlassPanel(
+                modifier = Modifier.fillMaxWidth(),
+                accent = MaterialTheme.colorScheme.error,
+                contentPadding = 13.dp,
+            ) {
                 Row(
-                    modifier = Modifier.padding(12.dp),
                     verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {

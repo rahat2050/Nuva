@@ -1,6 +1,6 @@
 # NUVA Privacy
 
-Last updated: v4.2 (2026-08-28). The app contains **no analytics, no trackers,
+Last updated: v4.3 (2026-08-28). The app contains **no analytics, no trackers,
 no ad SDKs**.
 
 ## What stays on your phone

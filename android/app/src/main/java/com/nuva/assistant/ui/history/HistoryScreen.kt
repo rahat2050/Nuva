@@ -1,17 +1,20 @@
 package com.nuva.assistant.ui.history
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -27,6 +31,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nuva.assistant.R
 import com.nuva.assistant.core.NuvaContainer
+import com.nuva.assistant.ui.theme.NuvaGlassPanel
+import com.nuva.assistant.ui.theme.NuvaScreenHeader
+import com.nuva.assistant.ui.theme.NuvaStatusChip
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -68,99 +75,156 @@ private val STATUS_FILTERS = listOf("all", "completed", "failed", "pending")
 fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
     val history by viewModel.history.collectAsState()
     var filter by remember { mutableStateOf("all") }
+    var showClearConfirmation by remember { mutableStateOf(false) }
+    val rows = when (filter) {
+        "completed" -> history.filter { it.status == "completed" }
+        "failed" -> history.filter { it.status in listOf("failed", "blocked", "unsupported") }
+        "pending" -> history.filter { it.status.startsWith("pending") || it.status == "executing" }
+        else -> history
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(stringResource(R.string.nav_history), style = MaterialTheme.typography.headlineSmall)
-            TextButton(onClick = { viewModel.clear() }) { Text(stringResource(R.string.clear)) }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            STATUS_FILTERS.forEach { status ->
-                FilterChip(
-                    selected = filter == status,
-                    onClick = { filter = status },
-                    label = {
-                        Text(
-                            when (status) {
-                                "all" -> stringResource(R.string.filter_all)
-                                "completed" -> stringResource(R.string.filter_completed)
-                                "failed" -> stringResource(R.string.filter_failed)
-                                else -> stringResource(R.string.filter_pending)
-                            },
-                        )
-                    },
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                NuvaScreenHeader(
+                    eyebrow = "LOCAL AUDIT TRAIL",
+                    title = stringResource(R.string.nav_history),
+                    subtitle = "প্রতিটি command-এর result ও security status",
+                    modifier = Modifier.weight(1f),
                 )
+                TextButton(
+                    onClick = { if (history.isNotEmpty()) showClearConfirmation = true },
+                    enabled = history.isNotEmpty(),
+                ) { Text(stringResource(R.string.clear)) }
             }
         }
 
-        Spacer(Modifier.padding(6.dp))
-
-        val rows = when (filter) {
-            "completed" -> history.filter { it.status == "completed" }
-            "failed" -> history.filter { it.status in listOf("failed", "blocked", "unsupported") }
-            "pending" -> history.filter { it.status.startsWith("pending") || it.status == "executing" }
-            else -> history
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                STATUS_FILTERS.forEach { status ->
+                    FilterChip(
+                        selected = filter == status,
+                        onClick = { filter = status },
+                        label = {
+                            Text(
+                                when (status) {
+                                    "all" -> stringResource(R.string.filter_all)
+                                    "completed" -> stringResource(R.string.filter_completed)
+                                    "failed" -> stringResource(R.string.filter_failed)
+                                    else -> stringResource(R.string.filter_pending)
+                                },
+                            )
+                        },
+                    )
+                }
+            }
         }
 
         if (rows.isEmpty()) {
-            Text(
-                stringResource(R.string.no_commands_yet),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            item {
+                NuvaGlassPanel(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.no_commands_yet),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(rows, key = { it.id }) { row ->
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(row.text, style = MaterialTheme.typography.bodyLarge)
-                            Spacer(Modifier.padding(3.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Column {
-                                    Text(
-                                        "${row.intent} · ${statusLabel(row.status)}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = when (row.status) {
-                                            "completed" -> MaterialTheme.colorScheme.secondary
-                                            "failed", "rejected", "blocked" -> MaterialTheme.colorScheme.error
-                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
-                                    )
-                                    row.error?.takeIf { it.isNotBlank() }?.let {
-                                        Text(
-                                            "${stringResource(R.string.failure_reason)}: $it",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.error,
-                                        )
-                                    }
-                                }
+            items(rows, key = { it.id }) { row ->
+                val statusColor = when (row.status) {
+                    "completed" -> MaterialTheme.colorScheme.secondary
+                    "failed", "rejected", "blocked" -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.primary
+                }
+                NuvaGlassPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = statusColor,
+                    contentPadding = 14.dp,
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Text(
+                                row.text,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f),
+                            )
+                            NuvaStatusChip(
+                                label = statusLabel(row.status).uppercase(),
+                                color = statusColor,
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(Modifier.weight(1f)) {
                                 Text(
-                                    SimpleDateFormat("d MMM, h:mm a", Locale.ENGLISH).format(Date(row.createdAt)),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    row.intent,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
-                            }
-                            if (row.status in listOf("failed", "blocked", "unsupported")) {
-                                TextButton(onClick = { viewModel.retry(row.text) }) {
-                                    Text(stringResource(R.string.retry))
+                                row.error?.takeIf { it.isNotBlank() }?.let {
+                                    Text(
+                                        "${stringResource(R.string.failure_reason)}: $it",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
                                 }
+                            }
+                            Text(
+                                SimpleDateFormat("d MMM, h:mm a", Locale.ENGLISH).format(Date(row.createdAt)),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (row.status in listOf("failed", "blocked", "unsupported")) {
+                            TextButton(onClick = { viewModel.retry(row.text) }) {
+                                Text(stringResource(R.string.retry))
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    if (showClearConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmation = false },
+            title = { Text("Clear command history?") },
+            text = { Text("এই ফোনের ${history.size}টি history entry permanently মুছে যাবে। এই কাজ undo করা যাবে না।") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showClearConfirmation = false
+                        viewModel.clear()
+                    },
+                ) { Text("Clear history") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showClearConfirmation = false }) {
+                    Text(stringResource(R.string.confirm_no))
+                }
+            },
+        )
     }
 }
 

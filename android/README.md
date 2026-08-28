@@ -203,6 +203,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   handoff; credential events excluded, ambiguity stops, no WRITE_CALENDAR/direct delete.
 * **v4.2 system assistant**: complete default-assistant registration, gesture/power invocation,
   visible custom wake fallback, recognizer-discovery/race/timeout fixes and live diagnostics.
+* **v4.3 accessible 3D UI**: aurora backdrop, raised glass surfaces, tactile command orb, floating
+  labeled navigation and bottom assistant voice plate without infinite decorative animation.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

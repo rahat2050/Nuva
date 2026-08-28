@@ -194,6 +194,26 @@ def main() -> None:
     require("withTimeoutOrNull(WAKE_LISTEN_TIMEOUT_MS)" in wake_source, "stuck wake-cycle recovery missing")
     require('speakIfEnabled("Listening")' not in wake_source, "wake listener must not recognize its own TTS")
 
+    # v4.3 visual system: depth must not trade away navigation, touch targets or reduced-motion safety.
+    app_ui_source = (MAIN / "java/com/nuva/assistant/ui/NuvaApp.kt").read_text()
+    ui_3d_source = (MAIN / "java/com/nuva/assistant/ui/theme/Nuva3D.kt").read_text()
+    require("NuvaBackdrop" in app_ui_source, "global 3D backdrop missing")
+    require("NuvaGlassPanel" in app_ui_source, "floating navigation glass panel missing")
+    require("NavigationBarItem" in app_ui_source, "four-route navigation must remain explicit")
+    require("heightIn(min = 50.dp)" in ui_3d_source, "custom primary action touch target is too small")
+    require("Role.Button" in ui_3d_source, "3D voice control needs button semantics")
+    require("rememberInfiniteTransition" not in ui_3d_source, "decorative infinite motion is not allowed")
+    three_d_screens: dict[str, str] = {}
+    for screen_name in ("home/HomeScreen.kt", "history/HistoryScreen.kt", "memory/MemoryScreen.kt"):
+        screen_source = (MAIN / f"java/com/nuva/assistant/ui/{screen_name}").read_text()
+        three_d_screens[screen_name] = screen_source
+        require(screen_source.count("LazyColumn(") == 1, f"{screen_name} must use one bounded lazy list")
+        require("NuvaGlassPanel" in screen_source, f"{screen_name} is outside the 3D component system")
+    require("showClearConfirmation" in three_d_screens["history/HistoryScreen.kt"], "history clear needs confirmation")
+    require("PendingMemoryDeletion" in three_d_screens["memory/MemoryScreen.kt"], "memory deletion needs confirmation")
+    overlay_source = (MAIN / "java/com/nuva/assistant/ui/floating/FloatingAssistantOverlay.kt").read_text()
+    require("Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL" in overlay_source, "assistant voice plate should stay reachable")
+
     # Server/AI still cannot resolve local provider/device actions.
     intent_source = (MAIN / "java/com/nuva/assistant/command/Intent.kt").read_text()
     require(

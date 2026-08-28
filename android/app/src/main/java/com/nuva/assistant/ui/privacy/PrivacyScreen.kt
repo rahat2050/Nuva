@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.nuva.assistant.R
+import com.nuva.assistant.ui.theme.NuvaGlassPanel
+import com.nuva.assistant.ui.theme.NuvaScreenHeader
 
 /**
  * Privacy screen (v1.6, Phase 21): exactly what happens to the user's data —
@@ -30,7 +31,11 @@ fun PrivacyScreen() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(stringResource(R.string.privacy_title), style = MaterialTheme.typography.headlineSmall)
+        NuvaScreenHeader(
+            eyebrow = "TRANSPARENT DATA FLOW",
+            title = stringResource(R.string.privacy_title),
+            subtitle = "কোন data ফোনে থাকে এবং কখন text বাইরে যায়—সব এক জায়গায়",
+        )
 
         PrivacyCard(
             title = stringResource(R.string.privacy_local_title),
@@ -58,13 +63,14 @@ fun PrivacyScreen() {
 
 @Composable
 private fun PrivacyCard(title: String, body: String, highlight: Boolean = false) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleSmall,
-                color = if (highlight) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-            )
+    val accent = if (highlight) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    NuvaGlassPanel(
+        modifier = Modifier.fillMaxWidth(),
+        accent = accent,
+        contentPadding = 14.dp,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = accent)
             Text(body, style = MaterialTheme.typography.bodyMedium)
         }
     }

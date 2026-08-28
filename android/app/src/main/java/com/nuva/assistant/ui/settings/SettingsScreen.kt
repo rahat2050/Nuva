@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -41,6 +40,9 @@ import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.core.permissions.NuvaPermissions
 import com.nuva.assistant.service.WakeWordService
 import com.nuva.assistant.systemassistant.SystemAssistantController
+import com.nuva.assistant.ui.theme.NuvaDivider
+import com.nuva.assistant.ui.theme.NuvaGlassPanel
+import com.nuva.assistant.ui.theme.NuvaScreenHeader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -274,10 +276,14 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(stringResource(R.string.nav_settings), style = MaterialTheme.typography.headlineMedium)
+        NuvaScreenHeader(
+            eyebrow = "CONTROL DECK",
+            title = stringResource(R.string.nav_settings),
+            subtitle = "Connections, privacy, voice এবং Android permissions",
+        )
 
         OutlinedTextField(
             value = baseUrlDraft,
@@ -293,7 +299,7 @@ fun SettingsScreen(
             }
         }
 
-        HorizontalDivider()
+        NuvaDivider()
 
         OutlinedTextField(
             value = supabaseDraft,
@@ -338,7 +344,7 @@ fun SettingsScreen(
             Button(onClick = { viewModel.signIn(email, password) }) { Text("Sign in") }
         }
 
-        HorizontalDivider()
+        NuvaDivider()
 
         Text("Home Assistant", style = MaterialTheme.typography.titleMedium)
         Text(
@@ -376,7 +382,7 @@ fun SettingsScreen(
             }
         }
 
-        HorizontalDivider()
+        NuvaDivider()
 
         Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -416,7 +422,7 @@ fun SettingsScreen(
             Text(stringResource(R.string.settings_tts_test))
         }
 
-        HorizontalDivider()
+        NuvaDivider()
 
         Text(stringResource(R.string.settings_status_title), style = MaterialTheme.typography.titleMedium)
         val accessibilityRunning = remember(permissionRefresh) {
@@ -441,7 +447,7 @@ fun SettingsScreen(
             OutlinedButton(onClick = onOpenPrivacy) { Text(stringResource(R.string.settings_open_privacy)) }
         }
 
-        HorizontalDivider()
+        NuvaDivider()
 
         Text("Hey NUVA & default assistant", style = MaterialTheme.typography.titleMedium)
         Text(
@@ -518,8 +524,18 @@ fun SettingsScreen(
             }
         }
 
-        message?.let {
-            Text(it, color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodyMedium)
+        message?.let { currentMessage ->
+            NuvaGlassPanel(
+                modifier = Modifier.fillMaxWidth(),
+                accent = MaterialTheme.colorScheme.secondary,
+                contentPadding = 12.dp,
+            ) {
+                Text(
+                    currentMessage,
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
 
         Text(
@@ -532,12 +548,18 @@ fun SettingsScreen(
 
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
+    NuvaGlassPanel(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        accent = if (checked) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+        contentPadding = 12.dp,
     ) {
-        Text(label, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChange)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = checked, onCheckedChange = onChange)
+        }
     }
 }

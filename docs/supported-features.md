@@ -1,4 +1,4 @@
-# NUVA — Supported features (v4.2)
+# NUVA — Supported features (v4.3)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -14,6 +14,15 @@ self-TTS rejection are included. Google's screen-off low-power DSP hotword path 
 keyphrase support unavailable to an ordinary APK. Bangla/Banglish/English/mixed parsing, typed fallback,
 Bangla-first replies, 15-second command timeout recovery and 5-minute conversational context remain.
 Details: [`hey-nuva-system-assistant.md`](hey-nuva-system-assistant.md).
+
+## 3D interface & accessibility — SUPPORTED / DEVICE QA PENDING
+v4.3 adds a native Compose aurora backdrop, raised glass panels, static 3D command orb, floating
+four-route navigation, state chips and a bottom-center assistant voice plate. Home, History and Memory
+each use one bounded lazy list, avoiding nested scrolling/clipping on small displays. Custom primary
+actions retain 50dp+ targets, the voice orb exposes button semantics, navigation keeps text labels and
+no decorative infinite animation is used. Light/dark system-bar icon contrast is synchronized. Full
+Gradle, screenshot, TalkBack and physical-device contrast QA remain pending. Details:
+[`3d-ui-ux.md`](3d-ui-ux.md).
 
 ## Natural command grammar — SUPPORTED
 A data-audited grammar accepts **12,250 concrete static command forms** (50 families × 5 aliases ×

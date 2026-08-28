@@ -62,7 +62,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v4.2 passes** — practical assistant → system assistant | ✅ Implemented in code (real-device QA still pending): user-selectable Android default-assistant entry, visible “Hey Nuva” fallback hardening, encrypted Home Assistant and bounded Calendar provider access; see [`docs/supported-features.md`](docs/supported-features.md) |
+| **v1.1–v4.3 passes** — practical assistant → 3D voice experience | ✅ Implemented in code (real-device QA still pending): accessible native 3D/glass UI, user-selectable Android default-assistant entry, visible “Hey Nuva” fallback, encrypted Home Assistant and bounded Calendar provider access; see [`docs/supported-features.md`](docs/supported-features.md) |
 
 `backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
@@ -205,6 +205,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [home-assistant.md](docs/home-assistant.md) | v4.0 encrypted configuration and physical-control allowlist |
 | [calendar-provider.md](docs/calendar-provider.md) | v4.1 optional bounded agenda read and exact event handoff |
 | [hey-nuva-system-assistant.md](docs/hey-nuva-system-assistant.md) | v4.2 default-assistant registration and visible wake fallback |
+| [3d-ui-ux.md](docs/3d-ui-ux.md) | v4.3 accessible native 3D/glass interface system |
 | [v4.2-apk-build-qa.md](docs/v4.2-apk-build-qa.md) | Reproducible contract/API checks and real-device release gate |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |

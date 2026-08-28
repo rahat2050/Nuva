@@ -6,27 +6,23 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -54,6 +51,11 @@ import com.nuva.assistant.command.CommandDecision
 import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.core.permissions.NuvaPermissions
 import com.nuva.assistant.ui.ConfirmationSummary
+import com.nuva.assistant.ui.theme.NuvaGlassPanel
+import com.nuva.assistant.ui.theme.NuvaPrimaryAction
+import com.nuva.assistant.ui.theme.NuvaScreenHeader
+import com.nuva.assistant.ui.theme.NuvaStatusChip
+import com.nuva.assistant.ui.theme.NuvaVoiceOrb
 import com.nuva.assistant.voice.VoiceController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.CoroutineScope
@@ -241,177 +243,216 @@ fun HomeScreen(
         contactPicker.launch(null)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+    val status = when (val s = state) {
+        VoiceController.State.Idle -> stringResource(R.string.how_can_i_help)
+        VoiceController.State.Listening -> stringResource(R.string.listening)
+        VoiceController.State.Processing -> stringResource(R.string.thinking)
+        is VoiceController.State.Transcribed -> "“${s.text}”"
+        is VoiceController.State.AwaitingConfirmation -> stringResource(R.string.confirm_title)
+        is VoiceController.State.AwaitingContactChoice -> stringResource(R.string.contact_choice_title)
+        is VoiceController.State.Done -> s.speech
+        is VoiceController.State.Failed -> s.speech
+    }
+    val statusColor = when (state) {
+        VoiceController.State.Listening -> MaterialTheme.colorScheme.secondary
+        VoiceController.State.Processing -> MaterialTheme.colorScheme.tertiary
+        is VoiceController.State.Done -> MaterialTheme.colorScheme.secondary
+        is VoiceController.State.Failed -> MaterialTheme.colorScheme.error
+        is VoiceController.State.AwaitingConfirmation,
+        is VoiceController.State.AwaitingContactChoice,
+        -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("NUVA", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-        Text(stringResource(R.string.home_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        item {
+            NuvaScreenHeader(
+                eyebrow = "VOICE • TYPE • ACT",
+                title = "NUVA",
+                subtitle = stringResource(R.string.home_subtitle),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
-        Spacer(Modifier.height(24.dp))
+        item {
+            NuvaVoiceOrb(
+                color = statusColor,
+                busy = state is VoiceController.State.Listening || state is VoiceController.State.Processing,
+                accessibilityLabel = stringResource(R.string.speak),
+                onClick = {
+                    if (NuvaPermissions.hasRecordAudio(context)) {
+                        viewModel.startListening()
+                    } else {
+                        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+            )
+        }
 
-        // Big mic button + processing spinner.
-        Surface(
-            onClick = {
-                if (NuvaPermissions.hasRecordAudio(context)) {
-                    viewModel.startListening()
-                } else {
-                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                }
-            },
-            shape = CircleShape,
-            color = when (state) {
-                is VoiceController.State.Listening -> MaterialTheme.colorScheme.error
-                is VoiceController.State.Processing -> MaterialTheme.colorScheme.tertiary
-                else -> MaterialTheme.colorScheme.primary
-            },
-            modifier = Modifier.size(112.dp),
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
+        item {
+            NuvaGlassPanel(
+                modifier = Modifier.fillMaxWidth(),
+                accent = statusColor,
+                contentPadding = 14.dp,
             ) {
-                if (state is VoiceController.State.Processing) {
-                    CircularProgressIndicator(modifier = Modifier.size(44.dp), color = MaterialTheme.colorScheme.onPrimary)
-                } else {
-                    Text("🎙️", style = MaterialTheme.typography.headlineMedium)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    NuvaStatusChip(
+                        label = when (state) {
+                            VoiceController.State.Idle -> "READY"
+                            VoiceController.State.Listening -> "LISTENING"
+                            VoiceController.State.Processing -> "THINKING"
+                            is VoiceController.State.Failed -> "NEEDS ATTENTION"
+                            is VoiceController.State.Done -> "COMPLETE"
+                            else -> "IN PROGRESS"
+                        },
+                        color = statusColor,
+                    )
+                    Text(
+                        status,
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (state is VoiceController.State.Failed && (state as VoiceController.State.Failed).fromVoice) {
+                        Text(
+                            stringResource(R.string.voice_failed_typed_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-
-        val status = when (val s = state) {
-            VoiceController.State.Idle -> stringResource(R.string.how_can_i_help)
-            VoiceController.State.Listening -> stringResource(R.string.listening)
-            VoiceController.State.Processing -> stringResource(R.string.thinking)
-            is VoiceController.State.Transcribed -> "“${s.text}”"
-            is VoiceController.State.AwaitingConfirmation -> stringResource(R.string.confirm_title)
-            is VoiceController.State.AwaitingContactChoice -> stringResource(R.string.contact_choice_title)
-            is VoiceController.State.Done -> s.speech
-            is VoiceController.State.Failed -> s.speech
-        }
-        Text(
-            status,
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        // Voice failed → the typed fallback is the primary affordance (req §2).
-        if (state is VoiceController.State.Failed && (state as VoiceController.State.Failed).fromVoice) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.voice_failed_typed_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        }
-
-        // Typed command input — always available, same pipeline as voice.
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedTextField(
-                value = typedCommand,
-                onValueChange = { typedCommand = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text(stringResource(R.string.typed_hint)) },
-                singleLine = true,
-            )
-            Button(
-                onClick = {
-                    val text = typedCommand.trim()
-                    if (text.isNotEmpty()) {
-                        typedCommand = ""
-                        viewModel.submitTyped(text)
+        item {
+            NuvaGlassPanel(modifier = Modifier.fillMaxWidth(), contentPadding = 12.dp) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    OutlinedTextField(
+                        value = typedCommand,
+                        onValueChange = { typedCommand = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text(stringResource(R.string.typed_hint)) },
+                        singleLine = true,
+                    )
+                    NuvaPrimaryAction(
+                        onClick = {
+                            val text = typedCommand.trim()
+                            if (text.isNotEmpty()) {
+                                typedCommand = ""
+                                viewModel.submitTyped(text)
+                            }
+                        },
+                        enabled = typedCommand.isNotBlank() && state !is VoiceController.State.Processing,
+                    ) {
+                        Text("→", color = Color.White, style = MaterialTheme.typography.titleLarge)
                     }
-                },
-                enabled = typedCommand.isNotBlank() && state !is VoiceController.State.Processing,
-            ) { Text(stringResource(R.string.send)) }
+                }
+            }
         }
 
-        // Accessibility setup guide (req §13).
         if (!NuvaAccessibilityService.isRunning) {
-            Spacer(Modifier.height(12.dp))
-            Card(onClick = { showAccessibilityGuide = true }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    Text(
-                        stringResource(R.string.accessibility_disabled),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    Text(
-                        stringResource(R.string.accessibility_setup_link),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+            item {
+                NuvaGlassPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = MaterialTheme.colorScheme.error,
+                    onClick = { showAccessibilityGuide = true },
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(
+                            stringResource(R.string.accessibility_disabled),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Text(
+                            stringResource(R.string.accessibility_setup_link),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }
 
         if (state is VoiceController.State.Done && (state as VoiceController.State.Done).screenText != null) {
-            Spacer(Modifier.height(12.dp))
-            Card(Modifier.fillMaxWidth()) {
-                Text(
-                    (state as VoiceController.State.Done).screenText.orEmpty(),
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+            item {
+                NuvaGlassPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = MaterialTheme.colorScheme.secondary,
+                ) {
+                    Text(
+                        (state as VoiceController.State.Done).screenText.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
         }
 
-        Spacer(Modifier.height(24.dp))
-
-        Text(stringResource(R.string.recent_commands), style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.recent_commands), style = MaterialTheme.typography.titleLarge)
+                NuvaStatusChip(label = "${recent.size}", color = MaterialTheme.colorScheme.primary)
+            }
+        }
 
         if (recent.isEmpty()) {
-            Text(
-                stringResource(R.string.no_commands_yet),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            item {
+                NuvaGlassPanel(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.no_commands_yet),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(recent, key = { it.id }) { row ->
-                    Card(Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(row.text, maxLines = 2)
-                                if (row.status in listOf("failed", "blocked", "unsupported") && !row.error.isNullOrBlank()) {
-                                    Text(
-                                        row.error,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.error,
-                                        maxLines = 1,
-                                    )
-                                }
+            items(recent.take(12), key = { it.id }) { row ->
+                val rowColor = when (row.status) {
+                    "completed" -> MaterialTheme.colorScheme.secondary
+                    "failed", "rejected", "blocked" -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.primary
+                }
+                NuvaGlassPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = rowColor,
+                    contentPadding = 13.dp,
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(row.text, style = MaterialTheme.typography.bodyLarge, maxLines = 2)
+                            if (row.status in listOf("failed", "blocked", "unsupported") && !row.error.isNullOrBlank()) {
+                                Text(
+                                    row.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    maxLines = 1,
+                                )
                             }
-                            Text(
-                                row.status,
-                                color = when (row.status) {
-                                    "completed" -> MaterialTheme.colorScheme.secondary
-                                    "failed", "rejected", "blocked" -> MaterialTheme.colorScheme.error
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            NuvaStatusChip(label = row.status.uppercase(), color = rowColor)
                             if (row.status in listOf("failed", "blocked", "unsupported")) {
-                                Spacer(Modifier.width(6.dp))
                                 TextButton(onClick = { viewModel.retry(row.text) }) {
                                     Text(stringResource(R.string.retry))
                                 }
