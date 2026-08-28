@@ -224,7 +224,7 @@ object DailyUtilityParser {
         val pct = "(?:%|percent|percentage|shotangsho|পারসেন্ট|শতাংশ)"
         val ofForm = Regex("""(-?\d+(?:\.\d+)?)\s*$pct\s*(?:of|er|এর|এর মধ্যে)\s*(-?\d+(?:\.\d+)?)""")
             .find(t)
-        val baseFirst = Regex("""(-?\d+(?:\.\d+)?)\s*(?:er|এর|of)?\s*(-?\d+(?:\.\d+)?)\s*$pct""")
+        val baseFirst = Regex("""(-?\d+(?:\.\d+)?)\s+(?:(?:er|এর|of)\s+)?(-?\d+(?:\.\d+)?)\s*$pct""")
             .find(t)
         val whatPercent = Regex("""(-?\d+(?:\.\d+)?)\s*(?:is|holo|হলো)?\s*(?:what|koto|কত)\s*$pct\s*(?:of|er|এর)\s*(-?\d+(?:\.\d+)?)""")
             .find(t)

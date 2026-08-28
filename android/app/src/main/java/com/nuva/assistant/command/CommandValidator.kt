@@ -362,13 +362,26 @@ object CommandValidator {
     private fun validateMediaControl(json: JsonObject): ValidatedAction {
         val command = MediaCommand.fromWire(json.str("command"))
             ?: return ValidatedAction.Invalid(listOf("MEDIA_CONTROL requires a known command"))
-        return ValidatedAction.Valid(NuvaAction.MediaControl(command))
+        val rawOffset = json.int("offset_seconds")
+        val offset = rawOffset?.takeIf { it in 1..300 }
+        val seekCommand = command == MediaCommand.FAST_FORWARD || command == MediaCommand.REWIND
+        if (seekCommand && offset == null) return ValidatedAction.Invalid(listOf("seek command requires offset_seconds"))
+        if (!seekCommand && rawOffset != null) return ValidatedAction.Invalid(listOf("offset_seconds only allowed for seek"))
+        return ValidatedAction.Valid(NuvaAction.MediaControl(command, offset))
     }
 
     private fun validateVolumeControl(json: JsonObject): ValidatedAction {
         val command = VolumeCommand.fromWire(json.str("command"))
             ?: return ValidatedAction.Invalid(listOf("VOLUME_CONTROL requires a known command"))
-        return ValidatedAction.Valid(NuvaAction.VolumeControl(command))
+        val rawLevel = json.int("level_percent")
+        val level = rawLevel?.takeIf { it in 0..100 }
+        if (command == VolumeCommand.SET && level == null) {
+            return ValidatedAction.Invalid(listOf("volume set requires level_percent"))
+        }
+        if (command != VolumeCommand.SET && rawLevel != null) {
+            return ValidatedAction.Invalid(listOf("level_percent only allowed for volume set"))
+        }
+        return ValidatedAction.Valid(NuvaAction.VolumeControl(command, level))
     }
 
     private fun validateCamera(json: JsonObject): ValidatedAction {

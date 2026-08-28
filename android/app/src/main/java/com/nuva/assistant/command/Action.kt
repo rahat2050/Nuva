@@ -104,12 +104,12 @@ sealed interface NuvaAction {
     }
 
     /** Media playback control via the active MediaSession (v1.2). */
-    data class MediaControl(val command: MediaCommand) : NuvaAction {
+    data class MediaControl(val command: MediaCommand, val offsetSeconds: Int? = null) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.MEDIA_CONTROL
     }
 
-    /** Direct volume changes — permitted by Android, no settings detour (v1.2). */
-    data class VolumeControl(val command: VolumeCommand) : NuvaAction {
+    /** Direct media-volume changes — permitted by Android, no settings detour. */
+    data class VolumeControl(val command: VolumeCommand, val levelPercent: Int? = null) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.VOLUME_CONTROL
     }
 
@@ -414,6 +414,9 @@ enum class MediaCommand(val wireName: String) {
     TOGGLE("toggle"),
     NEXT("next"),
     PREVIOUS("previous"),
+    STOP("stop"),
+    FAST_FORWARD("fast_forward"),
+    REWIND("rewind"),
     ;
 
     companion object {
@@ -427,6 +430,8 @@ enum class VolumeCommand(val wireName: String) {
     UP("up"),
     DOWN("down"),
     MUTE("mute"),
+    UNMUTE("unmute"),
+    SET("set"),
     ;
 
     companion object {

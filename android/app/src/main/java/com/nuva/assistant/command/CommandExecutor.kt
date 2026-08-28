@@ -969,15 +969,15 @@ class CommandExecutor(
                 }
             }
 
-            is NuvaAction.MediaControl -> when (val r = com.nuva.assistant.automation.MediaPlaybackControl.control(context, action.command)) {
+            is NuvaAction.MediaControl -> when (val r = com.nuva.assistant.automation.MediaPlaybackControl.control(context, action)) {
                 is com.nuva.assistant.automation.MediaPlaybackControl.Result.Done ->
-                    ExecutionOutcome("completed", "Kore dilam.")
+                    ExecutionOutcome("completed", r.speech)
 
                 is com.nuva.assistant.automation.MediaPlaybackControl.Result.Failed ->
                     ExecutionOutcome("failed", r.userReason, r.userReason)
             }
 
-            is NuvaAction.VolumeControl -> when (val r = com.nuva.assistant.automation.VolumeController.control(context, action.command)) {
+            is NuvaAction.VolumeControl -> when (val r = com.nuva.assistant.automation.VolumeController.control(context, action)) {
                 is com.nuva.assistant.automation.VolumeController.Result.Done ->
                     ExecutionOutcome("completed", r.speech)
 

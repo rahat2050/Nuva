@@ -1,4 +1,4 @@
-# NUVA — Supported features (v3.4)
+# NUVA — Supported features (v3.5)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -51,8 +51,9 @@ Rich Calendar insert drafts support title, begin/end duration, location, descrip
 email; the visible Calendar app owns final Save. Sensitive/financial event details are refused.
 
 ## Media & camera — SUPPORTED / ANDROID-LIMITED
-YouTube search/play, Spotify fallback, pause/resume/next/previous (active MediaSession —
-ANDROID-LIMITED via notification access), volume up/down/mute. Camera open photo/video +
+YouTube search/play, Spotify fallback, play/pause/next/previous/stop and bounded 1–300 second
+forward/rewind through the active MediaSession (ANDROID-LIMITED via notification access). Media
+volume supports up/down/mute/unmute and exact 0–100%; Android safe-volume/OEM rules still win. Camera open photo/video +
 explicit-capture flow (shutter always user-controlled). User-present Android pickers support
 photo/video selection, viewing and share-sheet handoff. v2.5 adds selected-photo `ACTION_EDIT`
 handoff; the installed editor remains visible and final Save is user-controlled. Gallery-wide search,

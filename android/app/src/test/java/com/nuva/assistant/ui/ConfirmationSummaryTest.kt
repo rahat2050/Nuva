@@ -130,6 +130,20 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `advanced media summaries expose seek and exact volume`() {
+        val seek = ConfirmationSummary.build(
+            NuvaAction.MediaControl(com.nuva.assistant.command.MediaCommand.FAST_FORWARD, 30),
+            NuvaRisk.LOW,
+        )
+        assertTrue(seek.lines.any { it.value.contains("30") })
+        val volume = ConfirmationSummary.build(
+            NuvaAction.VolumeControl(com.nuva.assistant.command.VolumeCommand.SET, 55),
+            NuvaRisk.LOW,
+        )
+        assertTrue(volume.lines.any { it.value == "55%" })
+    }
+
+    @Test
     fun `emergency summary says dialer only and shows 999`() {
         val summary = ConfirmationSummary.build(
             NuvaAction.EmergencyDialer(com.nuva.assistant.command.EmergencyService.AMBULANCE),

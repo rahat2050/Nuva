@@ -137,6 +137,20 @@ object ConfirmationSummary {
                 confirmLabelOverride = "CANCEL DRAFT"
             }
 
+            is NuvaAction.MediaControl -> {
+                title = "Media control"
+                lines += Line("কাজ", action.command.wireName)
+                action.offsetSeconds?.let { lines += Line("Offset", "$it second") }
+                detail = "শুধু active MediaSession-এর official transport action চলবে।"
+            }
+
+            is NuvaAction.VolumeControl -> {
+                title = "Media volume control"
+                lines += Line("কাজ", action.command.wireName)
+                action.levelPercent?.let { lines += Line("Level", "$it%") }
+                detail = "Android AudioManager-এর bounded media stream control ব্যবহার হবে।"
+            }
+
             is NuvaAction.EmergencyDialer -> {
                 title = "Emergency dialer"
                 lines += Line("সেবা", action.service.wireName)

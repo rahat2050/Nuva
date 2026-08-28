@@ -1138,10 +1138,17 @@ object CommandParser {
             .any { t.contains(it) } && (hasMediaWord || t.contains("pause"))
         val resume = listOf("resume koro", "resume korun", "resume", "abar chalao", "আবার চালাও")
             .any { t.contains(it) } && (hasMediaWord || t.contains("resume"))
+        val stop = hasMediaWord && listOf("stop koro", "media stop", "music stop", "পুরো বন্ধ", "স্টপ করো").any { t.contains(it) }
+        val forward = hasMediaWord && listOf("fast forward", "forward", "samne nao", "এগিয়ে", "এগিয়ে", "সামনে নাও").any { t.contains(it) }
+        val rewind = hasMediaWord && listOf("rewind", "pichone nao", "পিছনে নাও", "পেছনে নাও").any { t.contains(it) }
+        val offset = NuvaDateTimeParser.parseDuration(t)?.toInt()?.coerceIn(1, 300) ?: 10
         val next = hasMediaWord && listOf("next", "porer", "পরের", "agamir").any { t.contains(it) }
         val previous = hasMediaWord && listOf("previous", "ager", "আগের", "agerta", "prev").any { t.contains(it) }
 
         return when {
+            forward -> ok(NuvaAction.MediaControl(MediaCommand.FAST_FORWARD, offset), "$offset second samne jacchi.")
+            rewind -> ok(NuvaAction.MediaControl(MediaCommand.REWIND, offset), "$offset second pichone jacchi.")
+            stop -> ok(NuvaAction.MediaControl(MediaCommand.STOP), "Media stop korchi.")
             pause -> ok(NuvaAction.MediaControl(MediaCommand.PAUSE), "Music pause korlam.")
             resume -> ok(NuvaAction.MediaControl(MediaCommand.PLAY), "Music abar chalacchi.")
             next -> ok(NuvaAction.MediaControl(MediaCommand.NEXT), "Porer ta chalacchi.")
@@ -1155,7 +1162,18 @@ object CommandParser {
     private fun parseVolumeControl(t: String): CommandDecision? {
         val mentionsVolume = listOf("volume", "ভলিউম", "shobdo", "শব্দ", "sound", "সাউন্ড").any { t.contains(it) }
         if (!mentionsVolume) return null
+        val requestedLevel = Regex("""(?:volume|sound|ভলিউম)\s*(?:set|koro|করো|at|to)?\s*(\d{1,3})\s*(?:%|percent|শতাংশ)""")
+            .find(t)?.groupValues?.get(1)?.toIntOrNull()
+        if (requestedLevel != null && requestedLevel !in 0..100) {
+            return unsupported("Volume 0 theke 100 percent-er moddhe bolun.")
+        }
+        val exactLevel = requestedLevel?.takeIf { it in 0..100 }
         return when {
+            exactLevel != null -> ok(NuvaAction.VolumeControl(VolumeCommand.SET, exactLevel), "Volume $exactLevel percent korchi.")
+
+            listOf("unmute", "sound on", "awaj chalu", "শব্দ চালু", "মিউট বন্ধ").any { t.contains(it) } ->
+                ok(NuvaAction.VolumeControl(VolumeCommand.UNMUTE), "Sound unmute korchi.")
+
             listOf("mute", "নীরব", "চুপ", "bondho shobdo", "shobdo bondho", "শব্দ বন্ধ").any { t.contains(it) } ->
                 ok(NuvaAction.VolumeControl(VolumeCommand.MUTE), "Sound mute korlam.")
 
@@ -1165,7 +1183,7 @@ object CommandParser {
             listOf("kom koro", "koman", "kom", "namiye", "নামাও", "কম করো", "কমাও").any { t.contains(it) } ->
                 ok(NuvaAction.VolumeControl(VolumeCommand.DOWN), "Volume kome dicchi.")
 
-            else -> null // "volume setting" etc. falls through to parseSettings
+            else -> null
         }
     }
 

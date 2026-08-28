@@ -196,9 +196,11 @@ object ActionJson {
         is NuvaAction.CreateTodo -> buildJsonObject { put("type", "CREATE_TODO"); put("content", action.content) }
         is NuvaAction.MediaControl -> buildJsonObject {
             put("type", "MEDIA_CONTROL"); put("command", action.command.wireName)
+            action.offsetSeconds?.let { put("offset_seconds", it) }
         }
         is NuvaAction.VolumeControl -> buildJsonObject {
             put("type", "VOLUME_CONTROL"); put("command", action.command.wireName)
+            action.levelPercent?.let { put("level_percent", it) }
         }
         is NuvaAction.CameraOpen -> buildJsonObject {
             put("type", "CAMERA"); put("mode", action.mode.wireName)

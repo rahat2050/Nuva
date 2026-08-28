@@ -754,6 +754,14 @@ class CommandParserTest {
 
         val bangla = CommandParser.parse("গান থামাও")
         assertEquals(MediaCommand.PAUSE, (bangla!!.action as NuvaAction.MediaControl).command)
+
+        val forward = CommandParser.parse("music 30 second forward")!!.action as NuvaAction.MediaControl
+        assertEquals(MediaCommand.FAST_FORWARD, forward.command)
+        assertEquals(30, forward.offsetSeconds)
+        val rewind = CommandParser.parse("video 15 second rewind")!!.action as NuvaAction.MediaControl
+        assertEquals(MediaCommand.REWIND, rewind.command)
+        assertEquals(15, rewind.offsetSeconds)
+        assertEquals(MediaCommand.STOP, (CommandParser.parse("music stop koro")!!.action as NuvaAction.MediaControl).command)
     }
 
     @Test
@@ -767,6 +775,11 @@ class CommandParserTest {
 
         val mute = CommandParser.parse("nuva sound mute koro")
         assertEquals(VolumeCommand.MUTE, (mute!!.action as NuvaAction.VolumeControl).command)
+        assertEquals(VolumeCommand.UNMUTE, (CommandParser.parse("sound unmute koro")!!.action as NuvaAction.VolumeControl).command)
+        val exact = CommandParser.parse("volume 55 percent")!!.action as NuvaAction.VolumeControl
+        assertEquals(VolumeCommand.SET, exact.command)
+        assertEquals(55, exact.levelPercent)
+        assertTrue(CommandParser.parse("volume 150 percent")!!.unsupported)
 
         // "volume setting" still opens the settings screen instead
         val settings = CommandParser.parse("nuva volume setting khulo")

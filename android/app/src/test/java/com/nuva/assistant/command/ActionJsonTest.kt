@@ -104,6 +104,10 @@ class ActionJsonTest {
             NuvaAction.OpenVoicemail,
             NuvaAction.MapNavigation(MapRequestType.DIRECTIONS, "Dhaka", "Sylhet", TravelMode.TRANSIT),
             NuvaAction.EmergencyDialer(EmergencyService.AMBULANCE),
+            NuvaAction.MediaControl(MediaCommand.FAST_FORWARD, 30),
+            NuvaAction.MediaControl(MediaCommand.STOP),
+            NuvaAction.VolumeControl(VolumeCommand.SET, 55),
+            NuvaAction.VolumeControl(VolumeCommand.UNMUTE),
             NuvaAction.OpenSettingScreen(SettingTarget.AIRPLANE_MODE),
             NuvaAction.OpenSettingScreen(SettingTarget.VPN),
             NuvaAction.OpenSettingScreen(SettingTarget.DEFAULT_APPS),
@@ -301,6 +305,16 @@ class ActionJsonTest {
             },
         )
         assertTrue(emptyMap is CommandValidator.ValidatedAction.Invalid)
+
+        val seekWithoutOffset = CommandValidator.validateAction(
+            buildJsonObject { put("type", "MEDIA_CONTROL"); put("command", "fast_forward") },
+        )
+        assertTrue(seekWithoutOffset is CommandValidator.ValidatedAction.Invalid)
+
+        val setWithoutLevel = CommandValidator.validateAction(
+            buildJsonObject { put("type", "VOLUME_CONTROL"); put("command", "set") },
+        )
+        assertTrue(setWithoutLevel is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test

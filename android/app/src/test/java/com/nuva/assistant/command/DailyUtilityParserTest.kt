@@ -92,6 +92,7 @@ class DailyUtilityParserTest {
     fun `unrelated conversation is not mistaken for a utility`() {
         assertNull(DailyUtilityParser.parse("amar jonno ekta kobita likho"))
         assertNull(DailyUtilityParser.parse("youtube khulo"))
+        assertNull(DailyUtilityParser.parse("volume 55 percent"))
         assertNotNull(DailyUtilityParser.parse("10 mile kilometer e koto"))
     }
 }

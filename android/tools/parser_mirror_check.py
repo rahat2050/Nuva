@@ -544,7 +544,7 @@ def parse_daily(t):
     # Compact mirror of the Kotlin data-driven utility engine. The Kotlin JVM
     # suite owns exhaustive converter/math coverage; these probes catch route
     # ordering regressions in environments without an Android SDK.
-    m = re.search(r"(-?\d+(?:\.\d+)?)\s*(?:er|এর|of)?\s*(-?\d+(?:\.\d+)?)\s*(?:%|percent|shotangsho|পারসেন্ট|শতাংশ)", t)
+    m = re.search(r"(-?\d+(?:\.\d+)?)\s+(?:(?:er|এর|of)\s+)?(-?\d+(?:\.\d+)?)\s*(?:%|percent|shotangsho|পারসেন্ট|শতাংশ)", t)
     if m:
         base, pct = float(m.group(1)), float(m.group(2))
         value = base * pct / 100
@@ -610,8 +610,15 @@ def parse_media_ctl(t):
     media_word = any(w in t for w in ["gaan","গান","music","song","video","ভিডিও","media","player","giti","গীত","track","ট্র্যাক"])
     pause = any(w in t for w in ["pause koro","pause korun","pause","thamo","থামাও","band koro music"]) and (media_word or "pause" in t)
     resume = any(w in t for w in ["resume koro","resume korun","resume","abar chalao","আবার চালাও"]) and (media_word or "resume" in t)
+    stop = media_word and any(w in t for w in ["stop koro","media stop","music stop"])
+    forward = media_word and any(w in t for w in ["fast forward","forward","samne nao"])
+    rewind = media_word and any(w in t for w in ["rewind","pichone nao"])
+    duration=parse_duration(t) or 10; duration=max(1,min(300,duration))
     nxt = media_word and any(w in t for w in ["next","porer","পরের","agamir"])
     prev = media_word and any(w in t for w in ["previous","ager","আগের","agerta","prev"])
+    if forward: return ok({"kind":"FAST_FORWARD","offset":duration},"MEDIA_CONTROL")
+    if rewind: return ok({"kind":"REWIND","offset":duration},"MEDIA_CONTROL")
+    if stop: return ok({"kind":"STOP"},"MEDIA_CONTROL")
     if pause: return ok({"kind":"PAUSE"},"MEDIA_CONTROL")
     if resume: return ok({"kind":"PLAY"},"MEDIA_CONTROL")
     if nxt: return ok({"kind":"NEXT"},"MEDIA_CONTROL")
@@ -620,6 +627,13 @@ def parse_media_ctl(t):
 
 def parse_volume(t):
     if not any(w in t for w in ["volume","ভলিউম","shobdo","শব্দ","sound","সাউন্ড"]): return None
+    m=re.search(r"(?:volume|sound|ভলিউম)\s*(?:set|koro|at|to)?\s*(\d{1,3})\s*(?:%|percent|শতাংশ)",t)
+    if m:
+        level=int(m.group(1))
+        if not 0 <= level <= 100: return unsupported("Volume 0-100")
+        return ok({"kind":"SET","level":level},"VOLUME_CONTROL")
+    if any(w in t for w in ["unmute","sound on","awaj chalu","শব্দ চালু"]):
+        return ok({"kind":"UNMUTE"},"VOLUME_CONTROL")
     if any(w in t for w in ["mute","নীরব","চুপ","bondho shobdo","shobdo bandho","শব্দ বন্ধ"]):
         return ok({"kind":"MUTE"},"VOLUME_CONTROL")
     if any(w in t for w in ["barao","baran","badhao","beshi","up","বাড়াও","বাড়ান","বেশি","চড়াও"]):
@@ -1053,7 +1067,12 @@ check(parse("nuva 01712345678 ke call koro")["action"]["number"] == "01712345678
 w = parse("nuva rahim ke whatsapp e bole dao kal class hobe")
 check(w["action"]["message"] == "kal class hobe" and w["confirm"], "wa msg")
 check(parse("nuva volume barao")["intent"] == "VOLUME_CONTROL", "vol up")
+check(parse("volume 55 percent")["action"]["level"] == 55, "exact volume")
+check(parse("sound unmute koro")["action"]["kind"] == "UNMUTE", "unmute")
 check(parse("nuva music pause koro")["intent"] == "MEDIA_CONTROL", "pause")
+check(parse("music 30 second forward")["action"]["offset"] == 30, "media forward")
+check(parse("video 15 second rewind")["action"]["kind"] == "REWIND", "media rewind")
+check(parse("music stop koro")["action"]["kind"] == "STOP", "media stop")
 check(parse("nuva chobi tolo")["action"]["kind"] == "CAPTURE", "chobi tolo")
 check(parse("nuva torch jalo")["action"]["kind"] == "TORCH", "torch")
 check(parse("nuva google e dhaka weather khujho")["action"]["query"] == "dhaka weather", "web search")
