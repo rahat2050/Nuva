@@ -213,6 +213,16 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `PDF print summary keeps system preview user controlled`() {
+        val summary = ConfirmationSummary.build(
+            NuvaAction.UserFile(UserFileOperation.PRINT_PDF),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(summary.detail.contains("print preview"))
+        assertTrue(summary.detail.contains("final Print"))
+    }
+
+    @Test
     fun `file mutation summary promises exact target second confirmation`() {
         val summary = ConfirmationSummary.build(
             NuvaAction.UserFile(UserFileOperation.RENAME_FILE, "report.pdf"),

@@ -298,6 +298,8 @@ def parse_user_file(t):
     opened = any(w in t for w in ["open","kholo","khulo","খোলো","খুলে"])
     file_word=any(w in t for w in ["file","document","ফাইল","ডকুমেন্ট"])
     multiple=any(w in t for w in ["multiple","several","onek","sob","একাধিক","অনেক"])
+    if (file_word or "pdf" in t) and any(w in t for w in ["print","প্রিন্ট"]):
+        return ok({"kind":"userfile","operation":"PRINT_PDF"},"USER_FILE",risk="MEDIUM")
     if file_word and share and multiple:
         return ok({"kind":"userfile","operation":"SHARE_MULTIPLE_FILES"},"USER_FILE",risk="MEDIUM")
     if file_word and any(w in t for w in ["delete","remove","muchhe","মুছে","ডিলিট"]):
@@ -349,7 +351,10 @@ def parse_productivity(t):
         if text: text=re.sub(r"^(je|যে)\s+","",text).strip()
         if not text: return unsupported("Clipboard text bolun")
         return ok({"kind":"clipboard","operation":"COPY","text":text},"CLIPBOARD_ACTION",risk="MEDIUM",base="MEDIUM")
-    if any(w in t for w in ["calendar event create","calendar event add","meeting create","event draft"]):
+    calendar_event=any(w in t for w in ["calendar event create","calendar event add","meeting create","event draft"])
+    if not calendar_event and any(w in t for w in ["calendar dekhao","show calendar","calendar agenda","today calendar","tomorrow calendar"]):
+        return ok({"kind":"calendarview","tomorrow":"tomorrow" in t},"VIEW_CALENDAR")
+    if calendar_event:
         tm=parse_time(t)
         if not tm: return unsupported("Event time bolun")
         m=re.search(r"\s(?:title|name)\s+(.+?)(?=\s+(?:location|description|attendee|email)\s|$)",t)
@@ -1152,6 +1157,8 @@ check(parse("file rename koro new name report.pdf")["action"]["new_name"] == "re
 check(parse("file copy koro")["action"]["operation"] == "COPY_FILE", "picker copy")
 check(parse("file move koro")["action"]["operation"] == "MOVE_FILE", "picker move")
 check(parse("photo crop koro")["action"]["operation"] == "EDIT_PHOTO", "photo editor handoff")
+check(parse("pdf print koro")["action"]["operation"] == "PRINT_PDF", "PDF print handoff")
+check(parse("calendar dekhao")["intent"] == "VIEW_CALENDAR", "calendar view")
 check(parse("protidin 8 tay schedule sms message update")["action"]["recurrence"] == "DAILY", "daily draft")
 check(parse("shukrobar 9 tay schedule email je report")["action"]["recurrence"] == "WEEKLY", "weekly draft")
 check(parse("scheduled draft list dekhao")["intent"] == "LIST_SCHEDULED_DRAFTS", "list drafts")

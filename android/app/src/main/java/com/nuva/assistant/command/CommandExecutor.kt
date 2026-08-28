@@ -659,6 +659,15 @@ class CommandExecutor(
                     ExecutionOutcome("failed", result.reason, result.reason)
             }
 
+            is NuvaAction.ViewCalendar -> when (
+                val result = com.nuva.assistant.automation.CalendarViewHandoff.open(context, action.focusAt)
+            ) {
+                com.nuva.assistant.automation.CalendarViewHandoff.Result.Opened ->
+                    ExecutionOutcome("completed", "Calendar view khulechi.")
+                is com.nuva.assistant.automation.CalendarViewHandoff.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.CreateCalendarEvent -> when (
                 val result = com.nuva.assistant.automation.CalendarEventHandoff.open(context, action)
             ) {
@@ -1100,6 +1109,7 @@ class CommandExecutor(
                 UserFileOperation.EMAIL_ATTACHMENT -> "email attachment"
                 UserFileOperation.EMAIL_ATTACHMENTS -> "email attachments"
                 UserFileOperation.MMS_ATTACHMENT -> "MMS attachment"
+                UserFileOperation.PRINT_PDF -> "print korar PDF"
                 UserFileOperation.RENAME_FILE -> "rename korar file"
                 UserFileOperation.COPY_FILE -> "copy korar source file"
                 UserFileOperation.MOVE_FILE -> "move korar source file"

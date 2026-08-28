@@ -78,6 +78,8 @@ class UserPresentFileWorkflowTest {
         assertTrue(UserFileOperation.MOVE_FILE.changesSelectedContent)
         assertTrue(UserFileOperation.COPY_FILE.needsBlockingConfirmation)
         assertTrue(UserFileOperation.EDIT_PHOTO.needsWriteGrant)
+        assertTrue(UserFileOperation.PRINT_PDF.needsBlockingConfirmation)
+        assertEquals("application/pdf", UserFileOperation.PRINT_PDF.mimeType)
         assertTrue(!UserFileOperation.READ_TEXT.sharesOutsideDevice)
     }
 }

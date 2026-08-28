@@ -186,6 +186,9 @@ object ActionJson {
         is NuvaAction.ClockControl -> buildJsonObject {
             put("type", "CLOCK_CONTROL"); put("operation", action.operation.wireName)
         }
+        is NuvaAction.ViewCalendar -> buildJsonObject {
+            put("type", "VIEW_CALENDAR"); put("focus_at", action.focusAt)
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

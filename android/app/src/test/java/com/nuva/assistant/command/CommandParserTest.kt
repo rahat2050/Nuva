@@ -269,6 +269,7 @@ class CommandParserTest {
         assertEquals(UserFileOperation.MOVE_FILE, (CommandParser.parse("file move koro")!!.action as NuvaAction.UserFile).operation)
         assertEquals(UserFileOperation.DELETE_FILE, (CommandParser.parse("file delete koro")!!.action as NuvaAction.UserFile).operation)
         assertEquals(UserFileOperation.EDIT_PHOTO, (CommandParser.parse("photo crop koro")!!.action as NuvaAction.UserFile).operation)
+        assertEquals(UserFileOperation.PRINT_PDF, (CommandParser.parse("pdf print koro")!!.action as NuvaAction.UserFile).operation)
         assertTrue(CommandParser.parse("file rename koro")!!.unsupported)
     }
 
@@ -279,6 +280,7 @@ class CommandParserTest {
         assertTrue(CommandParser.parse("file delete koro")!!.requiresConfirmation)
         assertTrue(CommandParser.parse("file copy koro")!!.requiresConfirmation)
         assertTrue(CommandParser.parse("photo edit koro")!!.requiresConfirmation)
+        assertTrue(CommandParser.parse("pdf print koro")!!.requiresConfirmation)
         assertFalse(CommandParser.parse("file open koro")!!.requiresConfirmation)
         assertFalse(CommandParser.parse("text file poro")!!.requiresConfirmation)
     }
@@ -435,6 +437,14 @@ class CommandParserTest {
         assertEquals(ClipboardOperation.READ, (CommandParser.parse("clipboard poro")!!.action as NuvaAction.ClipboardAction).operation)
         assertEquals(ClipboardOperation.CLEAR, (CommandParser.parse("clipboard clear koro")!!.action as NuvaAction.ClipboardAction).operation)
         assertTrue(CommandParser.parse("copy to clipboard")!!.unsupported)
+    }
+
+    @Test
+    fun `calendar view opens requested relative day without reading events`() {
+        val today = CommandParser.parse("calendar dekhao")!!.action as NuvaAction.ViewCalendar
+        val tomorrow = CommandParser.parse("tomorrow calendar dekhao")!!.action as NuvaAction.ViewCalendar
+        val deltaHours = (tomorrow.focusAt - today.focusAt) / 3_600_000
+        assertTrue(deltaHours in 23..25)
     }
 
     @Test

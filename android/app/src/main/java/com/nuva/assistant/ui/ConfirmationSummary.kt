@@ -200,6 +200,12 @@ object ConfirmationSummary {
                 confirmLabelOverride = "CONFIRM"
             }
 
+            is NuvaAction.ViewCalendar -> {
+                title = "Calendar view"
+                lines += Line("তারিখ", java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.ENGLISH).format(java.util.Date(action.focusAt)))
+                detail = "Calendar app requested date-এ খুলবে; NUVA calendar data পড়বে না।"
+            }
+
             is NuvaAction.CreateCalendarEvent -> {
                 title = "Rich calendar event draft"
                 lines += Line("শিরোনাম", action.title)
@@ -275,6 +281,8 @@ object ConfirmationSummary {
                         "শুধু আপনার বেছে নেওয়া folder-এর access grant হবে।"
                     action.operation == com.nuva.assistant.command.UserFileOperation.EDIT_PHOTO ->
                         "আপনি photo বেছে নেবেন; installed editor-এ final Save আপনি করবেন।"
+                    action.operation == com.nuva.assistant.command.UserFileOperation.PRINT_PDF ->
+                        "আপনি PDF বেছে নেবেন; Android print preview-তে printer/pages/final Print আপনি ঠিক করবেন।"
                     action.operation.changesSelectedContent || action.operation == com.nuva.assistant.command.UserFileOperation.COPY_FILE ->
                         "Picker-এর পরে exact source/destination দেখিয়ে দ্বিতীয় confirmation নেওয়া হবে।"
                     else -> "শুধু আপনার বেছে নেওয়া file/media handle করা হবে।"

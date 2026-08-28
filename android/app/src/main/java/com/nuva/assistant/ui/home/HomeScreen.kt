@@ -123,9 +123,9 @@ class HomeViewModel : ViewModel() {
         voice.reject(choice.first)
     }
 
-    fun onFileWorkflowUri(uri: Uri?) {
+    fun onFileWorkflowUri(context: android.content.Context, uri: Uri?) {
         viewModelScope.launch {
-            val speech = UserPresentFileWorkflow.handleSelected(NuvaContainer.appContext, uri)
+            val speech = UserPresentFileWorkflow.handleSelected(context, uri)
             if (uri != null) {
                 val completed = UserPresentFileWorkflow.state.value as? UserPresentFileWorkflow.State.Completed
                 voice.speakIfEnabled(completed?.content?.take(600) ?: speech)
@@ -133,9 +133,9 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    fun onFileWorkflowUris(uris: List<Uri>) {
+    fun onFileWorkflowUris(context: android.content.Context, uris: List<Uri>) {
         viewModelScope.launch {
-            val speech = UserPresentFileWorkflow.handleMultipleSelected(NuvaContainer.appContext, uris)
+            val speech = UserPresentFileWorkflow.handleMultipleSelected(context, uris)
             if (uris.isNotEmpty()) voice.speakIfEnabled(speech)
         }
     }
@@ -174,13 +174,13 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     }
     val documentPicker = rememberLauncherForActivityResult(
         contract = OpenNuvaDocumentContract(),
-    ) { uri -> viewModel.onFileWorkflowUri(uri) }
+    ) { uri -> viewModel.onFileWorkflowUri(context, uri) }
     val multipleDocumentPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments(),
-    ) { uris -> viewModel.onFileWorkflowUris(uris) }
+    ) { uris -> viewModel.onFileWorkflowUris(context, uris) }
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree(),
-    ) { uri -> viewModel.onFileWorkflowUri(uri) }
+    ) { uri -> viewModel.onFileWorkflowUri(context, uri) }
     val contactPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickContact(),
     ) { uri -> viewModel.onContactWorkflowUri(uri) }

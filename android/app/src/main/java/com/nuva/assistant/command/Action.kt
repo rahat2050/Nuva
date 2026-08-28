@@ -302,6 +302,10 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.CLOCK_CONTROL
     }
 
+    data class ViewCalendar(val focusAt: Long) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.VIEW_CALENDAR
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -643,6 +647,7 @@ enum class UserFileOperation(val wireName: String, val mimeType: String, val use
     EMAIL_ATTACHMENT("email_attachment", "*/*"),
     EMAIL_ATTACHMENTS("email_attachments", "*/*"),
     MMS_ATTACHMENT("mms_attachment", "*/*"),
+    PRINT_PDF("print_pdf", "application/pdf"),
     RENAME_FILE("rename_file", "*/*"),
     COPY_FILE("copy_file", "*/*"),
     MOVE_FILE("move_file", "*/*"),
@@ -666,7 +671,7 @@ enum class UserFileOperation(val wireName: String, val mimeType: String, val use
         get() = this == OPEN_FOLDER || this == RENAME_FILE || this == COPY_FILE || this == MOVE_FILE || this == DELETE_FILE || this == EDIT_PHOTO
 
     val needsBlockingConfirmation: Boolean
-        get() = sharesOutsideDevice || changesSelectedContent || this == COPY_FILE || this == OPEN_FOLDER
+        get() = sharesOutsideDevice || changesSelectedContent || this == COPY_FILE || this == OPEN_FOLDER || this == PRINT_PDF
 
     companion object {
         fun fromWire(value: String?): UserFileOperation? =

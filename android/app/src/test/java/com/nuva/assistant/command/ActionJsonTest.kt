@@ -53,6 +53,7 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("MAP_NAVIGATION"))
         assertNull(NuvaIntent.fromWire("EMERGENCY_DIALER"))
         assertNull(NuvaIntent.fromWire("CLOCK_CONTROL"))
+        assertNull(NuvaIntent.fromWire("VIEW_CALENDAR"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -107,6 +108,8 @@ class ActionJsonTest {
             NuvaAction.EmergencyDialer(EmergencyService.AMBULANCE),
             NuvaAction.ClockControl(ClockOperation.DISMISS_ALARM),
             NuvaAction.ClockControl(ClockOperation.SHOW_TIMERS),
+            NuvaAction.ViewCalendar(1_800_000_000_000L),
+            NuvaAction.UserFile(UserFileOperation.PRINT_PDF),
             NuvaAction.MediaControl(MediaCommand.FAST_FORWARD, 30),
             NuvaAction.MediaControl(MediaCommand.STOP),
             NuvaAction.VolumeControl(VolumeCommand.SET, 55),
@@ -343,6 +346,7 @@ class ActionJsonTest {
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.MAP_NAVIGATION))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.EMERGENCY_DIALER))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CLOCK_CONTROL))
+        assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.VIEW_CALENDAR))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.LIST_SCHEDULED_DRAFTS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.DEVICE_STATUS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CREATE_NOTE))

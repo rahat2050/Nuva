@@ -148,7 +148,14 @@ object CommandValidator {
             NuvaIntent.MAP_NAVIGATION -> validateMapNavigation(actionJson)
             NuvaIntent.EMERGENCY_DIALER -> validateEmergencyDialer(actionJson)
             NuvaIntent.CLOCK_CONTROL -> validateClockControl(actionJson)
+            NuvaIntent.VIEW_CALENDAR -> validateViewCalendar(actionJson)
         }
+    }
+
+    private fun validateViewCalendar(json: JsonObject): ValidatedAction {
+        val focusAt = json.long("focus_at")?.takeIf { it in 1..4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("VIEW_CALENDAR requires focus_at"))
+        return ValidatedAction.Valid(NuvaAction.ViewCalendar(focusAt))
     }
 
     private fun validateClockControl(json: JsonObject): ValidatedAction {

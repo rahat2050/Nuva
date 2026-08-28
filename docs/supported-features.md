@@ -1,4 +1,4 @@
-# NUVA — Supported features (v3.6)
+# NUVA — Supported features (v3.7)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -48,7 +48,9 @@ Notification permission is required. Details: [`persistent-scheduled-drafts.md`]
 v3.0 supports explicit foreground clipboard copy/read/clear with blocking confirmation, bounded text,
 OTP-like redaction and runtime credential/financial checks. There is no clipboard monitoring/history.
 Rich Calendar insert drafts support title, begin/end duration, location, description and one attendee
-email; the visible Calendar app owns final Save. Sensitive/financial event details are refused.
+email; the visible Calendar app owns final Save. v3.7 also opens Calendar focused on today/tomorrow/
+requested weekday without reading event data or calendar permission. Sensitive/financial event
+details are refused.
 
 ## Media & camera — SUPPORTED / ANDROID-LIMITED
 YouTube search/play, Spotify fallback, play/pause/next/previous/stop and bounded 1–300 second
@@ -65,8 +67,9 @@ grants and—since v2.5—rename, copy, move and delete. v2.8 adds picker-based 
 files/photos/videos and up to 10 email attachments through `ACTION_SEND_MULTIPLE`. Mutations require command confirmation, exact
 source/destination picker selection, then a second target-aware confirmation. Move copies first and
 only deletes the source when permission succeeds; otherwise both copies remain and NUVA says so.
-Provider support/write grants can still limit an operation. Broad storage scan and arbitrary/model-
-invented paths remain **UNSUPPORTED**.
+Provider support/write grants can still limit an operation. v3.7 adds one user-selected PDF streamed
+to Android's system print preview; printer, pages and final Print remain user-controlled. Broad
+storage scan and arbitrary/model-invented paths remain **UNSUPPORTED**.
 
 ## Daily-life utility engine — SUPPORTED (offline)
 Data-driven local answers cover well over 1,000 command forms rather than 1,000 hard-coded phrases:

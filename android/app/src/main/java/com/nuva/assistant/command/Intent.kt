@@ -70,6 +70,7 @@ enum class NuvaIntent(val wireName: String, val localOnly: Boolean = false) {
     MAP_NAVIGATION("MAP_NAVIGATION", localOnly = true),
     EMERGENCY_DIALER("EMERGENCY_DIALER", localOnly = true),
     CLOCK_CONTROL("CLOCK_CONTROL", localOnly = true),
+    VIEW_CALENDAR("VIEW_CALENDAR", localOnly = true),
     ;
 
     companion object {

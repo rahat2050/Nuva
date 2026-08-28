@@ -173,7 +173,7 @@ object UserPresentFileWorkflow {
         }
     }
 
-    private fun handleSource(context: Context, request: Request, uri: Uri): String = runCatching {
+    private suspend fun handleSource(context: Context, request: Request, uri: Uri): String = runCatching {
         persistGrant(context, uri, request.operation.needsWriteGrant)
         val name = displayName(context, uri).ifBlank { "selected item" }
         when (request.operation) {
@@ -219,6 +219,12 @@ object UserPresentFileWorkflow {
                     is SocialMmsComposer.Result.Opened -> complete(result.speech)
                     SocialMmsComposer.Result.SensitiveBlocked -> error("sensitive MMS blocked")
                     is SocialMmsComposer.Result.Failed -> error(result.reason)
+                }
+            }
+            UserFileOperation.PRINT_PDF -> withContext(Dispatchers.Main) {
+                when (val result = PdfPrintHandoff.print(context, uri, name)) {
+                    PdfPrintHandoff.Result.Opened -> complete("Android print preview khulechi — printer/pages/final Print apni select korun.")
+                    is PdfPrintHandoff.Result.Failed -> error(result.reason)
                 }
             }
             UserFileOperation.SHARE_MULTIPLE_FILES,

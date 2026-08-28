@@ -507,6 +507,9 @@ object CommandParser {
         val multiple = listOf("multiple", "several", "onek", "sob", "all selected", "একাধিক", "অনেক", "কয়েকটি", "কয়েকটি")
             .any { t.contains(it) }
 
+        if ((fileWord || t.contains("pdf")) && listOf("print", "প্রিন্ট").any { t.contains(it) }) {
+            return decision(UserFileOperation.PRINT_PDF, "PDF picker-er por Android print preview khulbo.")
+        }
         if (fileWord && share && multiple) {
             return decision(UserFileOperation.SHARE_MULTIPLE_FILES, "Multiple file picker-er por Android share sheet khulbo.")
         }
@@ -605,6 +608,34 @@ object CommandParser {
         val calendarRequested = listOf(
             "calendar event create", "calendar event add", "meeting create", "event draft", "ক্যালেন্ডার ইভেন্ট", "মিটিং তৈরি",
         ).any { t.contains(it) }
+        val calendarView = !calendarRequested && listOf(
+            "calendar dekhao", "show calendar", "calendar agenda", "today calendar", "tomorrow calendar",
+            "ক্যালেন্ডার দেখাও", "আজকের ক্যালেন্ডার", "আগামীকালের ক্যালেন্ডার",
+        ).any { t.contains(it) }
+        if (calendarView) {
+            val focus = java.util.Calendar.getInstance()
+            when {
+                listOf("parso", "porshu", "পরশু").any { NuvaDateTimeParser.hasWord(t, it) } ->
+                    focus.add(java.util.Calendar.DAY_OF_YEAR, 2)
+                NuvaDateTimeParser.relativeDay(t) == RelativeDay.TOMORROW ->
+                    focus.add(java.util.Calendar.DAY_OF_YEAR, 1)
+                NuvaDateTimeParser.weekday(t) != null -> {
+                    val wanted = when (NuvaDateTimeParser.weekday(t)!!) {
+                        Weekday.MON -> java.util.Calendar.MONDAY
+                        Weekday.TUE -> java.util.Calendar.TUESDAY
+                        Weekday.WED -> java.util.Calendar.WEDNESDAY
+                        Weekday.THU -> java.util.Calendar.THURSDAY
+                        Weekday.FRI -> java.util.Calendar.FRIDAY
+                        Weekday.SAT -> java.util.Calendar.SATURDAY
+                        Weekday.SUN -> java.util.Calendar.SUNDAY
+                    }
+                    var delta = (wanted - focus.get(java.util.Calendar.DAY_OF_WEEK) + 7) % 7
+                    if (delta == 0) delta = 7
+                    focus.add(java.util.Calendar.DAY_OF_YEAR, delta)
+                }
+            }
+            return ok(NuvaAction.ViewCalendar(focus.timeInMillis), "Calendar view khulchi.")
+        }
         if (calendarRequested) {
             val parsedTime = NuvaDateTimeParser.parseTime(t)
                 ?: return unsupported("Calendar event-er time bolun.")
