@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Focused Kotlin/API semantic compile when a full Android SDK/Gradle is unavailable.
 
-This checks the provider and assistant code added in v4.0-v4.2 against a real
+This checks high-risk provider, assistant and quick-entry code through v4.4 against a real
 public android.jar. Tiny project-only stubs isolate Android API signatures from
 Compose/Room/network dependencies. It is a supplement, never a replacement, for
 `:app:testDebugUnitTest`, lint and `:app:assembleDebug`.
@@ -168,7 +168,47 @@ sealed class NuvaAction {
             ],
         )
 
-    print("PASS: 5 focused Kotlin/API compile groups")
+        quick_entry_stub = write(
+            root / "stubs-quick/com/nuva/assistant/QuickEntry.kt",
+            """package com.nuva.assistant
+class MainActivity { companion object { const val ACTION_QUICK_SPEAK = "quick" } }
+object R {
+    object string { const val quick_tile_label = 1; const val quick_tile_subtitle = 2 }
+    object drawable { const val ic_nuva_tile = 3 }
+}
+""",
+        )
+        compile_group(
+            "quick-settings-tile",
+            args.kotlinc,
+            args.android_jar,
+            root,
+            [
+                quick_entry_stub,
+                SOURCE / "service/NuvaQuickSettingsTileService.kt",
+                SOURCE / "automation/QuickSettingsTileController.kt",
+            ],
+        )
+
+        messaging_stub = write(
+            root / "stubs-handoff/com/nuva/assistant/command/MessagingApp.kt",
+            """package com.nuva.assistant.command
+enum class MessagingApp { WHATSAPP, SMS, TELEGRAM }
+""",
+        )
+        compile_group(
+            "external-text-policy",
+            args.kotlinc,
+            args.android_jar,
+            root,
+            [
+                messaging_stub,
+                SOURCE / "core/security/SensitiveAppPolicy.kt",
+                SOURCE / "automation/ExternalTextHandoffPolicy.kt",
+            ],
+        )
+
+    print("PASS: 7 focused Kotlin/API compile groups")
     print("NOTE: full Gradle compile, resource linking, lint and device QA are still required")
 
 

@@ -73,7 +73,35 @@
                 <action android:name="android.intent.action.ASSIST" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- Explicit user handoff only: selected/shared text becomes a
+                 local editable draft and is never submitted automatically. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- User-added Quick Settings tile. A tap only opens a visible NUVA
+             listening session; it performs no command from the background. -->
+        <service
+            android:name=".service.NuvaQuickSettingsTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_nuva_tile"
+            android:label="@string/quick_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <!-- Official Android digital-assistant integration. The user alone can
              select NUVA in Default apps; the app cannot replace Gemini silently. -->

@@ -5,6 +5,13 @@
     <string name="accessibility_service_description">আপনার বলা কাজ নুভাকে করতে দিলে সে স্ক্রিনের বাটন খুঁজে চাপা, লেখা ও স্ক্রল করতে পারে। নুভা শুধু অনুমোদিত ১৫টি কাজ করে এবং ঝুঁকিপূর্ণ কাজের আগে অবশ্যই জিজ্ঞেস করে।</string>
     <string name="system_assistant_label">নুভা ডিজিটাল অ্যাসিস্ট্যান্ট</string>
     <string name="system_recognition_label">নুভা ভয়েস রিকগনিশন ব্রিজ</string>
+    <string name="quick_tile_label">নুভার সাথে কথা বলুন</string>
+    <string name="quick_tile_subtitle">কথা বলতে চাপুন</string>
+    <string name="shortcut_talk_short">নুভাকে বলুন</string>
+    <string name="shortcut_talk_long">নুভা খুলে কথা বলা শুরু করুন</string>
+    <string name="shortcut_talk_disabled">নুভা ভয়েস শর্টকাট এখন পাওয়া যাচ্ছে না</string>
+    <string name="settings_add_quick_tile">Quick Settings tile যোগ করুন</string>
+    <string name="external_text_draft_hint">শেয়ার করা লেখা শুধু draft—দেখে নিয়ে তারপর Send চাপুন।</string>
 
     <string name="home_title">নুভা</string>
     <string name="home_subtitle">আপনার ব্যক্তিগত এআই সহকারী</string>

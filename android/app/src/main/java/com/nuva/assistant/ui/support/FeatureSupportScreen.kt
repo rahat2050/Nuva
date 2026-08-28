@@ -34,6 +34,7 @@ import com.nuva.assistant.ui.theme.NuvaScreenHeader
 data class FeatureRow(val name: String, val supported: Boolean, val reason: String? = null)
 
 val SUPPORTED_FEATURES = listOf(
+    "Quick Settings Talk tile, app-icon long-press voice shortcut এবং selected/shared text-এর bounded editable NUVA draft—কখনো auto-submit নয়",
     "Accessible native 3D UI — aurora background, raised glass cards, voice orb, floating labeled navigation; no heavy 3D engine বা decorative infinite animation",
     "Home Assistant: encrypted HTTPS config + confirmed light/switch/fan on/off/toggle ও climate ১০–৩২°C",
     "১২,২৫০টি audited natural command form — polite/ASR/Bangla/Banglish/English variant ও ৬-step multi-command plan",

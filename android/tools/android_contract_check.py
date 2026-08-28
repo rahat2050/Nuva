@@ -110,7 +110,24 @@ def main() -> None:
     main_actions = {attr(node, "name") for node in main_activity.findall("./intent-filter/action")}
     require("android.intent.action.MAIN" in main_actions, "launcher action missing")
     require("android.intent.action.ASSIST" in main_actions, "assistant Activity fallback missing")
+    require("android.intent.action.SEND" in main_actions, "explicit shared-text handoff missing")
+    require("android.intent.action.PROCESS_TEXT" in main_actions, "selected-text handoff missing")
     require(attr(main_activity, "launchMode") == "singleTop", "assistant Activity must consume repeat invocations")
+    shortcuts_metadata = child_with_name(main_activity, "meta-data", "android.app.shortcuts")
+    require(attr(shortcuts_metadata, "resource") == "@xml/shortcuts", "launcher shortcut metadata missing")
+    shortcuts_root = ET.parse(MAIN / "res" / "xml" / "shortcuts.xml").getroot()
+    require(shortcuts_root.find("shortcut") is not None, "Talk to NUVA launcher shortcut missing")
+
+    quick_tile = child_with_name(application, "service", ".service.NuvaQuickSettingsTileService")
+    require(quick_tile is not None, "Quick Settings tile service missing")
+    assert quick_tile is not None
+    require(attr(quick_tile, "exported") == "true", "system must be able to bind the Quick Settings tile")
+    require(
+        attr(quick_tile, "permission") == "android.permission.BIND_QUICK_SETTINGS_TILE",
+        "Quick Settings tile must require the system bind permission",
+    )
+    tile_actions = {attr(node, "name") for node in quick_tile.findall("./intent-filter/action")}
+    require("android.service.quicksettings.action.QS_TILE" in tile_actions, "Quick Settings tile filter missing")
 
     # Complete VoiceInteractionService registration.
     voice_service = child_with_name(
@@ -213,6 +230,18 @@ def main() -> None:
     require("PendingMemoryDeletion" in three_d_screens["memory/MemoryScreen.kt"], "memory deletion needs confirmation")
     overlay_source = (MAIN / "java/com/nuva/assistant/ui/floating/FloatingAssistantOverlay.kt").read_text()
     require("Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL" in overlay_source, "assistant voice plate should stay reachable")
+
+    # v4.4 user-present entry points must never turn external text into an automatic command.
+    main_activity_source = (MAIN / "java/com/nuva/assistant/MainActivity.kt").read_text()
+    handoff_source = (MAIN / "java/com/nuva/assistant/automation/ExternalTextHandoffPolicy.kt").read_text()
+    tile_source = (MAIN / "java/com/nuva/assistant/service/NuvaQuickSettingsTileService.kt").read_text()
+    require("draftText" in main_activity_source, "external text must be represented as a draft")
+    require("viewModel.submitTyped(invocation.draftText" not in three_d_screens["home/HomeScreen.kt"], "external draft auto-submit detected")
+    require("mentionsCredentials" in handoff_source, "external text credential guard missing")
+    require("isTransactionRequest" in handoff_source, "external text transaction guard missing")
+    require("MAX_DRAFT_CHARS = 1_000" in handoff_source, "external text bound changed")
+    require("ACTION_QUICK_SPEAK" in tile_source, "Quick Settings tile must open the explicit speak route")
+    require("startActivityAndCollapse(pendingIntent)" in tile_source, "Android 14 tile PendingIntent path missing")
 
     # Server/AI still cannot resolve local provider/device actions.
     intent_source = (MAIN / "java/com/nuva/assistant/command/Intent.kt").read_text()

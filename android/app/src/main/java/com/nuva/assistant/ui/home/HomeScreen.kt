@@ -192,19 +192,6 @@ fun HomeScreen(
         contract = ActivityResultContracts.PickContact(),
     ) { uri -> viewModel.onContactWorkflowUri(uri) }
 
-    LaunchedEffect(assistantInvocation?.id) {
-        val invocation = assistantInvocation ?: return@LaunchedEffect
-        if (invocation.listenInApp) {
-            val command = invocation.inlineCommand
-            when {
-                !command.isNullOrBlank() -> viewModel.submitTyped(command)
-                NuvaPermissions.hasRecordAudio(context) -> viewModel.startListening()
-                else -> micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            }
-        }
-        onAssistantInvocationConsumed(invocation.id)
-    }
-
     val state by viewModel.state.collectAsState(initial = VoiceController.State.Idle)
     val pending by viewModel.pending.collectAsState()
     val contactChoice by viewModel.contactChoice.collectAsState()
@@ -213,7 +200,27 @@ fun HomeScreen(
     val contactWorkflow by viewModel.contactWorkflow.collectAsState()
 
     var typedCommand by remember { mutableStateOf("") }
+    var externalDraftLoaded by remember { mutableStateOf(false) }
     var showAccessibilityGuide by remember { mutableStateOf(false) }
+
+    LaunchedEffect(assistantInvocation?.id) {
+        val invocation = assistantInvocation ?: return@LaunchedEffect
+        when {
+            !invocation.draftText.isNullOrBlank() -> {
+                typedCommand = invocation.draftText
+                externalDraftLoaded = true
+            }
+            invocation.listenInApp -> {
+                val command = invocation.inlineCommand
+                when {
+                    !command.isNullOrBlank() -> viewModel.submitTyped(command)
+                    NuvaPermissions.hasRecordAudio(context) -> viewModel.startListening()
+                    else -> micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            }
+        }
+        onAssistantInvocationConsumed(invocation.id)
+    }
 
     LaunchedEffect(state) { viewModel.onStateChanged(state) }
     LaunchedEffect(fileWorkflow) {
@@ -336,29 +343,42 @@ fun HomeScreen(
 
         item {
             NuvaGlassPanel(modifier = Modifier.fillMaxWidth(), contentPadding = 12.dp) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(9.dp),
-                ) {
-                    OutlinedTextField(
-                        value = typedCommand,
-                        onValueChange = { typedCommand = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text(stringResource(R.string.typed_hint)) },
-                        singleLine = true,
-                    )
-                    NuvaPrimaryAction(
-                        onClick = {
-                            val text = typedCommand.trim()
-                            if (text.isNotEmpty()) {
-                                typedCommand = ""
-                                viewModel.submitTyped(text)
-                            }
-                        },
-                        enabled = typedCommand.isNotBlank() && state !is VoiceController.State.Processing,
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    if (externalDraftLoaded) {
+                        Text(
+                            stringResource(R.string.external_text_draft_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(9.dp),
                     ) {
-                        Text("→", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                        OutlinedTextField(
+                            value = typedCommand,
+                            onValueChange = {
+                                typedCommand = it
+                                if (it.isBlank()) externalDraftLoaded = false
+                            },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text(stringResource(R.string.typed_hint)) },
+                            singleLine = true,
+                        )
+                        NuvaPrimaryAction(
+                            onClick = {
+                                val text = typedCommand.trim()
+                                if (text.isNotEmpty()) {
+                                    typedCommand = ""
+                                    externalDraftLoaded = false
+                                    viewModel.submitTyped(text)
+                                }
+                            },
+                            enabled = typedCommand.isNotBlank() && state !is VoiceController.State.Processing,
+                        ) {
+                            Text("→", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                        }
                     }
                 }
             }

@@ -128,8 +128,8 @@ python3 tools/focused_android_api_compile_check.py \
   --android-jar /path/to/platforms/android-35/android.jar
 ```
 
-The focused compile validates system-assistant, Calendar-provider, Keystore, SpeechRecognizer and
-wake-state API signatures. It does not replace:
+The focused compile validates system-assistant, Calendar-provider, Keystore, SpeechRecognizer,
+wake-state, Quick Settings tile and external-text policy API signatures. It does not replace:
 
 ```bash
 gradle --no-daemon -p android :app:testDebugUnitTest :app:lintDebug :app:assembleDebug

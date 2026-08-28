@@ -124,6 +124,17 @@ NUVA's memory into a password store.
 - Assistant invocation changes only the entry point; all normal validation, risk and confirmation
   gates still run.
 
+## Quick access / external text boundary (v4.4)
+
+- Quick Settings tile installation is Android/user-owned; tile and launcher shortcut only open a
+  visible listening session.
+- `ACTION_SEND`/`ACTION_PROCESS_TEXT` accept `text/plain` only after the user selects NUVA.
+- External text is capped at 1,000 characters, credential/transaction checked and kept as an editable
+  draft; no automatic parser/backend submission occurs.
+- Consumed text extras and ClipData are cleared from the Activity Intent to prevent replay on
+  recreation.
+- No clipboard monitor, background share receiver or new dangerous permission is introduced.
+
 ## 8. Known limitations (honest list)
 
 1. **Rate limiting degrades gracefully, it is not a hard cap.** With `UPSTASH_REDIS_REST_*`

@@ -89,7 +89,8 @@ not replace—the Gradle build, lint or physical-device matrix.
    tap/type/swipe/scroll/read-screen; app open, alarms, timers, dialer and browser work without it.
 6. Toggle **Wake word “Hey Nuva”**. Confirm `waiting for wake`, leave the app, keep the screen on and
    say “Hey Nuva”. `Restart listener` and `Test voice` diagnose stale OEM recognizers.
-7. Optional: Supabase URL + anon key + sign-in to enable cloud memory/history sync.
+7. Optional quick entry: tap **Add Quick Settings tile**, or long-press the app icon for **Talk to NUVA**.
+8. Optional: Supabase URL + anon key + sign-in to enable cloud memory/history sync.
 
 ## The safety model (client half)
 
@@ -205,6 +206,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   visible custom wake fallback, recognizer-discovery/race/timeout fixes and live diagnostics.
 * **v4.3 accessible 3D UI**: aurora backdrop, raised glass surfaces, tactile command orb, floating
   labeled navigation and bottom assistant voice plate without infinite decorative animation.
+* **v4.4 quick access**: user-added Quick Settings tile, launcher Talk shortcut and Share/Process Text
+  target; imported text stays a bounded editable draft and never auto-submits.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

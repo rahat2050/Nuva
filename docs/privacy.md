@@ -1,6 +1,6 @@
 # NUVA Privacy
 
-Last updated: v4.3 (2026-08-28). The app contains **no analytics, no trackers,
+Last updated: v4.4 (2026-08-28). The app contains **no analytics, no trackers,
 no ad SDKs**.
 
 ## What stays on your phone
@@ -14,6 +14,9 @@ no ad SDKs**.
   AlarmManager carries only the local row id. They are never uploaded or automatically sent.
 * Clipboard access happens only on an explicit foreground copy/read/clear command; NUVA stores no
   clipboard history and never registers a clipboard-change monitor.
+* Text explicitly shared/selected into NUVA becomes a transient editable draft capped at 1,000
+  characters. It is never auto-submitted, is removed from the Activity Intent after consumption,
+  and credential/transaction text is refused before import.
 * Rich calendar event fields are passed to the visible Calendar insert screen and not saved by NUVA.
   Optional agenda access queries only an explicitly requested 1–31 day range; results stay transient,
   are never uploaded/synced, and credential-titled events are excluded.

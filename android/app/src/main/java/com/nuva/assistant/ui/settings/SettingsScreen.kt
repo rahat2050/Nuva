@@ -1,5 +1,6 @@
 package com.nuva.assistant.ui.settings
 
+import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nuva.assistant.R
+import com.nuva.assistant.automation.QuickSettingsTileController
 import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.core.permissions.NuvaPermissions
 import com.nuva.assistant.service.WakeWordService
@@ -470,6 +472,25 @@ fun SettingsScreen(
         ) {
             Text(if (nuvaIsDefaultAssistant) "Check default assistant" else "Choose NUVA as default")
         }
+        OutlinedButton(
+            onClick = {
+                val activity = context as? Activity
+                if (activity == null) {
+                    viewModel.setMessage("Quick Settings tile request needs the visible NUVA Activity.")
+                } else {
+                    QuickSettingsTileController.requestAdd(activity) { result ->
+                        viewModel.setMessage(QuickSettingsTileController.message(result))
+                    }
+                }
+            },
+        ) {
+            Text(stringResource(R.string.settings_add_quick_tile))
+        }
+        Text(
+            "App icon long-press করলেও Talk to NUVA shortcut পাবেন। Tile/shortcut শুধু visible listening session খোলে।",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         ToggleRow(
             label = "Step 2: " + stringResource(R.string.settings_wake_word),

@@ -5,6 +5,13 @@
     <string name="accessibility_service_description">Lets NUVA find buttons, tap, type and scroll on your behalf when you ask it to. NUVA only acts on the 15 registered actions and always asks before anything risky.</string>
     <string name="system_assistant_label">NUVA Digital Assistant</string>
     <string name="system_recognition_label">NUVA Voice Recognition Bridge</string>
+    <string name="quick_tile_label">Talk to NUVA</string>
+    <string name="quick_tile_subtitle">Tap to speak</string>
+    <string name="shortcut_talk_short">Talk to NUVA</string>
+    <string name="shortcut_talk_long">Open NUVA and start listening</string>
+    <string name="shortcut_talk_disabled">NUVA voice shortcut is unavailable</string>
+    <string name="settings_add_quick_tile">Add Quick Settings tile</string>
+    <string name="external_text_draft_hint">Shared text is only a draft—review it, then tap Send.</string>
 
     <string name="home_title">NUVA</string>
     <string name="home_subtitle">Your personal AI assistant</string>

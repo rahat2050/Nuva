@@ -1,4 +1,4 @@
-# NUVA — Supported features (v4.3)
+# NUVA — Supported features (v4.4)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -23,6 +23,14 @@ actions retain 50dp+ targets, the voice orb exposes button semantics, navigation
 no decorative infinite animation is used. Light/dark system-bar icon contrast is synchronized. Full
 Gradle, screenshot, TalkBack and physical-device contrast QA remain pending. Details:
 [`3d-ui-ux.md`](3d-ui-ux.md).
+
+## Quick access & selected-text handoff — USER-PRESENT SUPPORTED
+v4.4 adds a user-installed **Talk to NUVA** Quick Settings tile, launcher long-press shortcut and
+Android `text/plain` Share/Process Text target. Tile/shortcut only open one visible listening session.
+Selected/shared text becomes a transient editable draft capped at 1,000 characters; it is never
+auto-submitted. Credential-like and financial-transaction text is refused before import, and the
+Activity Intent payload is cleared after consumption. Details:
+[`quick-access-text-handoff.md`](quick-access-text-handoff.md).
 
 ## Natural command grammar — SUPPORTED
 A data-audited grammar accepts **12,250 concrete static command forms** (50 families × 5 aliases ×
