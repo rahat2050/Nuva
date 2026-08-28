@@ -205,6 +205,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [home-assistant.md](docs/home-assistant.md) | v4.0 encrypted configuration and physical-control allowlist |
 | [calendar-provider.md](docs/calendar-provider.md) | v4.1 optional bounded agenda read and exact event handoff |
 | [hey-nuva-system-assistant.md](docs/hey-nuva-system-assistant.md) | v4.2 default-assistant registration and visible wake fallback |
+| [v4.2-apk-build-qa.md](docs/v4.2-apk-build-qa.md) | Reproducible contract/API checks and real-device release gate |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |

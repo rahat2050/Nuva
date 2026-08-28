@@ -1,0 +1,233 @@
+#!/usr/bin/env python3
+"""Deterministic Android manifest/security/version contract audit for NUVA.
+
+This is intentionally dependency-free so it can run in constrained CI/sandboxes
+before Gradle is available. It does not replace assembleDebug, lint, JVM tests or
+real-device QA; it catches high-impact wiring and policy regressions early.
+
+Usage:
+    cd android && python3 tools/android_contract_check.py
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+ANDROID = "{http://schemas.android.com/apk/res/android}"
+ANDROID_DIR = Path(__file__).resolve().parents[1]
+REPO = ANDROID_DIR.parent
+APP = ANDROID_DIR / "app"
+MAIN = APP / "src" / "main"
+MANIFEST = MAIN / "AndroidManifest.xml"
+
+checks = 0
+
+
+def require(condition: bool, message: str) -> None:
+    global checks
+    checks += 1
+    if not condition:
+        raise AssertionError(message)
+
+
+def attr(node: ET.Element, name: str) -> str | None:
+    return node.get(ANDROID + name)
+
+
+def child_with_name(parent: ET.Element, tag: str, name: str) -> ET.Element | None:
+    return next((node for node in parent.findall(tag) if attr(node, "name") == name), None)
+
+
+def source_contains_component(simple_name: str, kotlin_source: str) -> bool:
+    return re.search(rf"\b(?:class|object)\s+{re.escape(simple_name)}\b", kotlin_source) is not None
+
+
+def main() -> None:
+    manifest_text = MANIFEST.read_text(encoding="utf-8")
+    root = ET.fromstring(manifest_text)
+    application = root.find("application")
+    require(application is not None, "manifest must contain <application>")
+    assert application is not None
+
+    # Every resource XML must be well formed.
+    xml_files = list(MAIN.rglob("*.xml"))
+    for path in xml_files:
+        ET.parse(path)
+    require(len(xml_files) >= 5, "expected Android XML resources")
+
+    permissions = [attr(node, "name") for node in root.findall("uses-permission")]
+    require(len(permissions) == len(set(permissions)), "manifest permissions must be unique")
+    required_permissions = {
+        "android.permission.RECORD_AUDIO",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+    }
+    require(required_permissions.issubset(set(permissions)), "voice foreground permissions are incomplete")
+
+    forbidden_permissions = {
+        "android.permission.CAPTURE_AUDIO_HOTWORD",  # system/signature only
+        "android.permission.RECORD_BACKGROUND_AUDIO",
+        "android.permission.MANAGE_SPEECH_RECOGNITION",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.READ_SMS",
+        "android.permission.RECEIVE_SMS",
+        "android.permission.MANAGE_EXTERNAL_STORAGE",
+        "android.permission.QUERY_ALL_PACKAGES",
+        "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+    }
+    present_forbidden = sorted(set(permissions) & forbidden_permissions)
+    require(not present_forbidden, f"forbidden/excess permissions declared: {present_forbidden}")
+
+    # Android 11+ package visibility is mandatory for SpeechRecognizer discovery.
+    queries = root.find("queries")
+    query_actions = {
+        attr(action, "name")
+        for action in (queries.findall("./intent/action") if queries is not None else [])
+    }
+    require(
+        "android.speech.RecognitionService" in query_actions,
+        "RecognitionService package-visibility query missing",
+    )
+
+    kotlin_files = list((MAIN / "java").rglob("*.kt"))
+    kotlin_source = "\n".join(path.read_text(encoding="utf-8") for path in kotlin_files)
+    for component_tag in ("activity", "service", "receiver"):
+        for component in application.findall(component_tag):
+            component_name = attr(component, "name") or ""
+            simple_name = component_name.rsplit(".", 1)[-1]
+            require(
+                source_contains_component(simple_name, kotlin_source),
+                f"manifest {component_tag} implementation not found: {component_name}",
+            )
+
+    main_activity = child_with_name(application, "activity", ".MainActivity")
+    require(main_activity is not None, "MainActivity declaration missing")
+    assert main_activity is not None
+    main_actions = {attr(node, "name") for node in main_activity.findall("./intent-filter/action")}
+    require("android.intent.action.MAIN" in main_actions, "launcher action missing")
+    require("android.intent.action.ASSIST" in main_actions, "assistant Activity fallback missing")
+    require(attr(main_activity, "launchMode") == "singleTop", "assistant Activity must consume repeat invocations")
+
+    # Complete VoiceInteractionService registration.
+    voice_service = child_with_name(
+        application,
+        "service",
+        ".systemassistant.NuvaVoiceInteractionService",
+    )
+    require(voice_service is not None, "VoiceInteractionService declaration missing")
+    assert voice_service is not None
+    require(attr(voice_service, "exported") == "true", "VoiceInteractionService must be system-bindable")
+    require(
+        attr(voice_service, "permission") == "android.permission.BIND_VOICE_INTERACTION",
+        "VoiceInteractionService must require BIND_VOICE_INTERACTION",
+    )
+    voice_actions = {attr(node, "name") for node in voice_service.findall("./intent-filter/action")}
+    require(
+        "android.service.voice.VoiceInteractionService" in voice_actions,
+        "VoiceInteractionService intent filter missing",
+    )
+    voice_metadata = child_with_name(voice_service, "meta-data", "android.voice_interaction")
+    require(attr(voice_metadata, "resource") == "@xml/voice_interaction_service", "voice metadata wiring missing")
+
+    voice_xml = ET.parse(MAIN / "res" / "xml" / "voice_interaction_service.xml").getroot()
+    require(voice_xml.tag == "voice-interaction-service", "voice metadata root is invalid")
+    session_class = attr(voice_xml, "sessionService") or ""
+    recognition_class = attr(voice_xml, "recognitionService") or ""
+    require(session_class.endswith(".NuvaVoiceInteractionSessionService"), "session service metadata mismatch")
+    require(recognition_class.endswith(".NuvaRecognitionService"), "recognition service metadata mismatch")
+    require(attr(voice_xml, "supportsAssist") == "true", "assistant role qualification requires assist support")
+    require(attr(voice_xml, "supportsLaunchVoiceAssistFromKeyguard") == "false", "lockscreen launch must stay off")
+    require(attr(voice_xml, "supportsLocalInteraction") == "false", "implicit local interaction must stay off")
+
+    session_service = child_with_name(
+        application,
+        "service",
+        ".systemassistant.NuvaVoiceInteractionSessionService",
+    )
+    require(session_service is not None, "session service declaration missing")
+    assert session_service is not None
+    require(
+        attr(session_service, "permission") == "android.permission.BIND_VOICE_INTERACTION",
+        "session service must require BIND_VOICE_INTERACTION",
+    )
+
+    recognition_service = child_with_name(
+        application,
+        "service",
+        ".systemassistant.NuvaRecognitionService",
+    )
+    require(recognition_service is not None, "recognition service declaration missing")
+    assert recognition_service is not None
+    recognition_actions = {
+        attr(node, "name") for node in recognition_service.findall("./intent-filter/action")
+    }
+    require("android.speech.RecognitionService" in recognition_actions, "recognition service filter missing")
+    require(
+        attr(recognition_service, "permission") is None,
+        "do not invent a bind permission; RecognitionService performs caller RECORD_AUDIO checks",
+    )
+    recognition_metadata = child_with_name(recognition_service, "meta-data", "android.speech")
+    require(attr(recognition_metadata, "resource") == "@xml/recognition_service", "recognition metadata missing")
+
+    # Microphone services must remain visible foreground services.
+    for service_name in (".service.NuvaForegroundService", ".service.WakeWordService"):
+        service = child_with_name(application, "service", service_name)
+        require(service is not None, f"{service_name} missing")
+        assert service is not None
+        require(attr(service, "foregroundServiceType") == "microphone", f"{service_name} must declare mic FGS")
+        require(attr(service, "exported") == "false", f"{service_name} must not be externally startable")
+
+    # Source-level privacy and recursion boundaries around the assistant stack.
+    voice_source = (MAIN / "java/com/nuva/assistant/systemassistant/NuvaVoiceInteractionService.kt").read_text()
+    recognizer_source = (MAIN / "java/com/nuva/assistant/systemassistant/NuvaRecognitionService.kt").read_text()
+    wake_source = (MAIN / "java/com/nuva/assistant/service/WakeWordService.kt").read_text()
+    require("setDisabledShowContext" in voice_source, "AssistStructure/screenshot disabling missing")
+    require("SHOW_WITH_ASSIST" in voice_source and "SHOW_WITH_SCREENSHOT" in voice_source, "assist privacy flags incomplete")
+    require("filterNot { it.packageName == ownPackage }" in recognizer_source, "recognizer recursion guard missing")
+    require("callingAttributionSource" in recognizer_source, "Android 12+ microphone attribution forwarding missing")
+    require("startForeground(" in wake_source, "wake listener must visibly enter foreground")
+    require("isScreenInteractive()" in wake_source, "screen-off wake pause missing")
+    require("withTimeoutOrNull(WAKE_LISTEN_TIMEOUT_MS)" in wake_source, "stuck wake-cycle recovery missing")
+    require('speakIfEnabled("Listening")' not in wake_source, "wake listener must not recognize its own TTS")
+
+    # Server/AI still cannot resolve local provider/device actions.
+    intent_source = (MAIN / "java/com/nuva/assistant/command/Intent.kt").read_text()
+    require(
+        "entries.firstOrNull { !it.localOnly && it.wireName == value }" in intent_source,
+        "LOCAL_ONLY wire rejection changed",
+    )
+    for local_intent in ("HOME_ASSISTANT", "CALENDAR_PROVIDER"):
+        require(
+            re.search(rf"\b{local_intent}\([^\n]+localOnly\s*=\s*true", intent_source) is not None,
+            f"{local_intent} must remain local-only",
+        )
+
+    # Version is one source of release truth across Android build + client header + docs.
+    gradle = (APP / "build.gradle.kts").read_text()
+    version_name = re.search(r'versionName\s*=\s*"([^"]+)"', gradle)
+    version_code = re.search(r"versionCode\s*=\s*(\d+)", gradle)
+    require(version_name is not None and version_code is not None, "Android version fields missing")
+    assert version_name is not None and version_code is not None
+    ai_source = (MAIN / "java/com/nuva/assistant/ai/AIRepository.kt").read_text()
+    require(
+        f'APP_VERSION = "{version_name.group(1)}"' in ai_source,
+        "Android versionName and API client header diverged",
+    )
+    major_minor = ".".join(version_name.group(1).split(".")[:2])
+    supported = (REPO / "docs/supported-features.md").read_text()
+    require(f"(v{major_minor})" in supported.splitlines()[0], "supported-features version heading is stale")
+
+    print(f"PASS: {checks} Android contracts · {len(kotlin_files)} Kotlin files · {len(xml_files)} XML files")
+    print(f"Version: {version_name.group(1)} (code {version_code.group(1)})")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (AssertionError, ET.ParseError) as error:
+        print(f"FAIL after {checks} checks: {error}", file=sys.stderr)
+        raise SystemExit(1)

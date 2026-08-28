@@ -64,7 +64,16 @@ com.nuva.assistant/
 ./gradlew lint           # Android lint
 ./gradlew test           # unit tests
 ./gradlew assembleDebug  # debug APK
+
+# Dependency-free preflight (also works when Gradle is unavailable)
+python3 tools/parser_mirror_check.py
+python3 tools/android_contract_check.py
 ```
+
+For constrained environments with a standalone Kotlin compiler + Android 35 API jar, run
+`tools/focused_android_api_compile_check.py`; see
+[`../docs/v4.2-apk-build-qa.md`](../docs/v4.2-apk-build-qa.md). This focused check supplements—it does
+not replace—the Gradle build, lint or physical-device matrix.
 
 ## First-run setup on a device
 
