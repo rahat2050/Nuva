@@ -54,6 +54,7 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("EMERGENCY_DIALER"))
         assertNull(NuvaIntent.fromWire("CLOCK_CONTROL"))
         assertNull(NuvaIntent.fromWire("VIEW_CALENDAR"))
+        assertNull(NuvaIntent.fromWire("HOME_ASSISTANT"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -109,6 +110,8 @@ class ActionJsonTest {
             NuvaAction.ClockControl(ClockOperation.DISMISS_ALARM),
             NuvaAction.ClockControl(ClockOperation.SHOW_TIMERS),
             NuvaAction.ViewCalendar(1_800_000_000_000L),
+            NuvaAction.HomeAssistantControl(HomeAssistantDomain.LIGHT, HomeAssistantOperation.TURN_ON, "living room"),
+            NuvaAction.HomeAssistantControl(HomeAssistantDomain.CLIMATE, HomeAssistantOperation.SET_TEMPERATURE, "bedroom", 24.0),
             NuvaAction.UserFile(UserFileOperation.PRINT_PDF),
             NuvaAction.MediaControl(MediaCommand.FAST_FORWARD, 30),
             NuvaAction.MediaControl(MediaCommand.STOP),
@@ -321,6 +324,21 @@ class ActionJsonTest {
             buildJsonObject { put("type", "VOLUME_CONTROL"); put("command", "set") },
         )
         assertTrue(setWithoutLevel is CommandValidator.ValidatedAction.Invalid)
+
+        val unsafeHaDomain = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "HOME_ASSISTANT"); put("domain", "lock"); put("operation", "turn_on"); put("entity_query", "front door")
+            },
+        )
+        assertTrue(unsafeHaDomain is CommandValidator.ValidatedAction.Invalid)
+
+        val unsafeTemperature = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "HOME_ASSISTANT"); put("domain", "climate"); put("operation", "set_temperature")
+                put("entity_query", "bedroom"); put("value", 50.0)
+            },
+        )
+        assertTrue(unsafeTemperature is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test
@@ -347,6 +365,7 @@ class ActionJsonTest {
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.EMERGENCY_DIALER))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CLOCK_CONTROL))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.VIEW_CALENDAR))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.HOME_ASSISTANT))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.LIST_SCHEDULED_DRAFTS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.DEVICE_STATUS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CREATE_NOTE))

@@ -725,7 +725,7 @@ Status: **BLOCKED** = security policy; **UNSUPPORTED** = feature নেই; **AN
 699. automatic away reply: incoming message দেখে নিজে reply করা
 700. automatic away reply: conversation/call history delete করা
 
-## Physical devices and IoT control — UNSUPPORTED
+## Unsupported/high-consequence physical and IoT control
 
 701. smart door lock: নিজে turn on করা
 702. smart door lock: নিজে turn off করা
@@ -742,20 +742,20 @@ Status: **BLOCKED** = security policy; **UNSUPPORTED** = feature নেই; **AN
 713. car engine: unlock/start/open করা
 714. car engine: critical setting পরিবর্তন করা
 715. car engine: user supervision ছাড়া autonomous operation চালানো
-716. smart thermostat: নিজে turn on করা
-717. smart thermostat: নিজে turn off করা
-718. smart thermostat: unlock/start/open করা
-719. smart thermostat: critical setting পরিবর্তন করা
+716. smart thermostat: configured Home Assistant allowlist ছাড়া control করা
+717. smart thermostat: ১০–৩২°C range-এর বাইরে temperature set করা
+718. smart thermostat: arbitrary preset/HVAC service চালানো
+719. smart thermostat: blocking confirmation ছাড়া পরিবর্তন করা
 720. smart thermostat: user supervision ছাড়া autonomous operation চালানো
-721. IoT air conditioner: নিজে turn on করা
-722. IoT air conditioner: নিজে turn off করা
-723. IoT air conditioner: unlock/start/open করা
-724. IoT air conditioner: critical setting পরিবর্তন করা
+721. IoT air conditioner: configured Home Assistant allowlist ছাড়া control করা
+722. IoT air conditioner: ১০–৩২°C range-এর বাইরে temperature set করা
+723. IoT air conditioner: arbitrary mode/service চালানো
+724. IoT air conditioner: blocking confirmation ছাড়া পরিবর্তন করা
 725. IoT air conditioner: user supervision ছাড়া autonomous operation চালানো
-726. smart light system: নিজে turn on করা
-727. smart light system: নিজে turn off করা
-728. smart light system: unlock/start/open করা
-729. smart light system: critical setting পরিবর্তন করা
+726. smart light system: configured Home Assistant allowlist ছাড়া control করা
+727. smart light system: unsupported brightness/color/effect service চালানো
+728. smart light system: arbitrary scene/script/automation চালানো
+729. smart light system: blocking confirmation ছাড়া পরিবর্তন করা
 730. smart light system: user supervision ছাড়া autonomous operation চালানো
 731. gas valve: নিজে turn on করা
 732. gas valve: নিজে turn off করা

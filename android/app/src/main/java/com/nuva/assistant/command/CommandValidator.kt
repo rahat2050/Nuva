@@ -54,6 +54,8 @@ object CommandValidator {
     private fun JsonObject.fraction(field: String): Float? =
         this[field]?.jsonPrimitive?.doubleOrNull?.toFloat()?.takeIf { it in 0.0f..1.0f }
 
+    private fun JsonObject.number(field: String): Double? = this[field]?.jsonPrimitive?.doubleOrNull
+
     private fun selector(json: JsonObject?): UiSelector? {
         if (json == null) return null
         val resourceId = json.str("resource_id")
@@ -149,7 +151,32 @@ object CommandValidator {
             NuvaIntent.EMERGENCY_DIALER -> validateEmergencyDialer(actionJson)
             NuvaIntent.CLOCK_CONTROL -> validateClockControl(actionJson)
             NuvaIntent.VIEW_CALENDAR -> validateViewCalendar(actionJson)
+            NuvaIntent.HOME_ASSISTANT -> validateHomeAssistant(actionJson)
         }
+    }
+
+    private fun validateHomeAssistant(json: JsonObject): ValidatedAction {
+        val domain = HomeAssistantDomain.fromWire(json.str("domain"))
+            ?: return ValidatedAction.Invalid(listOf("HOME_ASSISTANT requires allowed domain"))
+        val operation = HomeAssistantOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("HOME_ASSISTANT requires allowed operation"))
+        val entity = json.str("entity_query")?.takeIf { it.length in 1..120 }
+            ?: return ValidatedAction.Invalid(listOf("HOME_ASSISTANT requires entity_query"))
+        val value = json.number("value")
+        val settingTemperature = operation == HomeAssistantOperation.SET_TEMPERATURE
+        if (settingTemperature && (domain != HomeAssistantDomain.CLIMATE || value == null || value !in 10.0..32.0)) {
+            return ValidatedAction.Invalid(listOf("temperature requires climate and value 10..32"))
+        }
+        if (!settingTemperature && value != null) {
+            return ValidatedAction.Invalid(listOf("value only allowed for set_temperature"))
+        }
+        if (domain == HomeAssistantDomain.CLIMATE && operation == HomeAssistantOperation.TOGGLE) {
+            return ValidatedAction.Invalid(listOf("climate toggle is not allowlisted"))
+        }
+        if (domain != HomeAssistantDomain.CLIMATE && operation == HomeAssistantOperation.SET_TEMPERATURE) {
+            return ValidatedAction.Invalid(listOf("set_temperature only allowed for climate"))
+        }
+        return ValidatedAction.Valid(NuvaAction.HomeAssistantControl(domain, operation, entity, value))
     }
 
     private fun validateViewCalendar(json: JsonObject): ValidatedAction {

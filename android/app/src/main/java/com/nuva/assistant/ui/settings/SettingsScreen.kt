@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -54,6 +55,9 @@ class SettingsViewModel : ViewModel() {
     val signedIn = preferences.signedIn
 
     var message = mutableStateOf<String?>(null)
+        private set
+
+    var homeAssistantConfigured = mutableStateOf(NuvaContainer.homeAssistantConfig.isConfigured())
         private set
 
     fun setMessage(text: String?) {
@@ -98,6 +102,35 @@ class SettingsViewModel : ViewModel() {
             preferences.setSupabase(url, anonKey)
             message.value = "Supabase connection saved"
         }
+    }
+
+    fun saveHomeAssistant(url: String, token: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = NuvaContainer.homeAssistantConfig.save(url, token.takeIf { it.isNotBlank() })
+            homeAssistantConfigured.value = NuvaContainer.homeAssistantConfig.isConfigured()
+            message.value = result.fold(
+                onSuccess = { "Home Assistant config encrypted and saved" },
+                onFailure = { it.message ?: "Home Assistant config save failed" },
+            )
+        }
+    }
+
+    fun testHomeAssistant() {
+        CoroutineScope(Dispatchers.IO).launch {
+            message.value = "Checking Home Assistant…"
+            message.value = when (val result = NuvaContainer.homeAssistantClient.health()) {
+                is com.nuva.assistant.homeassistant.HomeAssistantClient.Result.Done -> "Home Assistant connected ✓"
+                com.nuva.assistant.homeassistant.HomeAssistantClient.Result.NotConfigured -> "Home Assistant is not configured"
+                is com.nuva.assistant.homeassistant.HomeAssistantClient.Result.Failed -> result.reason
+                else -> "Home Assistant check failed"
+            }
+        }
+    }
+
+    fun clearHomeAssistant() {
+        NuvaContainer.homeAssistantConfig.clear()
+        homeAssistantConfigured.value = false
+        message.value = "Home Assistant config removed"
     }
 
     fun signIn(email: String, password: String) {
@@ -164,12 +197,15 @@ fun SettingsScreen(
     val directCall by preferences.directCall.collectAsState(initial = false)
     val signedIn by viewModel.signedIn.collectAsState(initial = false)
     val message by viewModel.message
+    val homeAssistantConfigured by viewModel.homeAssistantConfigured
 
     var baseUrlDraft by remember(baseUrl) { mutableStateOf(baseUrl) }
     var supabaseDraft by remember(supabaseUrl) { mutableStateOf(supabaseUrl) }
     var anonKeyDraft by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var homeAssistantUrl by remember { mutableStateOf(NuvaContainer.homeAssistantConfig.savedBaseUrl()) }
+    var homeAssistantToken by remember { mutableStateOf("") }
 
     val scope = remember { CoroutineScope(Dispatchers.Main) }
     val overlayGranted = remember(permissionRefresh) { NuvaPermissions.canDrawOverlays(context) }
@@ -271,6 +307,44 @@ fun SettingsScreen(
                 singleLine = true,
             )
             Button(onClick = { viewModel.signIn(email, password) }) { Text("Sign in") }
+        }
+
+        HorizontalDivider()
+
+        Text("Home Assistant", style = MaterialTheme.typography.titleMedium)
+        Text(
+            if (homeAssistantConfigured) "Configured securely ✓" else "Optional · HTTPS only · token stays encrypted on this phone",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (homeAssistantConfigured) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = homeAssistantUrl,
+            onValueChange = { homeAssistantUrl = it },
+            label = { Text("Home Assistant HTTPS URL") },
+            placeholder = { Text("https://home.example.com") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = homeAssistantToken,
+            onValueChange = { homeAssistantToken = it },
+            label = { Text(if (homeAssistantConfigured) "New token (leave blank to keep saved token)" else "Long-lived access token") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    viewModel.saveHomeAssistant(homeAssistantUrl, homeAssistantToken)
+                    homeAssistantToken = ""
+                },
+                enabled = homeAssistantUrl.isNotBlank(),
+            ) { Text("Save encrypted") }
+            OutlinedButton(onClick = { viewModel.testHomeAssistant() }, enabled = homeAssistantConfigured) { Text("Test") }
+            if (homeAssistantConfigured) {
+                TextButton(onClick = { viewModel.clearHomeAssistant() }) { Text("Remove") }
+            }
         }
 
         HorizontalDivider()

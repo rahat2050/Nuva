@@ -306,6 +306,15 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.VIEW_CALENDAR
     }
 
+    data class HomeAssistantControl(
+        val domain: HomeAssistantDomain,
+        val operation: HomeAssistantOperation,
+        val entityQuery: String,
+        val value: Double? = null,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.HOME_ASSISTANT
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -462,6 +471,30 @@ enum class CaptureMode(val wireName: String) {
     companion object {
         fun fromWire(value: String?): CaptureMode? =
             entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class HomeAssistantDomain(val wireName: String) {
+    LIGHT("light"),
+    SWITCH("switch"),
+    FAN("fan"),
+    CLIMATE("climate"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): HomeAssistantDomain? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class HomeAssistantOperation(val wireName: String, val serviceName: String) {
+    TURN_ON("turn_on", "turn_on"),
+    TURN_OFF("turn_off", "turn_off"),
+    TOGGLE("toggle", "toggle"),
+    SET_TEMPERATURE("set_temperature", "set_temperature"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): HomeAssistantOperation? = entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }
 

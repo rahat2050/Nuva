@@ -20,6 +20,9 @@ no ad SDKs**.
 * Device diagnostics stay local and omit IMEI, serial, Android ID, ad ID, SIM identity, MAC, account
   list, exact IP/location and other persistent identifiers.
 * SOS drafts never auto-append current location; the user chooses text, recipient and final Send.
+* Home Assistant URL/token stay on-device. The token is AES-GCM encrypted by Android Keystore and is
+  sent only as a Bearer header directly to the user-configured HTTPS Home Assistant origin—not to
+  NUVA backend, Groq or Supabase.
 * Screen snapshots (`ScreenStateModel`) — transient, in RAM, never persisted or
   uploaded. Password fields are never captured; OTP-like codes are redacted even
   in memory before display.

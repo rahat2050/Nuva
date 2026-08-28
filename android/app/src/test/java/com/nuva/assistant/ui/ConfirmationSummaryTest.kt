@@ -130,6 +130,22 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `Home Assistant summary exposes allowlisted physical action`() {
+        val summary = ConfirmationSummary.build(
+            NuvaAction.HomeAssistantControl(
+                com.nuva.assistant.command.HomeAssistantDomain.CLIMATE,
+                com.nuva.assistant.command.HomeAssistantOperation.SET_TEMPERATURE,
+                "bedroom",
+                24.0,
+            ),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(summary.lines.any { it.value == "bedroom" })
+        assertTrue(summary.lines.any { it.value == "24.0" })
+        assertEquals("CONFIRM DEVICE", summary.confirmLabel)
+    }
+
+    @Test
     fun `clock summary distinguishes active changes`() {
         val summary = ConfirmationSummary.build(
             NuvaAction.ClockControl(com.nuva.assistant.command.ClockOperation.DISMISS_ALARM),

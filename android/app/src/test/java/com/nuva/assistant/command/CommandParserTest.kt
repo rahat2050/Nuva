@@ -49,6 +49,32 @@ class CommandParserTest {
         assertEquals(NuvaIntent.CLOSE_APP, CommandParser.parse("facebook বন্ধ করো")!!.intent)
     }
 
+    // --- Home Assistant ---------------------------------------------------------------
+
+    @Test
+    fun `safe Home Assistant domains parse with exact entity and confirmation`() {
+        val light = CommandParser.parse("living room light on koro")!!
+        val lightAction = light.action as NuvaAction.HomeAssistantControl
+        assertEquals(HomeAssistantDomain.LIGHT, lightAction.domain)
+        assertEquals(HomeAssistantOperation.TURN_ON, lightAction.operation)
+        assertEquals("living room", lightAction.entityQuery)
+        assertTrue(light.requiresConfirmation)
+
+        val fan = CommandParser.parse("bedroom fan off koro")!!.action as NuvaAction.HomeAssistantControl
+        assertEquals(HomeAssistantOperation.TURN_OFF, fan.operation)
+        assertEquals("bedroom", fan.entityQuery)
+
+        val climate = CommandParser.parse("bedroom ac temperature 24 degree")!!.action as NuvaAction.HomeAssistantControl
+        assertEquals(HomeAssistantDomain.CLIMATE, climate.domain)
+        assertEquals(HomeAssistantOperation.SET_TEMPERATURE, climate.operation)
+        assertEquals(24.0, climate.value!!, 0.01)
+
+        val toggle = CommandParser.parse("home assistant kitchen smart switch toggle")!!.action as NuvaAction.HomeAssistantControl
+        assertEquals(HomeAssistantDomain.SWITCH, toggle.domain)
+        assertEquals(HomeAssistantOperation.TOGGLE, toggle.operation)
+        assertTrue(CommandParser.parse("bedroom ac temperature 50 degree")!!.unsupported)
+    }
+
     // --- Navigation -----------------------------------------------------------------
 
     @Test

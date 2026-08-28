@@ -33,6 +33,7 @@ import com.nuva.assistant.R
 data class FeatureRow(val name: String, val supported: Boolean, val reason: String? = null)
 
 val SUPPORTED_FEATURES = listOf(
+    "Home Assistant: encrypted HTTPS config + confirmed light/switch/fan on/off/toggle ও climate ১০–৩২°C",
     "১২,২৫০টি audited natural command form — polite/ASR/Bangla/Banglish/English variant ও ৬-step multi-command plan",
     "অ্যাপ খোলা/Play Store suggestion; non-financial app-এর system uninstall prompt (final decision user); financial/NUVA blocked",
     "অ্যাপ বন্ধ, হোম, ব্যাক, রিসেন্ট অ্যাপ; ফাইন্যান্সিয়াল অ্যাপেও স্ক্রল/নেভিগেশন",
@@ -74,6 +75,7 @@ val SUPPORTED_FEATURES = listOf(
 )
 
 val UNSUPPORTED_FEATURES = listOf(
+    FeatureRow("Home Assistant lock/garage/cover/camera/security/gas/water/medical/arbitrary service", false, "v4.0 শুধু light/switch/fan/climate allowlist করে; high-consequence physical/security domain genericভাবে চালায় না।"),
     FeatureRow("টাকা পাঠানো / ক্যাশ আউট / ব্যাংক ট্রান্সফার / পেমেন্ট / রিচার্জ / পেমেন্ট কনফার্ম করা", false, "নীতি (LEVEL 3): ফাইন্যান্সিয়াল ট্রানজেকশন NUVA কখনো অটোমেট করে না — কনফার্মেশনও অফার করে না, সরাসরি বলে দেয়। অ্যাপ খুলে আপনি নিজে করতে পারবেন।"),
     FeatureRow("ফাইন্যান্সিয়াল অ্যাপের স্ক্রিন পড়া ও বাটনে ট্যাপ/টাইপ", false, "নীতি (LEVEL 2/3): OTP/PIN/ব্যালেন্স স্ক্রিন আলাদা করা নির্ভরযোগ্যভাবে সম্ভব নয়, তাই ওয়ালেট/ব্যাংক অ্যাপের সামনে স্ক্রিন-রিড ও ট্যাপ/টাইপ বন্ধ থাকে। অ্যাপ খোলা, স্ক্রল, back/home চলে।"),
     FeatureRow("OTP / PIN / পাসওয়ার্ড / CVV / কার্ড নম্বর পড়া, টাইপ বা সেভ করা", false, "নীতি (LEVEL 2): কোনো সিক্রেট NUVA ছুঁবে না — পাসওয়ার্ড ফিল্ড স্কিপ হয়, OTP-সদৃশ কোড সব জায়গায় লুকানো থাকে।"),

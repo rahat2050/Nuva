@@ -246,6 +246,28 @@ def parse_emergency(t):
     service="POLICE" if "police" in t else ("AMBULANCE" if "ambulance" in t else ("FIRE" if "fire" in t else "NATIONAL"))
     return ok({"kind":"emergency","service":service,"number":"999"},"EMERGENCY_DIALER")
 
+def parse_home_assistant(t):
+    if any(has_word(t,w) for w in ["light","lights","lamp","bulb"]): domain="LIGHT"
+    elif any(has_word(t,w) for w in ["fan"]): domain="FAN"
+    elif any(w in t for w in ["thermostat","climate","air conditioner","smart ac"]) or has_word(t,"ac"): domain="CLIMATE"
+    elif any(w in t for w in ["smart switch","home assistant switch"]): domain="SWITCH"
+    else: return None
+    m=re.search(r"(?:temperature|temp)\s*(\d{2}(?:\.\d)?)|\b(\d{2}(?:\.\d)?)\s*(?:degree|degrees|°)",t)
+    temp=float((m.group(1) or m.group(2))) if m and domain=="CLIMATE" else None
+    if temp is not None: operation="SET_TEMPERATURE"
+    elif any(w in t for w in ["turn off","switch off","off koro","bondho koro"]): operation="TURN_OFF"
+    elif "toggle" in t: operation="TOGGLE"
+    elif any(w in t for w in ["turn on","switch on","on koro","chalu koro"]): operation="TURN_ON"
+    else: return None
+    if temp is not None and not 10 <= temp <= 32: return unsupported("temperature 10-32")
+    entity=t
+    for w in sorted(["home assistant","smart","light","lights","lamp","bulb","fan","thermostat","climate","air conditioner","ac","switch",
+                     "turn off","switch off","off koro","bondho koro","turn on","switch on","on koro","chalu koro","toggle",
+                     "temperature","temp","degree","degrees"],key=len,reverse=True): entity=entity.replace(w," ")
+    if temp is not None: entity=re.sub(r"\b"+str(int(temp))+r"(?:\.\d)?\b"," ",entity)
+    entity=re.sub(r"\s+"," ",entity).strip(" ,.:?!") or domain.lower()
+    return ok({"kind":"ha","domain":domain,"operation":operation,"entity":entity,"value":temp},"HOME_ASSISTANT",risk="MEDIUM",base="MEDIUM")
+
 def parse_nav(t):
     if any(w in t for w in ["home e jao","go home","home e cholo","home e firi jao","হোমে যাও","হোম স্ক্রিনে যাও"]):
         return ok({"kind":"GoHome"}, "GO_HOME")
@@ -991,7 +1013,7 @@ def parse_knowledge(t):
     return None
 
 def rule_table(t):
-    return (parse_nav(t) or parse_emergency(t) or parse_user_file(t) or parse_productivity(t) or parse_communication(t)
+    return (parse_nav(t) or parse_emergency(t) or parse_home_assistant(t) or parse_user_file(t) or parse_productivity(t) or parse_communication(t)
             or parse_map_navigation(t) or parse_grammar(t) or parse_universal(t) or parse_screen(t) or parse_daily(t) or parse_realtime(t)
             or parse_status(t) or parse_help(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
             or parse_clock_control(t) or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
@@ -1112,6 +1134,12 @@ check(parse("ambulance call koro")["action"]["number"] == "999", "ambulance dial
 check(parse("fire service call")["action"]["service"] == "FIRE", "fire dialer")
 check(parse("sos message draft je help dorkar")["intent"] == "SHARE_TEXT", "SOS share draft")
 check(parse("emergency info setting khulo")["action"]["kind"] == "EMERGENCY_INFO", "emergency info settings")
+ha_light=parse("living room light on koro")
+check(ha_light["intent"]=="HOME_ASSISTANT" and ha_light["action"]["entity"]=="living room" and ha_light["confirm"], "HA light")
+check(parse("bedroom fan off koro")["action"]["operation"]=="TURN_OFF", "HA fan")
+ha_climate=parse("bedroom ac temperature 24 degree")["action"]
+check(ha_climate["domain"]=="CLIMATE" and ha_climate["value"]==24, "HA climate")
+check(parse("home assistant kitchen smart switch toggle")["action"]["domain"]=="SWITCH", "HA switch")
 check(parse("latest news ki")["intent"] == "SEARCH_WEB", "latest info web search")
 check(parse("2 + 3 * 4 koto")["intent"] == "LOCAL_ANSWER", "offline arithmetic")
 check(parse("500 er 20 percent discount")["intent"] == "LOCAL_ANSWER", "offline percentage")

@@ -1,4 +1,4 @@
-# NUVA — Supported features (v3.7)
+# NUVA — Supported features (v4.0)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -15,6 +15,14 @@ A data-audited grammar accepts **12,250 concrete static command forms** (50 fami
 Unknown commands get one conservative ASR/politeness canonicalization retry through the same typed
 parser; security is re-run on canonical text. Multi-step plans support more connectors and up to six
 segments. Details: [`10000-command-grammar.md`](10000-command-grammar.md).
+
+## Home Assistant / IoT — CONFIGURABLE SUPPORTED
+v4.0 supports allowlisted Home Assistant `light`, `switch`, `fan` and `climate` entities. Commands
+resolve dynamic friendly names/entity IDs, stop on ambiguity, require blocking confirmation and call
+only `turn_on`, `turn_off`, `toggle`, or climate `set_temperature` (10–32°C). Configuration requires
+an HTTPS origin; the long-lived token is AES-GCM encrypted with Android Keystore, stays on-device and
+is never logged/sent to NUVA backend. Locks, covers/garage, cameras, alarms/security, gas/water,
+medical and arbitrary domains/services remain refused.
 
 ## Apps & navigation — SUPPORTED
 Open any installed app by name (+ Play Store suggestion when missing), close/home/back/recents,

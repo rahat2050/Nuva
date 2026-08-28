@@ -659,6 +659,21 @@ class CommandExecutor(
                     ExecutionOutcome("failed", result.reason, result.reason)
             }
 
+            is NuvaAction.HomeAssistantControl -> when (val result = com.nuva.assistant.core.NuvaContainer.homeAssistantClient.control(action)) {
+                is com.nuva.assistant.homeassistant.HomeAssistantClient.Result.Done ->
+                    ExecutionOutcome("completed", result.speech)
+                com.nuva.assistant.homeassistant.HomeAssistantClient.Result.NotConfigured ->
+                    ExecutionOutcome("failed", "Settings-e Home Assistant HTTPS URL o token save korun.", "Home Assistant not configured")
+                is com.nuva.assistant.homeassistant.HomeAssistantClient.Result.NotFound ->
+                    ExecutionOutcome("failed", "${result.query} name-e matching Home Assistant entity paini.", "entity not found")
+                is com.nuva.assistant.homeassistant.HomeAssistantClient.Result.Ambiguous -> {
+                    val names = result.matches.joinToString(", ") { it.friendlyName }
+                    ExecutionOutcome("failed", "Ekadhik entity mileche — aro specific bolun: $names", "ambiguous entity")
+                }
+                is com.nuva.assistant.homeassistant.HomeAssistantClient.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.ViewCalendar -> when (
                 val result = com.nuva.assistant.automation.CalendarViewHandoff.open(context, action.focusAt)
             ) {

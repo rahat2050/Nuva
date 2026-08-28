@@ -206,6 +206,7 @@ object CommandParser {
 
     private fun ruleTable(text: String): CommandDecision? = parseNavigation(text)
         ?: parseEmergency(text)
+        ?: parseHomeAssistant(text)
         ?: parseUserPresentFile(text)
         ?: parseProductivityHandoff(text)
         ?: parseCommunicationCompose(text)
@@ -398,6 +399,64 @@ object CommandParser {
         return ok(
             NuvaAction.EmergencyDialer(service),
             "Bangladesh 999 dialer khulchi — final Call apni chapun.",
+        )
+    }
+
+    // --- 0d. Home Assistant safe physical controls (v4.0) ------------------------------
+
+    private fun parseHomeAssistant(t: String): CommandDecision? {
+        val domain = when {
+            listOf("light", "lights", "lamp", "bulb", "লাইট", "বাতি").any { NuvaDateTimeParser.hasWord(t, it) } ->
+                HomeAssistantDomain.LIGHT
+            listOf("fan", "পাখা", "ফ্যান").any { NuvaDateTimeParser.hasWord(t, it) } -> HomeAssistantDomain.FAN
+            listOf("thermostat", "climate", "air conditioner", "smart ac", "থার্মোস্ট্যাট", "স্মার্ট এসি")
+                .any { t.contains(it) } || NuvaDateTimeParser.hasWord(t, "ac") || NuvaDateTimeParser.hasWord(t, "এসি") ->
+                HomeAssistantDomain.CLIMATE
+            listOf("smart switch", "home assistant switch", "স্মার্ট সুইচ").any { t.contains(it) } ->
+                HomeAssistantDomain.SWITCH
+            else -> return null
+        }
+        val temperatureMatch = Regex(
+            """(?:temperature|temp|তাপমাত্রা)\s*(\d{2}(?:\.\d)?)|(?:\b(\d{2}(?:\.\d)?)\s*(?:degree|degrees|°|ডিগ্রি))""",
+        ).find(t)
+        val temperature = temperatureMatch?.let { match ->
+            match.groupValues[1].ifBlank { match.groupValues[2] }.toDoubleOrNull()
+        }?.takeIf { domain == HomeAssistantDomain.CLIMATE }
+        val operation = when {
+            temperature != null -> HomeAssistantOperation.SET_TEMPERATURE
+            listOf("turn off", "switch off", "off koro", "bondho koro", "বন্ধ করো", "অফ করো")
+                .any { t.contains(it) } -> HomeAssistantOperation.TURN_OFF
+            listOf("toggle", "টগল").any { t.contains(it) } -> HomeAssistantOperation.TOGGLE
+            listOf("turn on", "switch on", "on koro", "chalu koro", "চালু করো", "অন করো")
+                .any { t.contains(it) } -> HomeAssistantOperation.TURN_ON
+            else -> return null
+        }
+        if (temperature != null && temperature !in 10.0..32.0) {
+            return unsupported("Home Assistant temperature 10 theke 32 degree-er moddhe bolun.")
+        }
+        var entity = t
+        listOf(
+            "home assistant", "smart", "light", "lights", "lamp", "bulb", "লাইট", "বাতি", "fan", "ফ্যান", "পাখা",
+            "thermostat", "climate", "air conditioner", "ac", "থার্মোস্ট্যাট", "এসি", "switch", "সুইচ",
+            "turn off", "switch off", "off koro", "bondho koro", "বন্ধ করো", "অফ করো",
+            "turn on", "switch on", "on koro", "chalu koro", "চালু করো", "অন করো", "toggle", "টগল",
+            "temperature", "temp", "তাপমাত্রা", "degree", "degrees", "ডিগ্রি",
+        ).sortedByDescending { it.length }.forEach { entity = entity.replace(it, " ") }
+        temperature?.let { entity = entity.replace(Regex("""\b${it.toInt()}(?:\.\d)?\b"""), " ") }
+        TAIL_VERBS.forEach { entity = swapWord(entity, it) }
+        entity = entity.replace(Regex("""\s+"""), " ").trim(' ', ',', '.', ':', '?', '!')
+        if (entity.isBlank()) {
+            entity = when (domain) {
+                HomeAssistantDomain.LIGHT -> "light"
+                HomeAssistantDomain.FAN -> "fan"
+                HomeAssistantDomain.CLIMATE -> "climate"
+                HomeAssistantDomain.SWITCH -> "switch"
+            }
+        }
+        return ok(
+            NuvaAction.HomeAssistantControl(domain, operation, entity.take(120), temperature),
+            "Home Assistant-e $entity ${operation.wireName} korbo — nishchit korun.",
+            NuvaRisk.MEDIUM,
         )
     }
 

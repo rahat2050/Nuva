@@ -189,6 +189,11 @@ object ActionJson {
         is NuvaAction.ViewCalendar -> buildJsonObject {
             put("type", "VIEW_CALENDAR"); put("focus_at", action.focusAt)
         }
+        is NuvaAction.HomeAssistantControl -> buildJsonObject {
+            put("type", "HOME_ASSISTANT"); put("domain", action.domain.wireName)
+            put("operation", action.operation.wireName); put("entity_query", action.entityQuery)
+            action.value?.let { put("value", it) }
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

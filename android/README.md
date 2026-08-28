@@ -182,6 +182,8 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   confirmation for active changes and honest Clock-app fallback on unsupported OEMs.
 * **v3.7 print/calendar**: one picker-selected PDF streamed to Android print preview and Calendar
   date/agenda views without READ_CALENDAR; final print/save remains user-controlled.
+* **v4.0 Home Assistant**: HTTPS-only config, Android-Keystore-encrypted token, exact entity matching
+  and confirmed light/switch/fan/climate allowlist; locks/security/high-consequence domains excluded.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.

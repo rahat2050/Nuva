@@ -200,6 +200,16 @@ object ConfirmationSummary {
                 confirmLabelOverride = "CONFIRM"
             }
 
+            is NuvaAction.HomeAssistantControl -> {
+                title = "Home Assistant device control"
+                lines += Line("Domain", action.domain.wireName)
+                lines += Line("Entity", action.entityQuery)
+                lines += Line("কাজ", action.operation.wireName)
+                action.value?.let { lines += Line("Value", it.toString()) }
+                detail = "Encrypted local token দিয়ে allowlisted Home Assistant service call হবে।"
+                confirmLabelOverride = "CONFIRM DEVICE"
+            }
+
             is NuvaAction.ViewCalendar -> {
                 title = "Calendar view"
                 lines += Line("তারিখ", java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.ENGLISH).format(java.util.Date(action.focusAt)))

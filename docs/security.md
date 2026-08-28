@@ -94,6 +94,15 @@ Screen context sent with a command is used for that request only and is never pe
 `/api/memory` actively refuses credential-like keys, so a buggy or malicious client cannot turn
 NUVA's memory into a password store.
 
+## Home Assistant boundary (v4.0)
+
+- Configuration accepts HTTPS origins only; URL user-info/query/fragment credentials are rejected.
+- Long-lived token is encrypted with a non-exportable Android Keystore AES-GCM key and never logged.
+- Server/AI cannot emit `HOME_ASSISTANT`; it is a local-only action.
+- Runtime allowlist is limited to light/switch/fan and bounded climate temperature.
+- Every physical action is confirmation-gated and ambiguous entity matching stops.
+- Locks, covers/garage, cameras, security systems, gas/water/medical and arbitrary services are not callable.
+
 ## 8. Known limitations (honest list)
 
 1. **Rate limiting degrades gracefully, it is not a hard cap.** With `UPSTASH_REDIS_REST_*`
