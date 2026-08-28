@@ -9,10 +9,19 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import com.nuva.assistant.automation.ExternalTextHandoffPolicy
+import com.nuva.assistant.automation.ScheduledComposeScheduler
+import com.nuva.assistant.core.NuvaContainer
+import com.nuva.assistant.core.permissions.NuvaPermissions
+import com.nuva.assistant.service.WakeWordService
 import com.nuva.assistant.ui.NuvaApp
 import com.nuva.assistant.ui.theme.NuvaTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * Single-activity Compose app. Voice-first home screen; History / Memory /
@@ -28,6 +37,7 @@ class MainActivity : ComponentActivity() {
     )
 
     private val assistantInvocation = MutableStateFlow<AssistantInvocation?>(null)
+    private var visibleRestoreStarted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,6 +55,25 @@ class MainActivity : ComponentActivity() {
                     },
                 )
             }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (visibleRestoreStarted) return
+        visibleRestoreStarted = true
+        val normalVisibleLaunch = assistantInvocation.value == null
+        if (normalVisibleLaunch) {
+            lifecycleScope.launch {
+                val enabled = NuvaContainer.preferences.wakeWordEnabled.first()
+                val stillVisible = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                if (enabled && stillVisible && NuvaPermissions.hasWakeWordPermissions(this@MainActivity)) {
+                    WakeWordService.start(this@MainActivity)
+                }
+            }
+        }
+        lifecycleScope.launch(Dispatchers.IO) {
+            ScheduledComposeScheduler.restorePending(applicationContext)
         }
     }
 

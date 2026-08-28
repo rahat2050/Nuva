@@ -78,7 +78,8 @@ not replace—the Gradle build, lint or physical-device matrix.
 ## First-run setup on a device
 
 1. **Backend URL** — defaults to `https://nuvaa.vercel.app/` (verified with `/api/health?deep=1`).
-   For local backend testing on an emulator use `http://10.0.2.2:3000/`. Tap Save — it checks `/api/health`.
+   Custom backend and Supabase origins are HTTPS-only because commands/JWTs must never cross cleartext.
+   For local development, use a trusted HTTPS tunnel rather than `http://10.0.2.2`. Tap Save to check `/api/health`.
 2. **Microphone + notification** — grant when prompted. A visible foreground notification is shown
    whenever NUVA is listening or waiting for the wake phrase.
 3. **Default assistant** — Settings → Hey NUVA & default assistant → **Choose NUVA as default**,
@@ -101,8 +102,8 @@ not replace—the Gradle build, lint or physical-device matrix.
   confirmation dialog** (there is no setting that disables it).
 - Offline, a small deterministic parser handles `GO_HOME`, `GO_BACK`, simple `OPEN_APP`, and
   minute-based `SET_TIMER` — everything else honestly says it needs the server.
-- No secret ever ships in the APK: the app holds only the backend URL and the public Supabase
-  anon key.
+- No secret ever ships in the APK: the app holds only HTTPS endpoint configuration and the public
+  Supabase anon key; optional user session JWTs are AES-GCM encrypted with Android Keystore.
 - Pending actions are persisted and re-validated on decode, so nothing stale can execute.
 
 ## Wake word and default-assistant status

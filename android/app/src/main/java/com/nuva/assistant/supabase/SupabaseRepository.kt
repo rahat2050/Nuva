@@ -1,5 +1,7 @@
 package com.nuva.assistant.supabase
 
+import com.nuva.assistant.core.constants.AppConstants
+import com.nuva.assistant.core.security.SecureEndpointPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -66,7 +68,9 @@ class SupabaseRepository(
     }
 
     suspend fun signIn(email: String, password: String): SignInResult = withContext(Dispatchers.IO) {
-        val supabaseUrl = supabaseUrlProvider().trimEnd('/')
+        val supabaseUrl = SecureEndpointPolicy.normalizeRequired(supabaseUrlProvider())
+            ?.trimEnd('/')
+            ?: return@withContext SignInResult.Failure("Supabase URL অবশ্যই valid HTTPS endpoint হতে হবে।")
         val anonKey = anonKeyProvider()
         if (anonKey.isBlank()) return@withContext SignInResult.Failure("Supabase anon key set kora hoy nai (Settings).")
 
@@ -86,7 +90,12 @@ class SupabaseRepository(
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
                 if (response.isSuccessful) {
-                    SignInResult.Success(json.decodeFromString(Session.serializer(), text))
+                    val session = json.decodeFromString(Session.serializer(), text)
+                    if (session.accessToken.isBlank()) {
+                        SignInResult.Failure("Supabase response-e valid session token chilo na.")
+                    } else {
+                        SignInResult.Success(session)
+                    }
                 } else {
                     val parsed = runCatching { json.decodeFromString(GoTrueError.serializer(), text) }.getOrNull()
                     SignInResult.Failure(
@@ -105,16 +114,19 @@ class SupabaseRepository(
     // --- Backend endpoints that need the JWT -----------------------------------
 
     private fun url(path: String): String {
-        val base = baseUrlProvider().let { if (it.endsWith("/")) it else "$it/" }
-        return base + path
+        val base = SecureEndpointPolicy.normalizeRequired(
+            baseUrlProvider(),
+            defaultWhenBlank = AppConstants.DEFAULT_BASE_URL,
+        ) ?: AppConstants.DEFAULT_BASE_URL
+        return base + path.trimStart('/')
     }
 
-    private fun Request.Builder.withAuth(): Request.Builder {
-        val token = runCatching { kotlinx.coroutines.runBlocking { accessToken() } }.getOrNull()
+    private suspend fun Request.Builder.withAuth(): Request.Builder {
+        val token = runCatching { accessToken() }.getOrNull()
         return if (token.isNullOrBlank()) this else header("Authorization", "Bearer $token")
     }
 
-    private fun postJson(path: String, payload: String): Boolean = runCatching {
+    private suspend fun postJson(path: String, payload: String): Boolean = runCatching {
         val request = Request.Builder()
             .url(url(path))
             .header("Content-Type", "application/json")

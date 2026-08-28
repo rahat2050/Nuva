@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nuva.assistant.R
 import com.nuva.assistant.core.NuvaContainer
@@ -34,7 +35,6 @@ import com.nuva.assistant.ui.theme.NuvaGlassPanel
 import com.nuva.assistant.ui.theme.NuvaPrimaryAction
 import com.nuva.assistant.ui.theme.NuvaScreenHeader
 import com.nuva.assistant.ui.theme.NuvaStatusChip
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -48,22 +48,22 @@ class MemoryViewModel : ViewModel() {
 
     val memories = NuvaContainer.memory
         .all
-        .stateIn(CoroutineScope(Dispatchers.IO), SharingStarted.Lazily, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Voice-captured notes & to-dos (v1.1) — local only. */
     val notes = NuvaContainer.database.noteDao()
         .byKind("note")
-        .stateIn(CoroutineScope(Dispatchers.IO), SharingStarted.Lazily, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val todos = NuvaContainer.database.noteDao()
         .byKind("todo")
-        .stateIn(CoroutineScope(Dispatchers.IO), SharingStarted.Lazily, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     var message = mutableStateOf<String?>(null)
         private set
 
     fun save(key: String, value: String) {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val result = NuvaContainer.memory.remember(key, value)
             message.value = result.fold(
                 onSuccess = { "Saved: $key" },
@@ -73,26 +73,26 @@ class MemoryViewModel : ViewModel() {
     }
 
     fun delete(key: String) {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             NuvaContainer.memory.forget(key)
         }
     }
 
     fun syncNow() {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val report = NuvaContainer.syncManager.syncAll()
             message.value = "Synced — pushed ${report.pushedMemories}, pulled ${report.pulledMemories}"
         }
     }
 
     fun toggleTodo(id: Long, done: Boolean) {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             NuvaContainer.database.noteDao().setDone(id, done)
         }
     }
 
     fun deleteNote(id: Long) {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             NuvaContainer.database.noteDao().delete(id)
         }
     }

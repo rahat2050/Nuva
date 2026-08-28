@@ -8,6 +8,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.nuva.assistant.core.constants.AppConstants
+import com.nuva.assistant.core.security.AndroidTokenCipher
+import com.nuva.assistant.core.security.SecureEndpointPolicy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -21,6 +23,8 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
  * confirmations for risky actions (mode is always | risky_only).
  */
 class UserPreferences(private val context: Context) {
+
+    private val sessionCipher by lazy { AndroidTokenCipher(SESSION_KEY_ALIAS) }
 
     private object Keys {
         val BASE_URL = stringPreferencesKey("base_url")
@@ -38,18 +42,28 @@ class UserPreferences(private val context: Context) {
 
     // --- Flows for the UI ------------------------------------------------------
 
-    val baseUrl: Flow<String> = context.dataStore.data.map { it[Keys.BASE_URL] ?: AppConstants.DEFAULT_BASE_URL }
+    val baseUrl: Flow<String> = context.dataStore.data.map { prefs ->
+        SecureEndpointPolicy.normalizeRequired(
+            prefs[Keys.BASE_URL].orEmpty(),
+            defaultWhenBlank = AppConstants.DEFAULT_BASE_URL,
+        ) ?: AppConstants.DEFAULT_BASE_URL
+    }
     val language: Flow<String> = context.dataStore.data.map { it[Keys.LANGUAGE] ?: "auto" }
     val voiceEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.VOICE_ENABLED] ?: true }
     val confirmationAlways: Flow<Boolean> = context.dataStore.data.map { it[Keys.CONFIRMATION_ALWAYS] ?: false }
     val directCall: Flow<Boolean> = context.dataStore.data.map { it[Keys.DIRECT_CALL] ?: false }
     val wakeWordEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.WAKE_WORD_ENABLED] ?: false }
     val onboardingDone: Flow<Boolean> = context.dataStore.data.map { it[Keys.ONBOARDING_DONE] ?: false }
-    val supabaseUrl: Flow<String> =
-        context.dataStore.data.map { it[Keys.SUPABASE_URL] ?: AppConstants.DEFAULT_SUPABASE_URL }
+    val supabaseUrl: Flow<String> = context.dataStore.data.map { prefs ->
+        SecureEndpointPolicy.normalizeOptional(
+            prefs[Keys.SUPABASE_URL] ?: AppConstants.DEFAULT_SUPABASE_URL,
+        ) ?: ""
+    }
     val supabaseAnonKey: Flow<String> =
         context.dataStore.data.map { it[Keys.SUPABASE_ANON_KEY] ?: AppConstants.DEFAULT_SUPABASE_ANON_KEY }
-    val signedIn: Flow<Boolean> = context.dataStore.data.map { !it[Keys.ACCESS_TOKEN].isNullOrBlank() }
+    val signedIn: Flow<Boolean> = context.dataStore.data.map {
+        it[Keys.ACCESS_TOKEN]?.startsWith(SESSION_PREFIX) == true
+    }
 
     // --- Blocking accessors (call from IO dispatchers only) --------------------
 
@@ -65,15 +79,35 @@ class UserPreferences(private val context: Context) {
 
     // --- Writes ----------------------------------------------------------------
 
-    suspend fun setBaseUrl(url: String) {
-        context.dataStore.edit { it[Keys.BASE_URL] = url.trim().ifEmpty { AppConstants.DEFAULT_BASE_URL } }
+    suspend fun setBaseUrl(url: String): Boolean {
+        val normalized = SecureEndpointPolicy.normalizeRequired(
+            url,
+            defaultWhenBlank = AppConstants.DEFAULT_BASE_URL,
+        ) ?: return false
+        val endpointChanged = baseUrl.first() != normalized
+        context.dataStore.edit {
+            it[Keys.BASE_URL] = normalized
+            if (endpointChanged) {
+                it.remove(Keys.ACCESS_TOKEN)
+                it.remove(Keys.REFRESH_TOKEN)
+            }
+        }
+        return true
     }
 
-    suspend fun setSupabase(url: String, anonKey: String) {
+    suspend fun setSupabase(url: String, anonKey: String): Boolean {
+        val normalized = SecureEndpointPolicy.normalizeOptional(url) ?: return false
+        val cleanKey = anonKey.trim()
+        val endpointChanged = supabaseUrl.first() != normalized || supabaseAnonKey.first() != cleanKey
         context.dataStore.edit {
-            it[Keys.SUPABASE_URL] = url.trim()
-            it[Keys.SUPABASE_ANON_KEY] = anonKey.trim()
+            it[Keys.SUPABASE_URL] = normalized
+            it[Keys.SUPABASE_ANON_KEY] = cleanKey
+            if (endpointChanged) {
+                it.remove(Keys.ACCESS_TOKEN)
+                it.remove(Keys.REFRESH_TOKEN)
+            }
         }
+        return true
     }
 
     suspend fun setLanguage(language: String) {
@@ -95,9 +129,14 @@ class UserPreferences(private val context: Context) {
     // --- Auth session (Supabase JWT for the backend) ---------------------------
 
     suspend fun saveSession(accessToken: String, refreshToken: String?) {
+        require(accessToken.isNotBlank()) { "access token cannot be blank" }
+        val encryptedAccess = SESSION_PREFIX + sessionCipher.encrypt(accessToken)
+        val encryptedRefresh = refreshToken?.takeIf { it.isNotBlank() }
+            ?.let { SESSION_PREFIX + sessionCipher.encrypt(it) }
         context.dataStore.edit {
-            it[Keys.ACCESS_TOKEN] = accessToken
-            refreshToken?.let { token -> it[Keys.REFRESH_TOKEN] = token }
+            it[Keys.ACCESS_TOKEN] = encryptedAccess
+            if (encryptedRefresh == null) it.remove(Keys.REFRESH_TOKEN)
+            else it[Keys.REFRESH_TOKEN] = encryptedRefresh
         }
     }
 
@@ -108,7 +147,29 @@ class UserPreferences(private val context: Context) {
         }
     }
 
-    suspend fun accessToken(): String? = context.dataStore.data.first()[Keys.ACCESS_TOKEN]
-    suspend fun refreshToken(): String? = context.dataStore.data.first()[Keys.REFRESH_TOKEN]
+    suspend fun accessToken(): String? = readSessionToken(Keys.ACCESS_TOKEN)
+
+    suspend fun refreshToken(): String? = readSessionToken(Keys.REFRESH_TOKEN)
+
+    private suspend fun readSessionToken(key: Preferences.Key<String>): String? {
+        val stored = context.dataStore.data.first()[key] ?: return null
+        if (!stored.startsWith(SESSION_PREFIX)) {
+            // Refuse legacy/plaintext token storage. The user signs in again and
+            // receives a Keystore-encrypted session instead.
+            clearSession()
+            return null
+        }
+        return runCatching { sessionCipher.decrypt(stored.removePrefix(SESSION_PREFIX)) }
+            .getOrElse {
+                clearSession()
+                null
+            }
+    }
+
     fun accessTokenBlocking(): String? = runBlocking { accessToken() }
+
+    companion object {
+        private const val SESSION_PREFIX = "enc-v1:"
+        private const val SESSION_KEY_ALIAS = "nuva-supabase-session-v1"
+    }
 }

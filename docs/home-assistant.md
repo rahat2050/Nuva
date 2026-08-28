@@ -8,7 +8,8 @@ allowlist, not arbitrary Home Assistant service execution.
 Settings → Home Assistant:
 
 1. Enter an **HTTPS** Home Assistant origin (optional port/subpath allowed).
-2. Paste a Home Assistant long-lived access token in the app—never in chat/source code.
+2. Paste a Home Assistant long-lived access token in the app—never in chat/source code. Changing the
+   saved endpoint always requires a new token; the old token is never reused for another origin.
 3. Tap **Save encrypted**, then **Test**.
 
 The token is AES-GCM encrypted with a non-exportable Android Keystore key and stored in private app

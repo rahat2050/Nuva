@@ -23,4 +23,11 @@ class CalendarProviderControllerTest {
     fun `credential titled events are excluded from matching`() {
         assertTrue(CalendarProviderController.matchEvents(events, "otp").isEmpty())
     }
+
+    @Test
+    fun `calendar location hides credentials and redacts codes`() {
+        assertEquals(null, CalendarProviderController.safeLocationForDisplay("password secret"))
+        assertEquals("Door code ••••", CalendarProviderController.safeLocationForDisplay("Door code 1234"))
+        assertEquals("Clinic Road", CalendarProviderController.safeLocationForDisplay(" Clinic Road "))
+    }
 }

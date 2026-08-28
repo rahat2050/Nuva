@@ -1,6 +1,8 @@
 package com.nuva.assistant.ai
 
 import com.nuva.assistant.command.CommandDecision
+import com.nuva.assistant.core.constants.AppConstants
+import com.nuva.assistant.core.security.SecureEndpointPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -204,13 +206,12 @@ class AIRepository(
     private data class StageEventDto(val stage: String = "", val source: String? = null)
 
     companion object {
-        const val APP_VERSION = "4.4.0"
-        const val DEFAULT_BASE_URL = "https://nuva-backend.vercel.app/"
+        const val APP_VERSION = "4.4.1"
+        const val DEFAULT_BASE_URL = AppConstants.DEFAULT_BASE_URL
 
-        /** Accepts missing scheme and missing trailing slash. */
-        fun String.normalizeBaseUrl(): String {
-            val withScheme = if (contains("://")) this else "https://$this"
-            return if (withScheme.endsWith("/")) withScheme else "$withScheme/"
-        }
+        /** Missing schemes become HTTPS; insecure/malformed stored values fail closed to production. */
+        fun String.normalizeBaseUrl(): String =
+            SecureEndpointPolicy.normalizeRequired(this, defaultWhenBlank = DEFAULT_BASE_URL)
+                ?: DEFAULT_BASE_URL
     }
 }

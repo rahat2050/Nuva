@@ -19,7 +19,8 @@ no ad SDKs**.
   and credential/transaction text is refused before import.
 * Rich calendar event fields are passed to the visible Calendar insert screen and not saved by NUVA.
   Optional agenda access queries only an explicitly requested 1–31 day range; results stay transient,
-  are never uploaded/synced, and credential-titled events are excluded.
+  are never uploaded/synced, credential-titled events are excluded, and credential/code-like event
+  locations are omitted or redacted before display.
 * Social/MMS text and a picker-selected attachment go only to the visible Android compose/share intent
   chosen by the user; NUVA does not upload them to its backend or press Post/Send.
 * Maps routes contain only the places the user dictated. NUVA requests no location permission and
@@ -30,6 +31,9 @@ no ad SDKs**.
 * Home Assistant URL/token stay on-device. The token is AES-GCM encrypted by Android Keystore and is
   sent only as a Bearer header directly to the user-configured HTTPS Home Assistant origin—not to
   NUVA backend, Groq or Supabase.
+* Optional Supabase access/refresh JWTs are AES-GCM encrypted with a separate Android Keystore key.
+  Legacy plaintext session values are rejected and cleared; the user signs in again. Backend and
+  Supabase custom endpoints are HTTPS-only before any password, JWT or command can be sent.
 * Screen snapshots (`ScreenStateModel`) — transient, in RAM, never persisted or
   uploaded. Password fields are never captured; OTP-like codes are redacted even
   in memory before display.

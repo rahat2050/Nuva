@@ -62,9 +62,14 @@ class NuvaNotificationListener : NotificationListenerService() {
     }
 
     private fun refresh(list: List<StatusBarNotification>) {
+        val safe = list.asSequence()
+            .mapNotNull(::parse)
+            .sortedByDescending { it.postedAt }
+            .take(MAX_STORED)
+            .toList()
         synchronized(store) {
             store.clear()
-            list.forEach { parse(it)?.let { parsed -> store.add(parsed) } }
+            store.addAll(safe)
         }
     }
 
@@ -94,6 +99,9 @@ class NuvaNotificationListener : NotificationListenerService() {
 
     private fun parse(sbn: StatusBarNotification): NuvaNotification? {
         if (sbn.packageName == applicationContext.packageName) return null
+        // Fail before touching Notification.extras: financial notification
+        // title/text must never enter NUVA's transient store at all.
+        if (SensitiveAppPolicy.isSensitivePackage(sbn.packageName)) return null
         val extras = sbn.notification?.extras ?: return null
         val title = extras.getCharSequence("android.title")?.toString()
         val text = extras.getCharSequence("android.text")?.toString()

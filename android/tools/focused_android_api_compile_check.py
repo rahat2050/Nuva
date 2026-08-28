@@ -148,6 +148,26 @@ sealed class NuvaAction {
             [SOURCE / "homeassistant/HomeAssistantConfigStore.kt"],
         )
 
+        setting_target_stub = write(
+            root / "stubs-settings/com/nuva/assistant/command/SettingTarget.kt",
+            """package com.nuva.assistant.command
+enum class SettingTarget {
+    TORCH, BRIGHTNESS, VOLUME, DND, WIFI, BLUETOOTH, GENERAL_SETTINGS,
+    NOTIFICATION_SETTINGS, APP_SETTINGS, ACCESSIBILITY_SETTINGS, MOBILE_DATA,
+    AIRPLANE_MODE, LOCATION, HOTSPOT, NFC, VPN, BATTERY_SAVER, DEFAULT_APPS,
+    DATE_TIME, LANGUAGE, STORAGE_SETTINGS, PRIVACY, SECURITY, CAST, PRINT,
+    CAPTIONS, EMERGENCY_INFO,
+}
+""",
+        )
+        compile_group(
+            "settings-and-torch",
+            args.kotlinc,
+            args.android_jar,
+            root,
+            [setting_target_stub, SOURCE / "automation/SettingsOpener.kt"],
+        )
+
         compile_group(
             "speech-recognizer",
             args.kotlinc,
@@ -155,6 +175,22 @@ sealed class NuvaAction {
             root,
             [SOURCE / "voice/SpeechRecognizerController.kt"],
             extra_classpath=[coroutines],
+        )
+
+        compile_group(
+            "tts-manager",
+            args.kotlinc,
+            args.android_jar,
+            root,
+            [SOURCE / "voice/TTSManager.kt"],
+        )
+
+        compile_group(
+            "session-token-cipher",
+            args.kotlinc,
+            args.android_jar,
+            root,
+            [SOURCE / "core/security/AndroidTokenCipher.kt"],
         )
 
         compile_group(
@@ -204,11 +240,12 @@ enum class MessagingApp { WHATSAPP, SMS, TELEGRAM }
             [
                 messaging_stub,
                 SOURCE / "core/security/SensitiveAppPolicy.kt",
+                SOURCE / "core/security/SecureEndpointPolicy.kt",
                 SOURCE / "automation/ExternalTextHandoffPolicy.kt",
             ],
         )
 
-    print("PASS: 7 focused Kotlin/API compile groups")
+    print("PASS: 10 focused Kotlin/API compile groups")
     print("NOTE: full Gradle compile, resource linking, lint and device QA are still required")
 
 

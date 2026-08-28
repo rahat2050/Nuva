@@ -135,6 +135,18 @@ NUVA's memory into a password store.
   recreation.
 - No clipboard monitor, background share receiver or new dangerous permission is introduced.
 
+## Endpoint/session hardening
+
+- Custom NUVA backend and Supabase origins are normalized to HTTPS and reject URL credentials,
+  query/fragment tokens, invalid ports and parent-path traversal before any network request.
+- Invalid/legacy stored backend values fail closed to the production HTTPS origin.
+- Supabase access/refresh JWTs use AES-GCM with a separate non-exportable Android Keystore key;
+  legacy plaintext or undecryptable sessions are cleared rather than reused.
+- Changing the backend endpoint, Supabase endpoint or anon key atomically clears the previous session,
+  preventing an old JWT from being forwarded to a newly configured origin.
+- The Settings password field is masked and cleared from Compose state immediately on submit; the
+  password is never persisted.
+
 ## 8. Known limitations (honest list)
 
 1. **Rate limiting degrades gracefully, it is not a hard cap.** With `UPSTASH_REDIS_REST_*`

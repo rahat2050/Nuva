@@ -129,14 +129,16 @@ python3 tools/focused_android_api_compile_check.py \
   --android-jar /path/to/platforms/android-35/android.jar
 ```
 
-The focused compile validates system-assistant, Calendar-provider, Keystore, SpeechRecognizer,
-wake-state, Quick Settings tile and external-text policy API signatures. It does not replace:
+The focused compile validates system-assistant, Calendar-provider, Home Assistant Keystore,
+system settings/torch APIs, SpeechRecognizer, TextToSpeech, encrypted session-token cipher,
+wake-state, Quick Settings tile,
+external-text and secure-endpoint policy API signatures. It does not replace:
 
 ```bash
 gradle --no-daemon -p android :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
-See [`v4.2-apk-build-qa.md`](v4.2-apk-build-qa.md) for current results and blockers.
+See [`v4.4-full-code-audit.md`](v4.4-full-code-audit.md) for current results and blockers.
 
 ## 8. PHASE 2 manual test plan (real-device validation)
 

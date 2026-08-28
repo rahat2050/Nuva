@@ -8,9 +8,12 @@ import com.nuva.assistant.service.NuvaForegroundService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
@@ -49,7 +52,7 @@ class VoiceController(
     private var recognizer: SpeechRecognizerController? = null
     private var recognitionJob: Job? = null
     private val tts = TTSManager(NuvaContainer.appContext)
-    private val mainScope = CoroutineScope(Dispatchers.Main)
+    private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private companion object {
         /** Hard ceiling for one listening session (stuck-recovery). */
@@ -70,9 +73,9 @@ class VoiceController(
         _state.value = State.Listening
         NuvaForegroundService.start(context)
         recognizer = SpeechRecognizerController(context)
-        val language = NuvaContainer.preferences.languageBlocking()
 
         recognitionJob = mainScope.launch {
+            val language = NuvaContainer.preferences.language.first()
             try {
                 // v1.6 hardening: a recognizer that never reports back (OEM
                 // quirks, engine crash) must not leave NUVA "listening"
@@ -212,14 +215,18 @@ class VoiceController(
 
     fun speakIfEnabled(text: String) {
         if (text.isBlank()) return
-        if (!NuvaContainer.preferences.voiceEnabledBlocking()) return
-        val language = NuvaContainer.preferences.languageBlocking()
-        tts.speak(text, if (language == "auto") "banglish" else language)
+        mainScope.launch {
+            if (!NuvaContainer.preferences.voiceEnabled.first()) return@launch
+            val language = NuvaContainer.preferences.language.first()
+            tts.speak(text, if (language == "auto") "banglish" else language)
+        }
     }
 
     fun destroy() {
         recognitionJob?.cancel()
+        recognitionJob = null
         NuvaForegroundService.stop(NuvaContainer.appContext)
         tts.shutdown()
+        mainScope.cancel()
     }
 }

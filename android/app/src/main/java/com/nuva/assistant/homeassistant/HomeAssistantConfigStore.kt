@@ -18,11 +18,22 @@ class HomeAssistantConfigStore(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun save(baseUrl: String, newToken: String?): Result<Unit> = runCatching {
-        val normalized = normalizeAndValidateUrl(baseUrl) ?: error("Home Assistant URL must be a valid HTTPS origin")
-        val editor = prefs.edit().putString(KEY_URL, normalized)
-        if (!newToken.isNullOrBlank()) editor.putString(KEY_TOKEN, encrypt(newToken.trim()))
-        editor.apply()
-        if (readToken().isNullOrBlank()) error("Long-lived access token is required")
+        val normalized = normalizeAndValidateUrl(baseUrl)
+            ?: error("Home Assistant URL must be a valid HTTPS origin")
+        val previousUrl = prefs.getString(KEY_URL, null)?.let(::normalizeAndValidateUrl)
+        val suppliedToken = newToken?.trim()?.takeIf { it.isNotBlank() }
+        val encryptedToken = when {
+            suppliedToken != null -> encrypt(suppliedToken)
+            previousUrl != normalized -> error("A new token is required when the Home Assistant URL changes")
+            readToken().isNullOrBlank() -> error("Long-lived access token is required")
+            else -> null // same endpoint: keep the existing encrypted token
+        }
+        prefs.edit()
+            .putString(KEY_URL, normalized)
+            .apply {
+                encryptedToken?.let { putString(KEY_TOKEN, it) }
+            }
+            .apply()
     }
 
     fun config(): Config? {

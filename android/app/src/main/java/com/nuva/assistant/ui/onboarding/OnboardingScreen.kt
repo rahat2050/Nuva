@@ -32,6 +32,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nuva.assistant.R
 import com.nuva.assistant.accessibility.NuvaAccessibilityService
@@ -42,8 +43,6 @@ import com.nuva.assistant.ui.theme.NuvaGlassPanel
 import com.nuva.assistant.ui.theme.NuvaPrimaryAction
 import com.nuva.assistant.ui.theme.NuvaScreenHeader
 import com.nuva.assistant.ui.theme.NuvaStatusChip
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
@@ -58,10 +57,9 @@ import kotlinx.coroutines.launch
  */
 class OnboardingViewModel : ViewModel() {
     fun finish(onDone: () -> Unit) {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch {
             NuvaContainer.preferences.setOnboardingDone(true)
-            // Navigation must happen on the main thread.
-            kotlinx.coroutines.withContext(Dispatchers.Main) { onDone() }
+            onDone()
         }
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +36,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nuva.assistant.R
 import com.nuva.assistant.automation.QuickSettingsTileController
@@ -45,9 +47,9 @@ import com.nuva.assistant.systemassistant.SystemAssistantController
 import com.nuva.assistant.ui.theme.NuvaDivider
 import com.nuva.assistant.ui.theme.NuvaGlassPanel
 import com.nuva.assistant.ui.theme.NuvaScreenHeader
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -66,21 +68,31 @@ class SettingsViewModel : ViewModel() {
     var homeAssistantConfigured = mutableStateOf(NuvaContainer.homeAssistantConfig.isConfigured())
         private set
 
+    private val ttsManagerDelegate = lazy { com.nuva.assistant.voice.TTSManager(NuvaContainer.appContext) }
+    private val ttsManager by ttsManagerDelegate
+
     fun setMessage(text: String?) {
         message.value = text
     }
 
     fun saveBaseUrl(url: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            preferences.setBaseUrl(url)
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!preferences.setBaseUrl(url)) {
+                message.value = "Backend URL অবশ্যই valid HTTPS endpoint হতে হবে; query/credentials allowed নয়।"
+                return@launch
+            }
             val healthy = NuvaContainer.syncManager.healthOk()
-            message.value = if (healthy) "Backend reachable ✓" else "Saved — but /api/health did not answer"
+            message.value = if (healthy) {
+                "Backend reachable ✓ · endpoint change হলে previous sign-in cleared"
+            } else {
+                "Saved — but /api/health did not answer; endpoint change হলে previous sign-in cleared"
+            }
         }
     }
 
     /** Explicit backend health check (requirement §31). */
     fun checkHealth() {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             message.value = "Checking backend…"
             val healthy = NuvaContainer.syncManager.healthOk()
             message.value = if (healthy) {
@@ -93,25 +105,29 @@ class SettingsViewModel : ViewModel() {
 
     /** Speaks a sample sentence so the user can verify TTS (requirement §31). */
     fun testTts() {
-        val tts = com.nuva.assistant.voice.TTSManager(NuvaContainer.appContext)
-        val language = NuvaContainer.preferences.languageBlocking()
-        val sample = when (language) {
-            "en" -> "Hello, this is Nuva."
-            else -> "Assalamu alaikum, ami Nuva — apnar voice assistant."
+        viewModelScope.launch {
+            val language = preferences.language.first()
+            val sample = when (language) {
+                "en" -> "Hello, this is Nuva."
+                else -> "Assalamu alaikum, ami Nuva — apnar voice assistant."
+            }
+            ttsManager.speak(sample, if (language == "en") "en" else "banglish")
+            message.value = "TTS test: \"$sample\""
         }
-        tts.speak(sample, if (language == "en") "en" else "banglish")
-        message.value = "TTS test: \"$sample\""
     }
 
     fun saveSupabase(url: String, anonKey: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            preferences.setSupabase(url, anonKey)
-            message.value = "Supabase connection saved"
+        viewModelScope.launch(Dispatchers.IO) {
+            message.value = if (preferences.setSupabase(url, anonKey)) {
+                "Supabase HTTPS connection saved · changed config clears previous sign-in"
+            } else {
+                "Supabase URL অবশ্যই valid HTTPS endpoint হতে হবে; query/credentials allowed নয়।"
+            }
         }
     }
 
     fun saveHomeAssistant(url: String, token: String) {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val result = NuvaContainer.homeAssistantConfig.save(url, token.takeIf { it.isNotBlank() })
             homeAssistantConfigured.value = NuvaContainer.homeAssistantConfig.isConfigured()
             message.value = result.fold(
@@ -122,7 +138,7 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun testHomeAssistant() {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             message.value = "Checking Home Assistant…"
             message.value = when (val result = NuvaContainer.homeAssistantClient.health()) {
                 is com.nuva.assistant.homeassistant.HomeAssistantClient.Result.Done -> "Home Assistant connected ✓"
@@ -140,11 +156,16 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun signIn(email: String, password: String) {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             when (val result = NuvaContainer.supabaseRepository.signIn(email, password)) {
                 is com.nuva.assistant.supabase.SupabaseRepository.SignInResult.Success -> {
-                    preferences.saveSession(result.session.accessToken, result.session.refreshToken)
-                    message.value = "Signed in as ${result.session.user?.email ?: "user"}"
+                    message.value = runCatching {
+                        preferences.saveSession(result.session.accessToken, result.session.refreshToken)
+                        "Signed in as ${result.session.user?.email ?: "user"}"
+                    }.getOrElse {
+                        preferences.clearSession()
+                        "Sign-in session securely save করা যায়নি; আবার চেষ্টা করুন।"
+                    }
                 }
 
                 is com.nuva.assistant.supabase.SupabaseRepository.SignInResult.Failure ->
@@ -154,14 +175,14 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun signOut() {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             preferences.clearSession()
             message.value = "Signed out"
         }
     }
 
     fun setWakeWord(enabled: Boolean) {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             preferences.setWakeWordEnabled(enabled)
             if (enabled) {
                 val started = WakeWordService.start(NuvaContainer.appContext)
@@ -178,7 +199,7 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun restartWakeWord() {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             preferences.setWakeWordEnabled(true)
             WakeWordService.stop(NuvaContainer.appContext)
             delay(300)
@@ -194,6 +215,11 @@ class SettingsViewModel : ViewModel() {
         } else {
             "Android voice surface start করতে দেয়নি।"
         }
+    }
+
+    override fun onCleared() {
+        if (ttsManagerDelegate.isInitialized()) ttsManager.shutdown()
+        super.onCleared()
     }
 }
 
@@ -237,7 +263,7 @@ fun SettingsScreen(
     var homeAssistantUrl by remember { mutableStateOf(NuvaContainer.homeAssistantConfig.savedBaseUrl()) }
     var homeAssistantToken by remember { mutableStateOf("") }
 
-    val scope = remember { CoroutineScope(Dispatchers.Main) }
+    val scope = rememberCoroutineScope()
     val overlayGranted = remember(permissionRefresh) { NuvaPermissions.canDrawOverlays(context) }
     val runtimeMissing = remember(permissionRefresh) { NuvaPermissions.missingWakeWordRuntimePermissions(context) }
     val notificationGranted = remember(permissionRefresh) { NuvaPermissions.hasNotifications(context) }
@@ -342,8 +368,16 @@ fun SettingsScreen(
                 label = { Text("Password") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
             )
-            Button(onClick = { viewModel.signIn(email, password) }) { Text("Sign in") }
+            Button(
+                onClick = {
+                    val submittedPassword = password
+                    password = ""
+                    viewModel.signIn(email, submittedPassword)
+                },
+                enabled = email.isNotBlank() && password.isNotBlank(),
+            ) { Text("Sign in") }
         }
 
         NuvaDivider()

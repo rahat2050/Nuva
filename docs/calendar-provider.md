@@ -18,7 +18,8 @@ calendar event edit title project meeting
 - Range is bounded to 1–31 days and results to 100 queried/20 displayed events.
 - User must explicitly request the read and confirm it.
 - Title, begin time and optional location are shown; description/attendees are not queried.
-- OTP/password-like event titles are excluded; displayed titles are redacted.
+- OTP/password-like event titles are excluded; credential-like locations are omitted and code-like
+  title/location content is redacted before display.
 - Data stays on-device and is not synced to NUVA backend/Groq/Supabase.
 
 ## Exact event view/edit

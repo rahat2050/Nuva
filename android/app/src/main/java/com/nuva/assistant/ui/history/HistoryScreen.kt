@@ -28,13 +28,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nuva.assistant.R
 import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.ui.theme.NuvaGlassPanel
 import com.nuva.assistant.ui.theme.NuvaScreenHeader
 import com.nuva.assistant.ui.theme.NuvaStatusChip
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -53,17 +53,17 @@ class HistoryViewModel : ViewModel() {
     val history = NuvaContainer.database
         .commandHistoryDao()
         .recent(200)
-        .stateIn(CoroutineScope(Dispatchers.IO), SharingStarted.Lazily, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun clear() {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             NuvaContainer.database.commandHistoryDao().clear()
         }
     }
 
     /** Re-runs a past command through the normal pipeline (validation + gates). */
     fun retry(text: String) {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             NuvaContainer.commandExecutor.process(text)
         }
     }

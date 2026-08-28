@@ -58,8 +58,6 @@ import com.nuva.assistant.ui.theme.NuvaStatusChip
 import com.nuva.assistant.ui.theme.NuvaVoiceOrb
 import com.nuva.assistant.voice.VoiceController
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 
@@ -76,7 +74,7 @@ class HomeViewModel : ViewModel() {
     val recent = NuvaContainer.database
         .commandHistoryDao()
         .recent(20)
-        .stateIn(CoroutineScope(Dispatchers.IO), SharingStarted.Lazily, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val pending = MutableStateFlow<Pair<Long, CommandDecision>?>(null)
     val contactChoice =

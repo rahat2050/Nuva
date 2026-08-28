@@ -102,7 +102,8 @@ object CalendarProviderController {
         val screen = safe.take(20).mapIndexed { index, event ->
             val time = if (event.allDay) "all day" else formatter.format(Date(event.beginAt))
             val title = SensitiveAppPolicy.redactCodes(event.title).take(200)
-            "${index + 1}. $time · $title${event.location?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()}"
+            val location = safeLocationForDisplay(event.location)
+            "${index + 1}. $time · $title${location?.let { " · $it" }.orEmpty()}"
         }.joinToString("\n")
         val spoken = safe.take(8).mapIndexed { index, event ->
             val time = if (event.allDay) "all day" else formatter.format(Date(event.beginAt))
@@ -128,6 +129,12 @@ object CalendarProviderController {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
         context.startActivity(intent)
         return Result.Opened(event.title, editing)
+    }
+
+    internal fun safeLocationForDisplay(location: String?): String? {
+        val value = location?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        if (SensitiveAppPolicy.mentionsCredentials(value)) return null
+        return SensitiveAppPolicy.redactCodes(value).take(160)
     }
 
     private fun normalize(value: String): String = value.lowercase()

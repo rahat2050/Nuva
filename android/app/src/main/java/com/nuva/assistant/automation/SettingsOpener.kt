@@ -25,6 +25,8 @@ object SettingsOpener {
 
     @Volatile
     private var torchOn = false
+    @Volatile
+    private var torchCallbackRegistered = false
 
     sealed interface Result {
         /** Action done directly (torch) or screen/panel opened. */
@@ -104,6 +106,13 @@ object SettingsOpener {
         }
     }
 
+    @Synchronized
+    private fun ensureTorchCallback(manager: CameraManager) {
+        if (torchCallbackRegistered) return
+        manager.registerTorchCallback(torchCallback, null)
+        torchCallbackRegistered = true
+    }
+
     fun toggleTorch(context: Context): Result {
         return try {
             val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -111,7 +120,7 @@ object SettingsOpener {
                 manager.getCameraCharacteristics(cameraId)
                     .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
             } ?: return Result.Failed("Ei phone e flashlight nai bole mone hocche.")
-            manager.registerTorchCallback(torchCallback, null)
+            ensureTorchCallback(manager)
             val next = !torchOn
             manager.setTorchMode(id, next)
             Result.Done
