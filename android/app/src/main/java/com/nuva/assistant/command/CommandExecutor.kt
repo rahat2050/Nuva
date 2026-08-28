@@ -674,6 +674,25 @@ class CommandExecutor(
                     ExecutionOutcome("failed", result.reason, result.reason)
             }
 
+            is NuvaAction.CalendarProvider -> when (
+                val result = com.nuva.assistant.automation.CalendarProviderController.execute(context, action)
+            ) {
+                is com.nuva.assistant.automation.CalendarProviderController.Result.Agenda ->
+                    ExecutionOutcome("completed", result.speech, screenText = result.screenText)
+                is com.nuva.assistant.automation.CalendarProviderController.Result.Opened ->
+                    ExecutionOutcome("completed", "${result.title} Calendar app-e ${if (result.editing) "edit" else "view"} mode-e khulechi.")
+                com.nuva.assistant.automation.CalendarProviderController.Result.PermissionMissing ->
+                    ExecutionOutcome("failed", "Calendar agenda porte optional READ_CALENDAR permission din.", "calendar permission missing")
+                is com.nuva.assistant.automation.CalendarProviderController.Result.NotFound ->
+                    ExecutionOutcome("failed", "${result.query} title-er event ei range-e paini.", "calendar event not found")
+                is com.nuva.assistant.automation.CalendarProviderController.Result.Ambiguous -> {
+                    val names = result.events.joinToString(", ") { it.title }
+                    ExecutionOutcome("failed", "Ekadhik event mileche — title/date aro specific bolun: $names", "ambiguous calendar event")
+                }
+                is com.nuva.assistant.automation.CalendarProviderController.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.ViewCalendar -> when (
                 val result = com.nuva.assistant.automation.CalendarViewHandoff.open(context, action.focusAt)
             ) {

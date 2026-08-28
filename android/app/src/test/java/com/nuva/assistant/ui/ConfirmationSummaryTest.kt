@@ -130,6 +130,21 @@ class ConfirmationSummaryTest {
     }
 
     @Test
+    fun `calendar provider summary exposes requested range and exact event`() {
+        val summary = ConfirmationSummary.build(
+            NuvaAction.CalendarProvider(
+                com.nuva.assistant.command.CalendarProviderOperation.EDIT_EVENT,
+                1_800_000_000_000L,
+                1_800_086_400_000L,
+                "project meeting",
+            ),
+            NuvaRisk.MEDIUM,
+        )
+        assertTrue(summary.lines.any { it.value == "project meeting" })
+        assertTrue(summary.detail.contains("final Save"))
+    }
+
+    @Test
     fun `Home Assistant summary exposes allowlisted physical action`() {
         val summary = ConfirmationSummary.build(
             NuvaAction.HomeAssistantControl(

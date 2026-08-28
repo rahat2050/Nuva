@@ -13,6 +13,8 @@ no ad SDKs**.
 * Clipboard access happens only on an explicit foreground copy/read/clear command; NUVA stores no
   clipboard history and never registers a clipboard-change monitor.
 * Rich calendar event fields are passed to the visible Calendar insert screen and not saved by NUVA.
+  Optional agenda access queries only an explicitly requested 1–31 day range; results stay transient,
+  are never uploaded/synced, and credential-titled events are excluded.
 * Social/MMS text and a picker-selected attachment go only to the visible Android compose/share intent
   chosen by the user; NUVA does not upload them to its backend or press Post/Send.
 * Maps routes contain only the places the user dictated. NUVA requests no location permission and

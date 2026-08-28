@@ -1,4 +1,4 @@
-# NUVA — Supported features (v4.0)
+# NUVA — Supported features (v4.1)
 
 Statuses: **SUPPORTED** (works) · **PARTIAL** (built, piece missing/awaiting device QA) ·
 **ANDROID-LIMITED** (only as far as Android permits) · **UNSUPPORTED** (deliberate, stated in-app) ·
@@ -56,9 +56,10 @@ Notification permission is required. Details: [`persistent-scheduled-drafts.md`]
 v3.0 supports explicit foreground clipboard copy/read/clear with blocking confirmation, bounded text,
 OTP-like redaction and runtime credential/financial checks. There is no clipboard monitoring/history.
 Rich Calendar insert drafts support title, begin/end duration, location, description and one attendee
-email; the visible Calendar app owns final Save. v3.7 also opens Calendar focused on today/tomorrow/
-requested weekday without reading event data or calendar permission. Sensitive/financial event
-details are refused.
+email; the visible Calendar app owns final Save. Date views need no permission. v4.1 adds optional,
+explicit `READ_CALENDAR` access for bounded 1–31 day agenda summaries and exact title-matched event
+view/edit handoff. Credential-titled events are excluded, ambiguity stops, no calendar data is synced
+or uploaded, and edit opens the visible Calendar app for final Save. Direct delete/write remains absent.
 
 ## Media & camera — SUPPORTED / ANDROID-LIMITED
 YouTube search/play, Spotify fallback, play/pause/next/previous/stop and bounded 1–300 second

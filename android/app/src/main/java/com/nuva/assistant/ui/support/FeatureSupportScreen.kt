@@ -56,7 +56,7 @@ val SUPPORTED_FEATURES = listOf(
     "Passport/NID/birth/driving/visa/admission/job/doctor/hotel/flight/courier local form draft + official portal handoff",
     "Persistent email/SMS draft reminder — once/daily/weekly, reboot restore, voice list/cancel; tap করলে draft, auto-Send নয়",
     "Explicit clipboard copy/read/clear — confirmation, bounded/redacted text; কোনো monitoring/history নয়",
-    "Calendar today/tomorrow/weekday view (no READ_CALENDAR) + rich event draft; final Save user",
+    "Calendar date view + optional ১–৩১ day agenda read + exact event view/edit; final Save user, no direct delete",
     "কন্টাক্ট খোঁজা — একাধিক মিল হলে আপনি বেছে নেবেন",
     "অ্যালার্ম/টাইমার create ও list; confirmation-এর পর active snooze/dismiss official intent, fallback Clock app",
     "ক্যালেন্ডারে রিমাইন্ডার (কনফার্মেশনসহ, Save আপনি চাপবেন)",

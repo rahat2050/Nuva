@@ -152,7 +152,28 @@ object CommandValidator {
             NuvaIntent.CLOCK_CONTROL -> validateClockControl(actionJson)
             NuvaIntent.VIEW_CALENDAR -> validateViewCalendar(actionJson)
             NuvaIntent.HOME_ASSISTANT -> validateHomeAssistant(actionJson)
+            NuvaIntent.CALENDAR_PROVIDER -> validateCalendarProvider(actionJson)
         }
+    }
+
+    private fun validateCalendarProvider(json: JsonObject): ValidatedAction {
+        val operation = CalendarProviderOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("CALENDAR_PROVIDER requires operation"))
+        val start = json.long("range_start")?.takeIf { it in 1..4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("calendar provider requires range_start"))
+        val end = json.long("range_end")?.takeIf { it > start && it <= 4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("calendar provider requires valid range_end"))
+        if (end - start > 31L * 86_400_000L) {
+            return ValidatedAction.Invalid(listOf("calendar provider range is capped at 31 days"))
+        }
+        val query = json.str("event_query")?.takeIf { it.length in 1..200 }
+        if (operation != CalendarProviderOperation.READ_AGENDA && query == null) {
+            return ValidatedAction.Invalid(listOf("event open/edit requires event_query"))
+        }
+        if (operation == CalendarProviderOperation.READ_AGENDA && query != null) {
+            return ValidatedAction.Invalid(listOf("agenda read does not accept event_query"))
+        }
+        return ValidatedAction.Valid(NuvaAction.CalendarProvider(operation, start, end, query))
     }
 
     private fun validateHomeAssistant(json: JsonObject): ValidatedAction {

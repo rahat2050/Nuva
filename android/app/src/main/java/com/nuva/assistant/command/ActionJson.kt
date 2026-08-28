@@ -194,6 +194,11 @@ object ActionJson {
             put("operation", action.operation.wireName); put("entity_query", action.entityQuery)
             action.value?.let { put("value", it) }
         }
+        is NuvaAction.CalendarProvider -> buildJsonObject {
+            put("type", "CALENDAR_PROVIDER"); put("operation", action.operation.wireName)
+            put("range_start", action.rangeStart); put("range_end", action.rangeEnd)
+            action.eventQuery?.let { put("event_query", it) }
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }

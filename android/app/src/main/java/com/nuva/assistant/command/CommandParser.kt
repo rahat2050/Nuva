@@ -664,6 +664,50 @@ object CommandParser {
             return ok(NuvaAction.ClipboardAction(ClipboardOperation.COPY, text.take(5_000)), "Text copy korbo — nishchit korun.", NuvaRisk.MEDIUM)
         }
 
+        val agendaRead = listOf(
+            "agenda poro", "calendar events poro", "calendar agenda poro", "read agenda", "agenda read",
+            "এজেন্ডা পড়ো", "ক্যালেন্ডার ইভেন্ট পড়ো", "ক্যালেন্ডার পড়ো",
+        ).any { t.contains(it) }
+        val eventProviderOperation = when {
+            listOf("calendar event edit", "event edit koro", "ক্যালেন্ডার ইভেন্ট এডিট").any { t.contains(it) } ->
+                CalendarProviderOperation.EDIT_EVENT
+            listOf("calendar event kholo", "open calendar event", "event details kholo", "ক্যালেন্ডার ইভেন্ট খোলো")
+                .any { t.contains(it) } -> CalendarProviderOperation.OPEN_EVENT
+            else -> null
+        }
+        if (agendaRead || eventProviderOperation != null) {
+            val start = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+            }
+            if (listOf("parso", "porshu", "পরশু").any { NuvaDateTimeParser.hasWord(t, it) }) {
+                start.add(java.util.Calendar.DAY_OF_YEAR, 2)
+            } else if (NuvaDateTimeParser.relativeDay(t) == RelativeDay.TOMORROW) {
+                start.add(java.util.Calendar.DAY_OF_YEAR, 1)
+            }
+            val days = Regex("""(?:next|agami|আগামী)\s*(\d{1,2})\s*(?:day|days|din|দিন)""")
+                .find(t)?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(1, 31)
+                ?: if (listOf("week", "shoptaho", "সপ্তাহ").any { t.contains(it) }) 7 else 1
+            val end = (start.clone() as java.util.Calendar).apply { add(java.util.Calendar.DAY_OF_YEAR, days) }
+            val query = if (eventProviderOperation != null) {
+                val marker = listOf(" title ", " name ", " শিরোনাম ", " নাম ").firstOrNull { t.contains(it) }
+                marker?.let { t.substringAfter(it).trim(' ', ',', '.', ':').take(200) }
+                    ?.takeIf { it.isNotBlank() }
+                    ?: return unsupported("Kon calendar event khulbo/edit korbo? Title bolun.")
+            } else null
+            return ok(
+                NuvaAction.CalendarProvider(
+                    eventProviderOperation ?: CalendarProviderOperation.READ_AGENDA,
+                    start.timeInMillis,
+                    end.timeInMillis,
+                    query,
+                ),
+                if (eventProviderOperation == null) "Calendar agenda porbo — nishchit korun."
+                else "Exact event match kore Calendar app khulbo — nishchit korun.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
         val calendarRequested = listOf(
             "calendar event create", "calendar event add", "meeting create", "event draft", "ক্যালেন্ডার ইভেন্ট", "মিটিং তৈরি",
         ).any { t.contains(it) }

@@ -373,6 +373,16 @@ def parse_productivity(t):
         if text: text=re.sub(r"^(je|যে)\s+","",text).strip()
         if not text: return unsupported("Clipboard text bolun")
         return ok({"kind":"clipboard","operation":"COPY","text":text},"CLIPBOARD_ACTION",risk="MEDIUM",base="MEDIUM")
+    agenda=any(w in t for w in ["agenda poro","calendar events poro","calendar agenda poro","read agenda","agenda read"])
+    provider_op="EDIT_EVENT" if any(w in t for w in ["calendar event edit","event edit koro"]) else ("OPEN_EVENT" if any(w in t for w in ["calendar event kholo","open calendar event","event details kholo"]) else None)
+    if agenda or provider_op:
+        query=None
+        if provider_op:
+            m=re.search(r"\s(?:title|name)\s+(.+)$",t); query=m.group(1).strip() if m else None
+            if not query: return unsupported("Event title bolun")
+        m=re.search(r"(?:next|agami)\s*(\d{1,2})\s*(?:day|days|din)",t)
+        days=max(1,min(31,int(m.group(1)))) if m else (7 if "week" in t else 1)
+        return ok({"kind":"calendarprovider","operation":provider_op or "READ_AGENDA","query":query,"days":days},"CALENDAR_PROVIDER",risk="MEDIUM",base="MEDIUM")
     calendar_event=any(w in t for w in ["calendar event create","calendar event add","meeting create","event draft"])
     if not calendar_event and any(w in t for w in ["calendar dekhao","show calendar","calendar agenda","today calendar","tomorrow calendar"]):
         return ok({"kind":"calendarview","tomorrow":"tomorrow" in t},"VIEW_CALENDAR")
@@ -1187,6 +1197,9 @@ check(parse("file move koro")["action"]["operation"] == "MOVE_FILE", "picker mov
 check(parse("photo crop koro")["action"]["operation"] == "EDIT_PHOTO", "photo editor handoff")
 check(parse("pdf print koro")["action"]["operation"] == "PRINT_PDF", "PDF print handoff")
 check(parse("calendar dekhao")["intent"] == "VIEW_CALENDAR", "calendar view")
+check(parse("calendar agenda poro")["intent"] == "CALENDAR_PROVIDER", "calendar agenda read")
+check(parse("next 7 day calendar agenda poro")["action"]["days"] == 7, "calendar range")
+check(parse("calendar event edit title meeting")["action"]["operation"] == "EDIT_EVENT", "calendar exact edit")
 check(parse("protidin 8 tay schedule sms message update")["action"]["recurrence"] == "DAILY", "daily draft")
 check(parse("shukrobar 9 tay schedule email je report")["action"]["recurrence"] == "WEEKLY", "weekly draft")
 check(parse("scheduled draft list dekhao")["intent"] == "LIST_SCHEDULED_DRAFTS", "list drafts")

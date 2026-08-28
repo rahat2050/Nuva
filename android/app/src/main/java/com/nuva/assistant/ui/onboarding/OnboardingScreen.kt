@@ -139,6 +139,14 @@ fun OnboardingScreen(
         )
 
         PermissionCard(
+            title = stringResource(R.string.perm_calendar_title),
+            description = stringResource(R.string.perm_calendar_desc),
+            granted = NuvaPermissions.hasReadCalendar(context),
+            onGrant = { launcher.launch(Manifest.permission.READ_CALENDAR) },
+            optional = true,
+        )
+
+        PermissionCard(
             title = stringResource(R.string.perm_sms_title),
             description = stringResource(R.string.perm_sms_desc),
             granted = NuvaPermissions.hasSendSms(context),

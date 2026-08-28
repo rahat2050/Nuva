@@ -14,8 +14,8 @@ android {
         applicationId = "com.nuva.assistant"
         minSdk = 26
         targetSdk = 35
-        versionCode = 24
-        versionName = "4.0.0"
+        versionCode = 25
+        versionName = "4.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -74,6 +74,8 @@
     <string name="perm_accessibility_desc">স্ক্রিন পড়ে শোনানো ও আপনার বলা বাটনে চাপ দেওয়ার জন্য। সিস্টেম সেটিংস থেকে নিজ হাতে চালু করতে হয় — নুভা নিজে কখনো চালু করতে পারে না।</string>
     <string name="perm_contacts_title">👥 কন্টাক্ট</string>
     <string name="perm_contacts_desc">“রহিমকে কল করো” বললে নম্বর খুঁজতে। প্রথম কল/মেসেজ কমান্ডের সময়েই কেবল চাওয়া হয়।</string>
+    <string name="perm_calendar_title">📅 ক্যালেন্ডার পড়া</string>
+    <string name="perm_calendar_desc">ঐচ্ছিক। আপনি স্পষ্টভাবে চাইলে সীমিত agenda পড়ে; নুভা লুকিয়ে event লেখে, sync বা upload করে না।</string>
     <string name="perm_sms_title">✉ এসএমএস</string>
     <string name="perm_sms_desc">আপনি নিশ্চিত করার পর এসএমএস পাঠাতে। না দিলে নুভা লেখা বসিয়ে এসএমএস স্ক্রিন খুলে দেবে, সেন্ড আপনি চাপবেন।</string>
     <string name="perm_notif_listener_title">📩 নোটিফিকেশন অ্যাক্সেস</string>

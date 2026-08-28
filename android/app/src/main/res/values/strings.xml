@@ -74,6 +74,8 @@
     <string name="perm_accessibility_desc">Lets NUVA read the screen aloud and press buttons you name (screen reading, WhatsApp send, scroll). Enabled manually in system settings — NUVA can never turn it on itself.</string>
     <string name="perm_contacts_title">👥 Contacts</string>
     <string name="perm_contacts_desc">Needed to find a number when you say “call Rahim”. Requested only when you first run a call/message command.</string>
+    <string name="perm_calendar_title">📅 Calendar read</string>
+    <string name="perm_calendar_desc">Optional. Reads a bounded agenda only when you explicitly ask. NUVA never silently writes, syncs or uploads calendar data.</string>
     <string name="perm_sms_title">✉ SMS</string>
     <string name="perm_sms_desc">Lets NUVA send an SMS after you confirm. Without it NUVA opens the SMS screen pre-filled and you press Send yourself.</string>
     <string name="perm_notif_listener_title">📩 Notification access</string>

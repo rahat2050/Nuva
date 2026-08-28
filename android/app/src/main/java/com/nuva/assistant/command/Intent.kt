@@ -72,6 +72,7 @@ enum class NuvaIntent(val wireName: String, val localOnly: Boolean = false) {
     CLOCK_CONTROL("CLOCK_CONTROL", localOnly = true),
     VIEW_CALENDAR("VIEW_CALENDAR", localOnly = true),
     HOME_ASSISTANT("HOME_ASSISTANT", localOnly = true),
+    CALENDAR_PROVIDER("CALENDAR_PROVIDER", localOnly = true),
     ;
 
     companion object {
@@ -116,6 +117,7 @@ fun baselineRisk(intent: NuvaIntent): NuvaRisk = when (intent) {
     NuvaIntent.COMPOSE_SOCIAL_POST,
     NuvaIntent.COMPOSE_MMS,
     NuvaIntent.HOME_ASSISTANT,
+    NuvaIntent.CALENDAR_PROVIDER,
     // Policy §37: calendar edits always confirm (we prefill, the user saves).
     NuvaIntent.SET_REMINDER,
     -> NuvaRisk.MEDIUM

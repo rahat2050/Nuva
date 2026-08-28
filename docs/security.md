@@ -103,6 +103,13 @@ NUVA's memory into a password store.
 - Every physical action is confirmation-gated and ambiguous entity matching stops.
 - Locks, covers/garage, cameras, security systems, gas/water/medical and arbitrary services are not callable.
 
+## Calendar provider boundary (v4.1)
+
+- `READ_CALENDAR` is optional, explained and requested separately; `WRITE_CALENDAR` is absent.
+- Queries are explicit, transient and capped to 31 days/100 instances.
+- Credential-like event titles are excluded and ambiguous title matches stop.
+- Event edit opens the visible Calendar app; NUVA never silently updates/deletes events.
+
 ## 8. Known limitations (honest list)
 
 1. **Rate limiting degrades gracefully, it is not a hard cap.** With `UPSTASH_REDIS_REST_*`

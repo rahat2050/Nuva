@@ -210,6 +210,19 @@ object ConfirmationSummary {
                 confirmLabelOverride = "CONFIRM DEVICE"
             }
 
+            is NuvaAction.CalendarProvider -> {
+                title = "Calendar provider access"
+                lines += Line("কাজ", action.operation.wireName)
+                action.eventQuery?.let { lines += Line("Event", it) }
+                lines += Line("Range", java.text.SimpleDateFormat("d MMM", java.util.Locale.ENGLISH).format(java.util.Date(action.rangeStart)) + " – " + java.text.SimpleDateFormat("d MMM", java.util.Locale.ENGLISH).format(java.util.Date(action.rangeEnd)))
+                detail = if (action.operation == com.nuva.assistant.command.CalendarProviderOperation.EDIT_EVENT) {
+                    "Exact event খুঁজে visible Calendar editor খুলবে; final Save আপনি করবেন।"
+                } else {
+                    "শুধু explicit requested range পড়া/open হবে; data upload বা background sync হবে না।"
+                }
+                confirmLabelOverride = "CONTINUE"
+            }
+
             is NuvaAction.ViewCalendar -> {
                 title = "Calendar view"
                 lines += Line("তারিখ", java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.ENGLISH).format(java.util.Date(action.focusAt)))

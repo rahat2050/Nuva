@@ -466,6 +466,27 @@ class CommandParserTest {
     }
 
     @Test
+    fun `calendar provider agenda and exact event handoff parse safely`() {
+        val agenda = CommandParser.parse("calendar agenda poro")!!
+        val agendaAction = agenda.action as NuvaAction.CalendarProvider
+        assertEquals(CalendarProviderOperation.READ_AGENDA, agendaAction.operation)
+        assertNull(agendaAction.eventQuery)
+        assertTrue(agenda.requiresConfirmation)
+
+        val week = CommandParser.parse("next 7 day calendar agenda poro")!!.action as NuvaAction.CalendarProvider
+        val days = (week.rangeEnd - week.rangeStart) / 86_400_000L
+        assertEquals(7L, days)
+
+        val edit = CommandParser.parse("calendar event edit title project meeting")!!.action as NuvaAction.CalendarProvider
+        assertEquals(CalendarProviderOperation.EDIT_EVENT, edit.operation)
+        assertEquals("project meeting", edit.eventQuery)
+
+        val open = CommandParser.parse("calendar event kholo title dentist")!!.action as NuvaAction.CalendarProvider
+        assertEquals(CalendarProviderOperation.OPEN_EVENT, open.operation)
+        assertEquals("dentist", open.eventQuery)
+    }
+
+    @Test
     fun `calendar view opens requested relative day without reading events`() {
         val today = CommandParser.parse("calendar dekhao")!!.action as NuvaAction.ViewCalendar
         val tomorrow = CommandParser.parse("tomorrow calendar dekhao")!!.action as NuvaAction.ViewCalendar

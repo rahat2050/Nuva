@@ -315,6 +315,15 @@ sealed interface NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.HOME_ASSISTANT
     }
 
+    data class CalendarProvider(
+        val operation: CalendarProviderOperation,
+        val rangeStart: Long,
+        val rangeEnd: Long,
+        val eventQuery: String? = null,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CALENDAR_PROVIDER
+    }
+
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.OPEN_SETTING
     }
@@ -470,6 +479,18 @@ enum class CaptureMode(val wireName: String) {
 
     companion object {
         fun fromWire(value: String?): CaptureMode? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class CalendarProviderOperation(val wireName: String) {
+    READ_AGENDA("read_agenda"),
+    OPEN_EVENT("open_event"),
+    EDIT_EVENT("edit_event"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): CalendarProviderOperation? =
             entries.firstOrNull { it.wireName == value?.lowercase() }
     }
 }

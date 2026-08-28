@@ -52,6 +52,8 @@ you say into a validated action, asks before doing anything risky, and carries i
 "tomorrow calendar dekhao"            → Calendar view without reading events
 "living room light on koro"           → confirmed Home Assistant light control
 "bedroom ac temperature 24 degree"   → confirmed bounded climate request
+"next 7 day calendar agenda poro"    → explicit bounded local agenda read
+"calendar event edit title meeting" → exact visible event editor handoff
 ```
 
 ## Project status
@@ -60,7 +62,7 @@ you say into a validated action, asks before doing anything risky, and carries i
 | ---------------------------------------- | -------------------------------------------------- |
 | **PHASE 1** — Vercel Backend Foundation | ✅ Implemented · ⏳ awaiting production deployment |
 | **PHASE 2** — Android application      | ✅ Implemented (Kotlin + Compose) · build/verify on a real machine + production backend URL still needed |
-| **v1.1–v4.0 passes** — practical assistant → provider-specific Home Assistant | ✅ Implemented in code (real-device QA still pending): reviewed Android controls plus encrypted HTTPS Home Assistant light/switch/fan/climate integration with confirmation and strict physical-device allowlist; see [`docs/supported-features.md`](docs/supported-features.md) |
+| **v1.1–v4.1 passes** — practical assistant → explicit provider data | ✅ Implemented in code (real-device QA still pending): encrypted Home Assistant plus optional bounded Calendar agenda read and exact visible event view/edit with no direct write/delete; see [`docs/supported-features.md`](docs/supported-features.md) |
 
 `backend/` builds clean under strict TypeScript with **190 passing tests**. `android/` contains the
 full PHASE 2 app (Kotlin + Compose, see [`android/README.md`](android/README.md)). See
@@ -201,6 +203,7 @@ Full detail: [`docs/security.md`](docs/security.md).
 | [clock-management.md](docs/clock-management.md) | v3.6 AlarmClock list/snooze/dismiss and fallback rules |
 | [pdf-print-calendar-view.md](docs/pdf-print-calendar-view.md) | v3.7 selected PDF printing and no-read Calendar views |
 | [home-assistant.md](docs/home-assistant.md) | v4.0 encrypted configuration and physical-control allowlist |
+| [calendar-provider.md](docs/calendar-provider.md) | v4.1 optional bounded agenda read and exact event handoff |
 | [security.md](docs/security.md)            | Threat model, mitigations, known limitations      |
 | [testing.md](docs/testing.md)              | How to run and extend the suites                  |
 | [roadmap.md](docs/roadmap.md)              | Phase gates and the 23-step PHASE 2 build order  |

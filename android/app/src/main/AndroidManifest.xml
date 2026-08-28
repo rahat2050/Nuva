@@ -23,6 +23,8 @@
     <!-- Contact-name search for call/message commands (requested in context,
          never at startup). -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Optional explicit agenda/event lookup; calendar writes remain in visible Calendar UI. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
     <!-- SMS send ONLY after an explicit confirmation; without it NUVA falls
          back to the compose screen where the user taps Send. -->
     <uses-permission android:name="android.permission.SEND_SMS" />
