@@ -1,29 +1,28 @@
 package com.nuva.assistant.ui.home
 
 import android.Manifest
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,23 +34,33 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nuva.assistant.MainActivity
 import com.nuva.assistant.R
 import com.nuva.assistant.accessibility.NuvaAccessibilityService
+import com.nuva.assistant.automation.UserPresentContactWorkflow
+import com.nuva.assistant.automation.UserPresentFileWorkflow
 import com.nuva.assistant.command.CommandDecision
 import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.core.permissions.NuvaPermissions
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import com.nuva.assistant.ui.ConfirmationSummary
+import com.nuva.assistant.ui.theme.NuvaGlassPanel
+import com.nuva.assistant.ui.theme.NuvaPrimaryAction
+import com.nuva.assistant.ui.theme.NuvaScreenHeader
+import com.nuva.assistant.ui.theme.NuvaStatusChip
+import com.nuva.assistant.ui.theme.NuvaVoiceOrb
 import com.nuva.assistant.voice.VoiceController
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /**
@@ -67,11 +76,20 @@ class HomeViewModel : ViewModel() {
     val recent = NuvaContainer.database
         .commandHistoryDao()
         .recent(20)
-        .stateIn(CoroutineScope(Dispatchers.IO), SharingStarted.Lazily, emptyList())
+        .map { rows ->
+            rows.filterNot { row ->
+                SensitiveAppPolicy.mentionsCredentials(row.text) ||
+                    SensitiveAppPolicy.mentionsCredentials(row.error.orEmpty()) ||
+                    SensitiveAppPolicy.refusalForText(row.text) != null
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val pending = MutableStateFlow<Pair<Long, CommandDecision>?>(null)
     val contactChoice =
         MutableStateFlow<Pair<Long, List<com.nuva.assistant.contacts.ContactResolver.ContactMatch>>?>(null)
+    val fileWorkflow = UserPresentFileWorkflow.state
+    val contactWorkflow = UserPresentContactWorkflow.state
 
     fun startListening() = voice.startListening()
 
@@ -81,13 +99,20 @@ class HomeViewModel : ViewModel() {
 
     fun onStateChanged(newState: VoiceController.State) {
         when (newState) {
-            is VoiceController.State.AwaitingConfirmation ->
+            is VoiceController.State.AwaitingConfirmation -> {
+                contactChoice.value = null
                 pending.value = newState.pendingId to newState.decision
+            }
 
-            is VoiceController.State.AwaitingContactChoice ->
+            is VoiceController.State.AwaitingContactChoice -> {
+                pending.value = null
                 contactChoice.value = newState.pendingId to newState.matches
+            }
 
-            else -> Unit
+            else -> {
+                pending.value = null
+                contactChoice.value = null
+            }
         }
     }
 
@@ -115,6 +140,41 @@ class HomeViewModel : ViewModel() {
         voice.reject(choice.first)
     }
 
+    fun onFileWorkflowUri(context: android.content.Context, uri: Uri?) {
+        viewModelScope.launch {
+            val speech = UserPresentFileWorkflow.handleSelected(context, uri)
+            if (uri != null) {
+                val completed = UserPresentFileWorkflow.state.value as? UserPresentFileWorkflow.State.Completed
+                voice.speakIfEnabled(completed?.content?.take(600) ?: speech)
+            }
+        }
+    }
+
+    fun onFileWorkflowUris(context: android.content.Context, uris: List<Uri>) {
+        viewModelScope.launch {
+            val speech = UserPresentFileWorkflow.handleMultipleSelected(context, uris)
+            if (uris.isNotEmpty()) voice.speakIfEnabled(speech)
+        }
+    }
+
+    fun onContactWorkflowUri(uri: Uri?) {
+        val speech = UserPresentContactWorkflow.handleSelected(NuvaContainer.appContext, uri)
+        if (uri != null) voice.speakIfEnabled(speech)
+    }
+
+    fun dismissContactWorkflowResult() = UserPresentContactWorkflow.clear()
+
+    fun confirmFileMutation() {
+        viewModelScope.launch {
+            val speech = UserPresentFileWorkflow.confirmMutation(NuvaContainer.appContext)
+            voice.speakIfEnabled(speech)
+        }
+    }
+
+    fun cancelFileMutation() = UserPresentFileWorkflow.cancel()
+
+    fun dismissFileWorkflowResult() = UserPresentFileWorkflow.clearResult()
+
     override fun onCleared() {
         voice.destroy()
         super.onCleared()
@@ -122,195 +182,311 @@ class HomeViewModel : ViewModel() {
 }
 
 @Composable
-fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(
+    viewModel: HomeViewModel = viewModel(),
+    assistantInvocation: MainActivity.AssistantInvocation? = null,
+    onAssistantInvocationConsumed: (Long) -> Unit = {},
+) {
     val context = LocalContext.current
     val micPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) viewModel.startListening()
     }
+    val documentPicker = rememberLauncherForActivityResult(
+        contract = OpenNuvaDocumentContract(),
+    ) { uri -> viewModel.onFileWorkflowUri(context, uri) }
+    val multipleDocumentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris -> viewModel.onFileWorkflowUris(context, uris) }
+    val folderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+    ) { uri -> viewModel.onFileWorkflowUri(context, uri) }
+    val contactPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickContact(),
+    ) { uri -> viewModel.onContactWorkflowUri(uri) }
 
     val state by viewModel.state.collectAsState(initial = VoiceController.State.Idle)
     val pending by viewModel.pending.collectAsState()
     val contactChoice by viewModel.contactChoice.collectAsState()
     val recent by viewModel.recent.collectAsState()
+    val fileWorkflow by viewModel.fileWorkflow.collectAsState()
+    val contactWorkflow by viewModel.contactWorkflow.collectAsState()
 
     var typedCommand by remember { mutableStateOf("") }
+    var externalDraftLoaded by remember { mutableStateOf(false) }
     var showAccessibilityGuide by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state) { viewModel.onStateChanged(state) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("NUVA", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-        Text(stringResource(R.string.home_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-        Spacer(Modifier.height(24.dp))
-
-        // Big mic button + processing spinner.
-        Surface(
-            onClick = {
-                if (NuvaPermissions.hasRecordAudio(context)) {
-                    viewModel.startListening()
-                } else {
-                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    LaunchedEffect(assistantInvocation?.id) {
+        val invocation = assistantInvocation ?: return@LaunchedEffect
+        when {
+            !invocation.draftText.isNullOrBlank() -> {
+                typedCommand = invocation.draftText
+                externalDraftLoaded = true
+            }
+            invocation.listenInApp -> {
+                val command = invocation.inlineCommand
+                when {
+                    !command.isNullOrBlank() -> viewModel.submitTyped(command)
+                    NuvaPermissions.hasRecordAudio(context) -> viewModel.startListening()
+                    else -> micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                 }
-            },
-            shape = CircleShape,
-            color = when (state) {
-                is VoiceController.State.Listening -> MaterialTheme.colorScheme.error
-                is VoiceController.State.Processing -> MaterialTheme.colorScheme.tertiary
-                else -> MaterialTheme.colorScheme.primary
-            },
-            modifier = Modifier.size(112.dp),
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
+            }
+        }
+        onAssistantInvocationConsumed(invocation.id)
+    }
+
+    LaunchedEffect(state) { viewModel.onStateChanged(state) }
+    LaunchedEffect(fileWorkflow) {
+        when (val workflow = fileWorkflow) {
+            is UserPresentFileWorkflow.State.Pending -> {
+                val active = UserPresentFileWorkflow.markPickerActive(workflow.request.id)
+                    ?: return@LaunchedEffect
+                when {
+                    active.operation.usesFolderPicker -> folderPicker.launch(null)
+                    active.operation.usesMultiplePicker -> multipleDocumentPicker.launch(arrayOf(active.operation.mimeType))
+                    else -> documentPicker.launch(active.operation.mimeType)
+                }
+            }
+            is UserPresentFileWorkflow.State.DestinationPending -> {
+                UserPresentFileWorkflow.markDestinationPickerActive(workflow.request.id)
+                    ?: return@LaunchedEffect
+                folderPicker.launch(null)
+            }
+            else -> Unit
+        }
+    }
+
+    LaunchedEffect(contactWorkflow) {
+        val pendingContact = contactWorkflow as? UserPresentContactWorkflow.State.Pending
+            ?: return@LaunchedEffect
+        UserPresentContactWorkflow.markActive(pendingContact.id) ?: return@LaunchedEffect
+        contactPicker.launch(null)
+    }
+
+    val status = when (val s = state) {
+        VoiceController.State.Idle -> stringResource(R.string.how_can_i_help)
+        VoiceController.State.Listening -> stringResource(R.string.listening)
+        VoiceController.State.Processing -> stringResource(R.string.thinking)
+        is VoiceController.State.Transcribed -> "“${s.text}”"
+        is VoiceController.State.AwaitingConfirmation -> stringResource(R.string.confirm_title)
+        is VoiceController.State.AwaitingContactChoice -> stringResource(R.string.contact_choice_title)
+        is VoiceController.State.Done -> s.speech
+        is VoiceController.State.Failed -> s.speech
+    }
+    val statusColor = when (state) {
+        VoiceController.State.Listening -> MaterialTheme.colorScheme.secondary
+        VoiceController.State.Processing -> MaterialTheme.colorScheme.tertiary
+        is VoiceController.State.Done -> MaterialTheme.colorScheme.secondary
+        is VoiceController.State.Failed -> MaterialTheme.colorScheme.error
+        is VoiceController.State.AwaitingConfirmation,
+        is VoiceController.State.AwaitingContactChoice,
+        -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item {
+            NuvaScreenHeader(
+                eyebrow = "VOICE • TYPE • ACT",
+                title = "NUVA",
+                subtitle = stringResource(R.string.home_subtitle),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        item {
+            NuvaVoiceOrb(
+                color = statusColor,
+                busy = state is VoiceController.State.Listening || state is VoiceController.State.Processing,
+                accessibilityLabel = stringResource(R.string.speak),
+                onClick = {
+                    if (NuvaPermissions.hasRecordAudio(context)) {
+                        viewModel.startListening()
+                    } else {
+                        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+            )
+        }
+
+        item {
+            NuvaGlassPanel(
+                modifier = Modifier.fillMaxWidth(),
+                accent = statusColor,
+                contentPadding = 14.dp,
             ) {
-                if (state is VoiceController.State.Processing) {
-                    CircularProgressIndicator(modifier = Modifier.size(44.dp), color = MaterialTheme.colorScheme.onPrimary)
-                } else {
-                    Text("🎙️", style = MaterialTheme.typography.headlineMedium)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    NuvaStatusChip(
+                        label = when (state) {
+                            VoiceController.State.Idle -> "READY"
+                            VoiceController.State.Listening -> "LISTENING"
+                            VoiceController.State.Processing -> "THINKING"
+                            is VoiceController.State.Failed -> "NEEDS ATTENTION"
+                            is VoiceController.State.Done -> "COMPLETE"
+                            else -> "IN PROGRESS"
+                        },
+                        color = statusColor,
+                    )
+                    Text(
+                        status,
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (state is VoiceController.State.Failed && (state as VoiceController.State.Failed).fromVoice) {
+                        Text(
+                            stringResource(R.string.voice_failed_typed_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-
-        val status = when (val s = state) {
-            VoiceController.State.Idle -> stringResource(R.string.how_can_i_help)
-            VoiceController.State.Listening -> stringResource(R.string.listening)
-            VoiceController.State.Processing -> stringResource(R.string.thinking)
-            is VoiceController.State.Transcribed -> "“${s.text}”"
-            is VoiceController.State.AwaitingConfirmation -> stringResource(R.string.confirm_title)
-            is VoiceController.State.AwaitingContactChoice -> stringResource(R.string.contact_choice_title)
-            is VoiceController.State.Done -> s.speech
-            is VoiceController.State.Failed -> s.speech
-        }
-        Text(
-            status,
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        // Voice failed → the typed fallback is the primary affordance (req §2).
-        if (state is VoiceController.State.Failed && (state as VoiceController.State.Failed).fromVoice) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.voice_failed_typed_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        }
-
-        // Typed command input — always available, same pipeline as voice.
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedTextField(
-                value = typedCommand,
-                onValueChange = { typedCommand = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text(stringResource(R.string.typed_hint)) },
-                singleLine = true,
-            )
-            Button(
-                onClick = {
-                    val text = typedCommand.trim()
-                    if (text.isNotEmpty()) {
-                        typedCommand = ""
-                        viewModel.submitTyped(text)
+        item {
+            NuvaGlassPanel(modifier = Modifier.fillMaxWidth(), contentPadding = 12.dp) {
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    if (externalDraftLoaded) {
+                        Text(
+                            stringResource(R.string.external_text_draft_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
                     }
-                },
-                enabled = typedCommand.isNotBlank() && state !is VoiceController.State.Processing,
-            ) { Text(stringResource(R.string.send)) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = typedCommand,
+                            onValueChange = {
+                                typedCommand = it
+                                if (it.isBlank()) externalDraftLoaded = false
+                            },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text(stringResource(R.string.typed_hint)) },
+                            singleLine = true,
+                        )
+                        NuvaPrimaryAction(
+                            onClick = {
+                                val text = typedCommand.trim()
+                                if (text.isNotEmpty()) {
+                                    typedCommand = ""
+                                    externalDraftLoaded = false
+                                    viewModel.submitTyped(text)
+                                }
+                            },
+                            enabled = typedCommand.isNotBlank() && state !is VoiceController.State.Processing,
+                        ) {
+                            Text("→", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                        }
+                    }
+                }
+            }
         }
 
-        // Accessibility setup guide (req §13).
         if (!NuvaAccessibilityService.isRunning) {
-            Spacer(Modifier.height(12.dp))
-            Card(onClick = { showAccessibilityGuide = true }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    Text(
-                        stringResource(R.string.accessibility_disabled),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    Text(
-                        stringResource(R.string.accessibility_setup_link),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+            item {
+                NuvaGlassPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = MaterialTheme.colorScheme.error,
+                    onClick = { showAccessibilityGuide = true },
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(
+                            stringResource(R.string.accessibility_disabled),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Text(
+                            stringResource(R.string.accessibility_setup_link),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }
 
         if (state is VoiceController.State.Done && (state as VoiceController.State.Done).screenText != null) {
-            Spacer(Modifier.height(12.dp))
-            Card(Modifier.fillMaxWidth()) {
-                Text(
-                    (state as VoiceController.State.Done).screenText.orEmpty(),
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+            item {
+                NuvaGlassPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = MaterialTheme.colorScheme.secondary,
+                ) {
+                    Text(
+                        (state as VoiceController.State.Done).screenText.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
         }
 
-        Spacer(Modifier.height(24.dp))
-
-        Text(stringResource(R.string.recent_commands), style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.recent_commands), style = MaterialTheme.typography.titleLarge)
+                NuvaStatusChip(label = "${recent.size}", color = MaterialTheme.colorScheme.primary)
+            }
+        }
 
         if (recent.isEmpty()) {
-            Text(
-                stringResource(R.string.no_commands_yet),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            item {
+                NuvaGlassPanel(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.no_commands_yet),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(recent, key = { it.id }) { row ->
-                    Card(Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(row.text, maxLines = 2)
-                                if (row.status in listOf("failed", "blocked", "unsupported") && !row.error.isNullOrBlank()) {
-                                    Text(
-                                        row.error,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.error,
-                                        maxLines = 1,
-                                    )
-                                }
+            items(recent.take(12), key = { it.id }) { row ->
+                val rowColor = when (row.status) {
+                    "completed" -> MaterialTheme.colorScheme.secondary
+                    "failed", "rejected", "blocked" -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.primary
+                }
+                NuvaGlassPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = rowColor,
+                    contentPadding = 13.dp,
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(row.text, style = MaterialTheme.typography.bodyLarge, maxLines = 2)
+                            if (row.status in listOf("failed", "blocked", "unsupported") && !row.error.isNullOrBlank()) {
+                                Text(
+                                    row.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    maxLines = 1,
+                                )
                             }
-                            Text(
-                                row.status,
-                                color = when (row.status) {
-                                    "completed" -> MaterialTheme.colorScheme.secondary
-                                    "failed", "rejected", "blocked" -> MaterialTheme.colorScheme.error
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            NuvaStatusChip(label = row.status.uppercase(), color = rowColor)
                             if (row.status in listOf("failed", "blocked", "unsupported")) {
-                                Spacer(Modifier.width(6.dp))
                                 TextButton(onClick = { viewModel.retry(row.text) }) {
                                     Text(stringResource(R.string.retry))
                                 }
@@ -396,6 +572,81 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
                 }
             },
         )
+    }
+
+    // User-present file/media workflow result. The system picker remains the
+    // authority; only explicitly selected content can reach this dialog.
+    when (val workflow = fileWorkflow) {
+        is UserPresentFileWorkflow.State.AwaitingMutation -> AlertDialog(
+            onDismissRequest = { viewModel.cancelFileMutation() },
+            title = { Text("Selected target confirm করুন") },
+            text = {
+                Column {
+                    Text("File: ${workflow.sourceName}")
+                    workflow.request.newName?.let { Text("New name: $it") }
+                    workflow.destinationTree?.let { Text("Destination: ${it.lastPathSegment.orEmpty()}") }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Operation: ${workflow.request.operation.wireName}")
+                }
+            },
+            confirmButton = {
+                Button(onClick = { viewModel.confirmFileMutation() }) { Text("CONFIRM") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { viewModel.cancelFileMutation() }) { Text("CANCEL") }
+            },
+        )
+        is UserPresentFileWorkflow.State.Completed -> AlertDialog(
+            onDismissRequest = { viewModel.dismissFileWorkflowResult() },
+            title = { Text("File / media result") },
+            text = {
+                Column {
+                    Text(workflow.speech)
+                    workflow.content?.let { content ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            content.take(8_000),
+                            modifier = Modifier
+                                .height(280.dp)
+                                .verticalScroll(rememberScrollState()),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { viewModel.dismissFileWorkflowResult() }) { Text("OK") }
+            },
+        )
+        is UserPresentFileWorkflow.State.Failed -> AlertDialog(
+            onDismissRequest = { viewModel.dismissFileWorkflowResult() },
+            title = { Text("File / media problem") },
+            text = { Text(workflow.speech) },
+            confirmButton = {
+                Button(onClick = { viewModel.dismissFileWorkflowResult() }) { Text("OK") }
+            },
+        )
+        else -> Unit
+    }
+
+    when (val workflow = contactWorkflow) {
+        is UserPresentContactWorkflow.State.Completed -> AlertDialog(
+            onDismissRequest = { viewModel.dismissContactWorkflowResult() },
+            title = { Text("Contact handoff") },
+            text = { Text(workflow.speech) },
+            confirmButton = {
+                Button(onClick = { viewModel.dismissContactWorkflowResult() }) { Text("OK") }
+            },
+        )
+        is UserPresentContactWorkflow.State.Failed -> AlertDialog(
+            onDismissRequest = { viewModel.dismissContactWorkflowResult() },
+            title = { Text("Contact problem") },
+            text = { Text(workflow.speech) },
+            confirmButton = {
+                Button(onClick = { viewModel.dismissContactWorkflowResult() }) { Text("OK") }
+            },
+        )
+        else -> Unit
     }
 
     // Accessibility step-by-step setup guide (req §13).

@@ -13,16 +13,26 @@ import java.util.Locale
 class TTSManager(context: Context) {
 
     private var ready = false
+    private var initializationFinished = false
+    private var closed = false
     private var tts: TextToSpeech? = null
     private var banglaAvailable = false
+    private var pendingSpeech: Pair<String, String>? = null
 
     init {
-        tts = TextToSpeech(context.applicationContext) { status ->
+        tts = TextToSpeech(context.applicationContext, initListener@ { status ->
+            if (closed) return@initListener
+            initializationFinished = true
             ready = status == TextToSpeech.SUCCESS
             if (ready) {
                 banglaAvailable = tryLanguage(Locale("bn", "BD"))
+                val pending = pendingSpeech
+                pendingSpeech = null
+                pending?.let { (text, language) -> speak(text, language) }
+            } else {
+                pendingSpeech = null
             }
-        }
+        })
     }
 
     private fun tryLanguage(locale: Locale): Boolean = runCatching {
@@ -35,7 +45,14 @@ class TTSManager(context: Context) {
 
     /** Speaks in the reply's language. Falls back to English when bn missing. */
     fun speak(text: String, language: String = "banglish") {
-        if (!ready || text.isBlank()) return
+        if (closed || text.isBlank()) return
+        if (!ready) {
+            // TextToSpeech initialization is asynchronous. Keep only the most
+            // recent reply so an immediate first command is spoken once ready,
+            // without replaying a stale queue.
+            if (!initializationFinished && tts != null) pendingSpeech = text to language
+            return
+        }
         val engine = tts ?: return
         val locale = when {
             language == "en" && !isBanglaScript(text) -> Locale.US
@@ -49,12 +66,16 @@ class TTSManager(context: Context) {
     }
 
     fun stop() {
+        pendingSpeech = null
         runCatching { tts?.stop() }
     }
 
     fun shutdown() {
+        closed = true
+        pendingSpeech = null
         runCatching { tts?.stop(); tts?.shutdown() }
         tts = null
         ready = false
+        initializationFinished = true
     }
 }

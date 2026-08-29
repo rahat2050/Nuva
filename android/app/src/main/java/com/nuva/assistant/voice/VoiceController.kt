@@ -4,13 +4,17 @@ import com.nuva.assistant.command.CommandDecision
 import com.nuva.assistant.command.CommandExecutor
 import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.core.permissions.NuvaPermissions
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import com.nuva.assistant.service.NuvaForegroundService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
@@ -49,7 +53,7 @@ class VoiceController(
     private var recognizer: SpeechRecognizerController? = null
     private var recognitionJob: Job? = null
     private val tts = TTSManager(NuvaContainer.appContext)
-    private val mainScope = CoroutineScope(Dispatchers.Main)
+    private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private companion object {
         /** Hard ceiling for one listening session (stuck-recovery). */
@@ -70,9 +74,9 @@ class VoiceController(
         _state.value = State.Listening
         NuvaForegroundService.start(context)
         recognizer = SpeechRecognizerController(context)
-        val language = NuvaContainer.preferences.languageBlocking()
 
         recognitionJob = mainScope.launch {
+            val language = NuvaContainer.preferences.language.first()
             try {
                 // v1.6 hardening: a recognizer that never reports back (OEM
                 // quirks, engine crash) must not leave NUVA "listening"
@@ -82,10 +86,10 @@ class VoiceController(
                     when (event) {
                         is SpeechRecognizerController.VoiceEvent.ListeningStarted -> Unit
                         is SpeechRecognizerController.VoiceEvent.Partial ->
-                            _state.value = State.Transcribed(event.text)
+                            _state.value = State.Transcribed(safeTranscript(event.text))
 
                         is SpeechRecognizerController.VoiceEvent.Final -> {
-                            _state.value = State.Transcribed(event.text)
+                            _state.value = State.Transcribed(safeTranscript(event.text))
                             submit(event.text)
                         }
 
@@ -112,7 +116,9 @@ class VoiceController(
         recognitionJob = null
         recognizer = null // flow's awaitClose destroys the recognizer
         NuvaForegroundService.stop(NuvaContainer.appContext)
-        if (_state.value is State.Listening) _state.value = State.Idle
+        if (_state.value is State.Listening || _state.value is State.Transcribed) {
+            _state.value = State.Idle
+        }
     }
 
     /** Typed/text input uses the same pipeline as voice. */
@@ -160,7 +166,7 @@ class VoiceController(
         mainScope.launch {
             when (val step = NuvaContainer.commandExecutor.confirm(pendingId)) {
                 is CommandExecutor.Step.Done -> {
-                    _state.value = State.Done(step.speech)
+                    _state.value = State.Done(step.speech, step.screenText)
                     speakIfEnabled(step.speech)
                 }
 
@@ -184,7 +190,7 @@ class VoiceController(
                 }
 
                 is CommandExecutor.Step.Done -> {
-                    _state.value = State.Done(step.speech)
+                    _state.value = State.Done(step.speech, step.screenText)
                     speakIfEnabled(step.speech)
                 }
 
@@ -202,7 +208,7 @@ class VoiceController(
         mainScope.launch {
             val step = NuvaContainer.commandExecutor.reject(pendingId)
             if (step is CommandExecutor.Step.Done) {
-                _state.value = State.Done(step.speech)
+                _state.value = State.Done(step.speech, step.screenText)
                 speakIfEnabled(step.speech)
             } else {
                 _state.value = State.Idle
@@ -212,14 +218,25 @@ class VoiceController(
 
     fun speakIfEnabled(text: String) {
         if (text.isBlank()) return
-        if (!NuvaContainer.preferences.voiceEnabledBlocking()) return
-        val language = NuvaContainer.preferences.languageBlocking()
-        tts.speak(text, if (language == "auto") "banglish" else language)
+        mainScope.launch {
+            if (!NuvaContainer.preferences.voiceEnabled.first()) return@launch
+            val language = NuvaContainer.preferences.language.first()
+            tts.speak(text, if (language == "auto") "banglish" else language)
+        }
     }
+
+    private fun safeTranscript(text: String): String =
+        if (SensitiveAppPolicy.mentionsCredentials(text)) {
+            "Sensitive content hidden"
+        } else {
+            SensitiveAppPolicy.redactCodes(text)
+        }
 
     fun destroy() {
         recognitionJob?.cancel()
+        recognitionJob = null
         NuvaForegroundService.stop(NuvaContainer.appContext)
         tts.shutdown()
+        mainScope.cancel()
     }
 }

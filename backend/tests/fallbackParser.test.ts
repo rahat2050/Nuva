@@ -53,6 +53,35 @@ describe('parseFallback', () => {
     }
   });
 
+  it('routes current information questions to a live web source', () => {
+    for (const phrase of ['ajker weather kemon', 'latest news ki', 'cricket live score koto']) {
+      const result = parseFallback(phrase);
+      expect(result?.rule, phrase).toBe('OPEN_URL_LIVE_INFO');
+      expect(result?.action.type, phrase).toBe('OPEN_URL');
+      if (result?.action.type === 'OPEN_URL') {
+        expect(result.action.url).toContain('https://www.google.com/search?q=');
+      }
+    }
+  });
+
+  it('routes factual and daily how-to questions to web knowledge', () => {
+    for (const phrase of [
+      'photosynthesis ki',
+      'chicken biryani recipe',
+      'how to tie a tie',
+      'parcel tracking ZX123',
+      'passport application',
+      'internet speed test',
+      'passport ki kagoj lagbe',
+      'excel tutorial',
+      'washing machine repair',
+    ]) {
+      const result = parseFallback(phrase);
+      expect(result?.rule, phrase).toBe('OPEN_URL_KNOWLEDGE');
+      expect(result?.action.type, phrase).toBe('OPEN_URL');
+    }
+  });
+
   it('opens explicit URLs', () => {
     const result = parseFallback('open youtube.com/feed');
     expect(result?.action.type).toBe('OPEN_URL');

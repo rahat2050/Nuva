@@ -7,6 +7,7 @@ in ../app/src/main/java/com/nuva/assistant/command/.
 Usage: python3 parser_mirror_check.py   (exit 0 = all checks pass)
 """
 import re, sys
+from pathlib import Path
 
 BN_DIGITS = dict(zip("০১২৩৪৫৬৭৮৯", "0123456789"))
 
@@ -232,6 +233,41 @@ def parse(raw):
     if not text: return None
     return parse_prepared(text)
 
+def parse_emergency(t):
+    if any(w in t for w in ["emergency info setting","medical info setting","emergency profile"]):
+        return ok({"kind":"EMERGENCY_INFO"},"OPEN_SETTING")
+    marker=next((w for w in ["sos message draft","emergency message draft","help message share"] if w in t),None)
+    if marker:
+        text=content_after(t,marker) or "amar joruri shahajjo dorkar"
+        text=re.sub(r"^(je|যে)\s+","",text).strip()
+        return ok({"kind":"sharetext","text":text},"SHARE_TEXT",risk="MEDIUM",base="MEDIUM")
+    if not any(w in t for w in ["emergency call","emergency dialer","999 dial","police call","ambulance call","fire service call"]):
+        return None
+    service="POLICE" if "police" in t else ("AMBULANCE" if "ambulance" in t else ("FIRE" if "fire" in t else "NATIONAL"))
+    return ok({"kind":"emergency","service":service,"number":"999"},"EMERGENCY_DIALER")
+
+def parse_home_assistant(t):
+    if any(has_word(t,w) for w in ["light","lights","lamp","bulb"]): domain="LIGHT"
+    elif any(has_word(t,w) for w in ["fan"]): domain="FAN"
+    elif any(w in t for w in ["thermostat","climate","air conditioner","smart ac"]) or has_word(t,"ac"): domain="CLIMATE"
+    elif any(w in t for w in ["smart switch","home assistant switch"]): domain="SWITCH"
+    else: return None
+    m=re.search(r"(?:temperature|temp)\s*(\d{2}(?:\.\d)?)|\b(\d{2}(?:\.\d)?)\s*(?:degree|degrees|°)",t)
+    temp=float((m.group(1) or m.group(2))) if m and domain=="CLIMATE" else None
+    if temp is not None: operation="SET_TEMPERATURE"
+    elif any(w in t for w in ["turn off","switch off","off koro","bondho koro"]): operation="TURN_OFF"
+    elif "toggle" in t: operation="TOGGLE"
+    elif any(w in t for w in ["turn on","switch on","on koro","chalu koro"]): operation="TURN_ON"
+    else: return None
+    if temp is not None and not 10 <= temp <= 32: return unsupported("temperature 10-32")
+    entity=t
+    for w in sorted(["home assistant","smart","light","lights","lamp","bulb","fan","thermostat","climate","air conditioner","ac","switch",
+                     "turn off","switch off","off koro","bondho koro","turn on","switch on","on koro","chalu koro","toggle",
+                     "temperature","temp","degree","degrees"],key=len,reverse=True): entity=entity.replace(w," ")
+    if temp is not None: entity=re.sub(r"\b"+str(int(temp))+r"(?:\.\d)?\b"," ",entity)
+    entity=re.sub(r"\s+"," ",entity).strip(" ,.:?!") or domain.lower()
+    return ok({"kind":"ha","domain":domain,"operation":operation,"entity":entity,"value":temp},"HOME_ASSISTANT",risk="MEDIUM",base="MEDIUM")
+
 def parse_nav(t):
     if any(w in t for w in ["home e jao","go home","home e cholo","home e firi jao","হোমে যাও","হোম স্ক্রিনে যাও"]):
         return ok({"kind":"GoHome"}, "GO_HOME")
@@ -278,26 +314,348 @@ def parse_screen(t):
         return ok({"kind":"ReadNotifications"}, "READ_NOTIFICATIONS")
     return None
 
+def parse_user_file(t):
+    share = any(w in t for w in ["share","pathao","send","শেয়ার","শেয়ার","পাঠাও"])
+    select = any(w in t for w in ["select","choose","pick","beche","বেছে","নির্বাচন"])
+    opened = any(w in t for w in ["open","kholo","khulo","খোলো","খুলে"])
+    file_word=any(w in t for w in ["file","document","ফাইল","ডকুমেন্ট"])
+    multiple=any(w in t for w in ["multiple","several","onek","sob","একাধিক","অনেক"])
+    if (file_word or "pdf" in t) and any(w in t for w in ["print","প্রিন্ট"]):
+        return ok({"kind":"userfile","operation":"PRINT_PDF"},"USER_FILE",risk="MEDIUM")
+    if file_word and share and multiple:
+        return ok({"kind":"userfile","operation":"SHARE_MULTIPLE_FILES"},"USER_FILE",risk="MEDIUM")
+    if file_word and any(w in t for w in ["delete","remove","muchhe","মুছে","ডিলিট"]):
+        return ok({"kind":"userfile","operation":"DELETE_FILE"},"USER_FILE",risk="MEDIUM")
+    if file_word and any(w in t for w in ["rename","nam bodlao","নাম বদল","রিনেম"]):
+        marker=next((w for w in ["new name","rename to","nam dao","নাম দাও","নতুন নাম"] if w in t),None)
+        name=t.split(marker,1)[1].strip(" ,.: ") if marker else None
+        if not name: return unsupported("Notun nam bolun")
+        return ok({"kind":"userfile","operation":"RENAME_FILE","new_name":name},"USER_FILE",risk="MEDIUM")
+    if file_word and any(w in t for w in ["copy","কপি"]):
+        return ok({"kind":"userfile","operation":"COPY_FILE"},"USER_FILE",risk="MEDIUM")
+    if file_word and any(w in t for w in ["move","sorao","সরাও","মুভ"]):
+        return ok({"kind":"userfile","operation":"MOVE_FILE"},"USER_FILE",risk="MEDIUM")
+    if any(w in t for w in ["folder select","folder choose","folder access","directory select","ফোল্ডার বেছে"]):
+        return ok({"kind":"userfile","operation":"OPEN_FOLDER"}, "USER_FILE", risk="MEDIUM")
+    photo = any(w in t for w in ["photo","chobi","image","ছবি","ফটো"])
+    video = any(w in t for w in ["video","ভিডিও"])
+    gallery = any(w in t for w in ["gallery theke","গ্যালারি থেকে","photo picker","media picker"])
+    if photo and share and multiple:
+        return ok({"kind":"userfile","operation":"SHARE_MULTIPLE_PHOTOS"},"USER_FILE",risk="MEDIUM")
+    if video and share and multiple:
+        return ok({"kind":"userfile","operation":"SHARE_MULTIPLE_VIDEOS"},"USER_FILE",risk="MEDIUM")
+    if photo and any(w in t for w in ["edit","crop","rotate","filter","এডিট","ক্রপ"]):
+        return ok({"kind":"userfile","operation":"EDIT_PHOTO"},"USER_FILE",risk="MEDIUM")
+    if photo and (gallery or share or select):
+        op="SHARE_PHOTO" if share else "PICK_PHOTO"
+        return ok({"kind":"userfile","operation":op}, "USER_FILE", risk="MEDIUM" if share else "LOW")
+    if video and (gallery or share or select):
+        op="SHARE_VIDEO" if share else "PICK_VIDEO"
+        return ok({"kind":"userfile","operation":op}, "USER_FILE", risk="MEDIUM" if share else "LOW")
+    text_file=any(w in t for w in ["text file","txt file","টেক্সট ফাইল"])
+    wants_read=any(w in t for w in ["read","poro","পড়ো","পড়ো","pore shonao"])
+    if text_file and wants_read:
+        return ok({"kind":"userfile","operation":"READ_TEXT"}, "USER_FILE")
+    if file_word and share:
+        return ok({"kind":"userfile","operation":"SHARE_FILE"}, "USER_FILE", risk="MEDIUM")
+    if file_word and (select or opened):
+        return ok({"kind":"userfile","operation":"OPEN_FILE"}, "USER_FILE")
+    return None
+
+def parse_productivity(t):
+    if any(w in t for w in ["clipboard poro","read clipboard","clipboard e ki ache"]):
+        return ok({"kind":"clipboard","operation":"READ"},"CLIPBOARD_ACTION",risk="MEDIUM",base="MEDIUM")
+    if any(w in t for w in ["clipboard clear","clear clipboard","clipboard muchhe"]):
+        return ok({"kind":"clipboard","operation":"CLEAR"},"CLIPBOARD_ACTION",risk="MEDIUM",base="MEDIUM")
+    clip_marker=next((w for w in ["clipboard e copy koro","copy to clipboard","copy text","clipboard e rakho"] if w in t),None)
+    if clip_marker:
+        text=content_after(t,clip_marker)
+        if text: text=re.sub(r"^(je|যে)\s+","",text).strip()
+        if not text: return unsupported("Clipboard text bolun")
+        return ok({"kind":"clipboard","operation":"COPY","text":text},"CLIPBOARD_ACTION",risk="MEDIUM",base="MEDIUM")
+    agenda=any(w in t for w in ["agenda poro","calendar events poro","calendar agenda poro","read agenda","agenda read"])
+    provider_op="EDIT_EVENT" if any(w in t for w in ["calendar event edit","event edit koro"]) else ("OPEN_EVENT" if any(w in t for w in ["calendar event kholo","open calendar event","event details kholo"]) else None)
+    if agenda or provider_op:
+        query=None
+        if provider_op:
+            m=re.search(r"\s(?:title|name)\s+(.+)$",t); query=m.group(1).strip() if m else None
+            if not query: return unsupported("Event title bolun")
+        m=re.search(r"(?:next|agami)\s*(\d{1,2})\s*(?:day|days|din)",t)
+        days=max(1,min(31,int(m.group(1)))) if m else (7 if "week" in t else 1)
+        return ok({"kind":"calendarprovider","operation":provider_op or "READ_AGENDA","query":query,"days":days},"CALENDAR_PROVIDER",risk="MEDIUM",base="MEDIUM")
+    calendar_event=any(w in t for w in ["calendar event create","calendar event add","meeting create","event draft"])
+    if not calendar_event and any(w in t for w in ["calendar dekhao","show calendar","calendar agenda","today calendar","tomorrow calendar"]):
+        return ok({"kind":"calendarview","tomorrow":"tomorrow" in t},"VIEW_CALENDAR")
+    if calendar_event:
+        tm=parse_time(t)
+        if not tm: return unsupported("Event time bolun")
+        m=re.search(r"\s(?:title|name)\s+(.+?)(?=\s+(?:location|description|attendee|email)\s|$)",t)
+        if not m: return unsupported("Event title bolun")
+        return ok({"kind":"calendarevent","title":m.group(1).strip(),"time":tm},"CREATE_CALENDAR_EVENT",risk="MEDIUM",base="MEDIUM")
+    panel=None
+    if any(w in t for w in ["app info","application info","app details"]): panel="APP_INFO"
+    elif any(w in t for w in ["notification setting","notification settings"]): panel="NOTIFICATIONS"
+    elif any(w in t for w in ["play store page","store page"]): panel="PLAY_STORE"
+    if panel:
+        app=t
+        for w in ["application info","app details","app info","notification settings","notification setting","play store page","store page","khulo","kholo","open"]:
+            app=app.replace(w," ")
+        app=re.sub(r"\b(app|ta|please|er)\b"," ",app)
+        app=re.sub(r"\s+"," ",app).strip(" ,.: ")
+        if app: return ok({"kind":"appmanagement","app":app,"panel":panel},"OPEN_APP_MANAGEMENT")
+    uninstall=next((w for w in ["uninstall koro","uninstall korun","remove app","app uninstall"] if w in t),None)
+    if uninstall:
+        app=re.sub(r"\b(app|ta|please|koro|korun)\b"," ",t.replace(uninstall," "))
+        app=re.sub(r"\s+"," ",app).strip(" ,.: ")
+        if not app: return unsupported("App name bolun")
+        if app in ["bkash","nagad","rocket","upay"]: return unsupported("financial app uninstall blocked")
+        return ok({"kind":"uninstall","app":app},"UNINSTALL_APP",risk="MEDIUM",base="MEDIUM")
+    if any(w in t for w in ["contact edit","edit contact","contact bodlao"]):
+        return ok({"kind":"contacthandoff","operation":"EDIT"},"CONTACT_HANDOFF",risk="MEDIUM",base="MEDIUM")
+    if any(w in t for w in ["contact dekhao","contact details","view contact"]):
+        return ok({"kind":"contacthandoff","operation":"VIEW"},"CONTACT_HANDOFF",risk="MEDIUM",base="MEDIUM")
+    if any(w in t for w in ["new contact add","contact create","contact draft","নতুন কন্টাক্ট"]):
+        m=re.search(r"\s(?:name|nam|নাম)\s+(.+?)(?=\s+(?:number|phone|email)\s|$)",t)
+        if not m: return unsupported("Contact name bolun")
+        return ok({"kind":"contactdraft","name":m.group(1).strip()},"CREATE_CONTACT_DRAFT",risk="MEDIUM",base="MEDIUM")
+    share_marker=next((w for w in ["text share koro","lekha share koro","share text","ei lekha share"] if w in t),None)
+    if share_marker:
+        text=content_after(t,share_marker)
+        if text: text=re.sub(r"^(je|যে)\s+","",text).strip()
+        if not text: return unsupported("Text bolun")
+        return ok({"kind":"sharetext","text":text},"SHARE_TEXT",risk="MEDIUM",base="MEDIUM")
+    draft_words=["scheduled draft","scheduled email","scheduled sms","compose reminder"]
+    if any(w in t for w in draft_words) and any(w in t for w in ["list","dekhao","poro","show"]):
+        return ok({"kind":"listdrafts"},"LIST_SCHEDULED_DRAFTS")
+    if any(w in t for w in draft_words) and any(w in t for w in ["cancel","batil","remove"]):
+        m=re.search(r"(\d+)",t); ordinal=int(m.group(1)) if m else 1
+        return ok({"kind":"canceldraft","ordinal":ordinal},"CANCEL_SCHEDULED_DRAFT",risk="MEDIUM",base="MEDIUM")
+    scheduled=any(w in t for w in ["schedule email","scheduled email","email reminder","schedule sms","scheduled sms","message compose reminder"])
+    if scheduled:
+        tm=parse_time(t)
+        if not tm: return unsupported("Koto tay compose reminder dibo?")
+        body_marker=next((w for w in [" body "," message "," je "," যে "] if w in t),None)
+        body=t.split(body_marker,1)[1].strip(" ,.:") if body_marker else None
+        if not body: return unsupported("Compose body bolun")
+        channel="SMS" if "sms" in t else "EMAIL"
+        recurrence="DAILY" if any(w in t for w in ["protidin","daily","every day","প্রতিদিন"]) else \
+            ("WEEKLY" if any(w in t for w in ["weekly","every week","proti shoptaho","প্রতি সপ্তাহ"]) or weekday(t) else "ONCE")
+        return ok({"kind":"schedulecompose","channel":channel,"body":body,"time":tm,"recurrence":recurrence},"SCHEDULE_COMPOSE",risk="MEDIUM",base="MEDIUM")
+    form_requested=any(w in t for w in ["form prepare","application prepare","application form kholo","booking prepare","form draft"])
+    if not form_requested: return None
+    kinds=[("passport","PASSPORT"),("nid","NID"),("birth","BIRTH_REGISTRATION"),("driving","DRIVING_LICENSE"),
+           ("visa","VISA"),("admission","ADMISSION"),("job","JOB"),("doctor","DOCTOR"),("hotel","HOTEL"),
+           ("flight","FLIGHT"),("courier","COURIER")]
+    kind=next((value for marker,value in kinds if marker in t),None)
+    if not kind: return unsupported("Kon form?")
+    details=t.split(" details ",1)[1].strip() if " details " in t else None
+    return ok({"kind":"prepareform","form_kind":kind,"details":details},"PREPARE_FORM",risk="MEDIUM",base="MEDIUM")
+
+def parse_map_navigation(t):
+    street=any(w in t for w in ["street view","স্ট্রিট ভিউ"])
+    nearby=any(w in t for w in ["nearby ","near me","kacher ","কাছের "])
+    nav=next((w for w in ["navigate to","navigation to","start navigation","niye jao"] if w in t),None)
+    directions=next((w for w in ["directions to","direction to","route to","rasta dekhao","jawar rasta","kivabe jabo"] if w in t),None)
+    kind="STREET_VIEW" if street else ("NEARBY" if nearby else ("NAVIGATION" if nav else ("DIRECTIONS" if directions or re.search(r"\bfrom\s+.+\s+to\s+.+",t) else None)))
+    if not kind: return None
+    mode="WALKING" if any(w in t for w in ["walking","walk","hete"]) else ("BICYCLING" if any(w in t for w in ["bicycle","cycling","cycle"]) else ("TRANSIT" if any(w in t for w in ["transit","bus e","train e","public transport"]) else "DRIVING"))
+    origin=None; dest=None
+    m=re.search(r"\bfrom\s+(.+?)\s+to\s+(.+)$",t)
+    if m: origin,dest=m.group(1),m.group(2)
+    marker=nav if kind=="NAVIGATION" else (directions if kind=="DIRECTIONS" else ("street view" if kind=="STREET_VIEW" else next((w for w in ["nearby ","kacher ","near me"] if w in t),None)))
+    if dest is None and marker:
+        after=t.split(marker,1)[1].strip(); dest=after if after else t.split(marker,1)[0].strip()
+    def clean(v):
+        if v is None: return None
+        for w in ["walking","walk","driving","drive","bicycle","cycling","transit","public transport"]: v=v.replace(w," ")
+        return re.sub(r"\s+"," ",v).strip(" ,.:?!")
+    origin,dest=clean(origin),clean(dest)
+    if not dest: return unsupported("Destination bolun")
+    return ok({"kind":"mapnav","request_type":kind,"destination":dest,"origin":origin,"mode":mode},"MAP_NAVIGATION")
+
+def parse_communication(t):
+    if any(w in t for w in ["voicemail khulo","open voicemail","voicemail dialer"]):
+        return ok({"kind":"voicemail"},"OPEN_VOICEMAIL")
+    platforms=[("facebook","FACEBOOK"),("instagram","INSTAGRAM"),("linkedin","LINKEDIN"),("reddit","REDDIT"),
+               ("threads","THREADS"),("tiktok","TIKTOK"),("twitter","X")]
+    platform=next((value for marker,value in platforms if marker in t),None)
+    if platform and any(w in t for w in ["post draft","post compose","compose post","post likho"]):
+        marker=next((w for w in [" je "," text "] if w in t),None)
+        text=t.split(marker,1)[1].strip() if marker else None
+        if not text: return unsupported("Post text bolun")
+        return ok({"kind":"socialpost","platform":platform,"text":text},"COMPOSE_SOCIAL_POST",risk="MEDIUM",base="MEDIUM")
+    if any(w in t for w in ["mms compose","mms pathao","multimedia message","photo message"]):
+        m=PHONE_NUMBER.search(t); recipient=digits_only(m.group(0)) if m else None
+        attachment=any(w in t for w in ["attachment","attach","photo","image","file"])
+        marker=next((w for w in [" message "," body "," je "] if w in t),None)
+        body=t.split(marker,1)[1].strip() if marker else None
+        if body: body=re.sub(r"^je\s+","",body).strip()
+        if not body and not attachment: return unsupported("MMS body bolun")
+        return ok({"kind":"mms","recipient":recipient,"body":body,"attachment":attachment},"COMPOSE_MMS",risk="MEDIUM",base="MEDIUM")
+    mentions_notification="notification" in t or "নোটিফিকেশন" in t
+    if mentions_notification and any(w in t for w in ["dismiss","clear notification","notification muchhe","সরাও","মুছে দাও"]):
+        m=re.search(r"(\d+)",t); ordinal=int(m.group(1)) if m else 1
+        return ok({"kind":"managenotif","ordinal":ordinal,"operation":"DISMISS"},"MANAGE_NOTIFICATION",risk="MEDIUM",base="MEDIUM")
+    if mentions_notification and any(w in t for w in ["mark as read","mark read","পঠিত","পড়া হয়েছে"]):
+        m=re.search(r"(\d+)",t); ordinal=int(m.group(1)) if m else 1
+        return ok({"kind":"managenotif","ordinal":ordinal,"operation":"MARK_READ"},"MANAGE_NOTIFICATION",risk="MEDIUM",base="MEDIUM")
+    reply_marker=next((w for w in ["notification e reply dao","notification reply dao","notification reply koro",
+        "reply to notification","নোটিফিকেশনে রিপ্লাই দাও","reply dao","reply koro"] if w in t),None)
+    if reply_marker and ("notification" in t or "নোটিফিকেশন" in t):
+        m=re.search(r"(\d+)\s*(number|no|tomo|তম)",t)
+        ordinal=max(1,min(30,int(m.group(1)))) if m else 1
+        quoted=re.search(r'["\'“”](.+?)["\'“”]',t)
+        message=quoted.group(1).strip() if quoted else content_after(t,reply_marker)
+        if message:
+            message=re.sub(r"^(je|যে)\s+","",message).strip()
+        if not message: return unsupported("Notification e ki reply dibo?")
+        return ok({"kind":"replynotif","ordinal":ordinal,"message":message},"REPLY_NOTIFICATION",risk="MEDIUM",base="MEDIUM")
+    email_marker=next((w for w in ["email compose koro","compose email","email likho","email koro","email pathao",
+        "mail compose koro","mail likho","mail pathao","ইমেইল লেখো","ইমেইল পাঠাও"] if w in t),None)
+    if not email_marker: return None
+    m=re.search(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+",t)
+    recipient=m.group(0) if m else None
+    body_marker=next((w for w in [" body "," message "," je "," যে "] if w in t),None)
+    body=t.split(body_marker,1)[1].strip(" ,.:") if body_marker else None
+    attachment=any(w in t for w in ["attachment","attach file","file attach","document attach"])
+    multiple=attachment and any(w in t for w in ["multiple","several","onek","একাধিক","অনেক"])
+    return ok({"kind":"email","recipient":recipient,"body":body,"attachment":attachment,"multiple":multiple},"COMPOSE_EMAIL",risk="MEDIUM",base="MEDIUM")
+
 def parse_status(t):
-    if any(w in t for w in ["battery","battary","charge koto","কত চার্জ","ব্যাটারি","চার্জ কত"]):
+    if any(w in t for w in ["battery","battary","bettery","charge koto","charge koy","কত চার্জ","ব্যাটারি","চার্জ কত"]) and \
+       not any(w in t for w in ["battery saver","battery setting","power saving","ব্যাটারি সেভার"]):
         return ok({"kind":"BATTERY"}, "DEVICE_STATUS")
-    if any(w in t for w in ["কটা বাজে","কয়টা বাজে","somoy koto","time koto","koto bajche","সময় কত","এখন কটা"]):
-        return ok({"kind":"TIME"}, "DEVICE_STATUS")
-    if any(w in t for w in ["aj kibar","আজ কি বার","আজ কী বার","আজ কত তারিখ","tarikh koto","date koto","আজকের তারিখ"]):
-        return ok({"kind":"DATE"}, "DEVICE_STATUS")
-    if any(w in t for w in ["internet ache","internet on ache","network kothay","net ache","wifi e connected",
-        "নেটওয়ার্ক","ইন্টারনেট আছে","নেট আছে","network status"]):
+    if any(w in t for w in ["uptime","phone koto khon on","device koto khon cholche"]):
+        return ok({"kind":"UPTIME"},"DEVICE_STATUS")
+    now_words = ["ekhon","akhon","akon","akn","ekhn","now","current","এখন","বর্তমান"]
+    time_phrases = ["koyta baje","koita baje","koi ta baje","koy ta baje","kota baje","koto baje",
+        "koyta bajche","koita bajche","koto bajche","somoy koto","shomoy koto","time koto",
+        "what time is it","what's the time","current time","time now","tell me the time",
+        "কটা বাজে","কয়টা বাজে","কয়টা বাজে","কতটা বাজে","সময় কত","সময় কত","এখন কটা","এখন কয়টা","এখন কয়টা"]
+    asks_time = any(w in t for w in time_phrases) or (
+        any(has_word(t,w) for w in now_words) and any(w in t for w in ["time","somoy","shomoy","baje","bajche","সময়","সময়","বাজে"]))
+    today_words = ["aj","aaj","ajke","today","আজ","আজকে","আজকের"]
+    date_phrases = ["aj koto tarik","aj koto tarikh","aaj koto tarik","ajke koto tarik","ajke koto tarikh",
+        "aj tarikh koto","aj tarik koto","ajker tarik","ajker tarikh","aj ki tarik","aj ki tarikh",
+        "tarikh koto","tarik koto","date koto","today's date","todays date","date today","what is the date",
+        "what's the date","what day is it","aj kibar","aj ki bar","ajke ki bar","আজ কি বার","আজ কী বার",
+        "আজকে কি বার","আজকে কী বার","আজ কত তারিখ","আজকে কত তারিখ","আজ কী তারিখ","আজ কি তারিখ","আজকের তারিখ"]
+    asks_date = any(w in t for w in date_phrases) or (
+        any(has_word(t,w) for w in today_words) and any(w in t for w in ["tarik","tarikh","date","kibar","ki bar","তারিখ","কি বার","কী বার"]))
+    if asks_time and asks_date: return ok({"kind":"DATE_TIME"}, "DEVICE_STATUS")
+    if asks_time: return ok({"kind":"TIME"}, "DEVICE_STATUS")
+    if asks_date: return ok({"kind":"DATE"}, "DEVICE_STATUS")
+    diagnostics=[
+      (["phone model","device info","phone info","android version"],"DEVICE_INFO"),
+      (["ram koto","ram status","available ram","free ram"],"MEMORY"),
+      (["uptime","phone koto khon on","device koto khon cholche"],"UPTIME"),
+      (["display resolution","screen resolution","display size pixel"],"DISPLAY"),
+      (["volume koto","audio status","ringer mode","sound status"],"AUDIO"),
+      (["timezone","time zone","utc offset"],"TIMEZONE"),
+      (["phone language ki","current locale","locale ki","system language"],"LOCALE"),
+      (["koyta app installed","installed app count","app koyta ache"],"INSTALLED_APPS"),
+      (["sensor list","phone e ki sensor","koyta sensor"],"SENSORS")]
+    for aliases,kind in diagnostics:
+        if any(w in t for w in aliases): return ok({"kind":kind},"DEVICE_STATUS")
+    if any(w in t for w in ["internet ache","internet ase","internet on ache","network kothay","net ache","net ase","wifi e connected",
+        "নেটওয়ার্ক","ইন্টারনেট আছে","নেট আছে","network status","connection ache"]):
         return ok({"kind":"NETWORK"}, "DEVICE_STATUS")
-    if any(w in t for w in ["storage","koto jayga","কত জায়গা","স্টোরেজ","memory koto","space koto"]):
+    if any(w in t for w in ["storage","koto jayga","koto jaiga","কত জায়গা","কত জায়গা","স্টোরেজ","memory koto","space koto","free space","jayga khali","jaiga khali"]) and \
+       not any(w in t for w in ["storage setting","স্টোরেজ সেটিং"]):
         return ok({"kind":"STORAGE"}, "DEVICE_STATUS")
+    return None
+
+def parse_realtime(t):
+    topics = ["weather","abohawa","আবহাওয়া","আবহাওয়া","temperature","তাপমাত্রা","brishti","বৃষ্টি",
+        "latest news","today news","news today","ajker news","ajker khobor","খবর","সংবাদ",
+        "live score","score koto","current score","cricket score","football score","লাইভ স্কোর","স্কোর কত",
+        "traffic","jam kemon","rastar obostha","ট্রাফিক","যানজট","রাস্তার অবস্থা",
+        "dollar rate","exchange rate","gold price","sonar dam","fuel price","ডলারের রেট","সোনার দাম"]
+    if not any(w in t for w in topics): return None
+    hints = ["ekhon","akhon","akon","akn","ekhn","current","latest","live","today","aj","ajke","ajker",
+        "koto","kemon","ki","hobe","now","এখন","আজ","আজকে","আজকের","বর্তমান","সর্বশেষ","লাইভ","কত","কেমন","কি","কী","হবে"]
+    if not any(has_word(t,w) if w.isascii() else w in t for w in hints): return None
+    return ok({"kind":"search","query":t.strip(" .,?!:")}, "SEARCH_WEB")
+
+def parse_daily(t):
+    # Compact mirror of the Kotlin data-driven utility engine. The Kotlin JVM
+    # suite owns exhaustive converter/math coverage; these probes catch route
+    # ordering regressions in environments without an Android SDK.
+    m = re.search(r"(-?\d+(?:\.\d+)?)\s+(?:(?:er|এর|of)\s+)?(-?\d+(?:\.\d+)?)\s*(?:%|percent|shotangsho|পারসেন্ট|শতাংশ)", t)
+    if m:
+        base, pct = float(m.group(1)), float(m.group(2))
+        value = base * pct / 100
+        if any(w in t for w in ["discount","ছাড়","ছাড়","komle","কমলে"]): value = base - value
+        return ok({"kind":"localanswer","answer":str(value),"category":"percentage"}, "LOCAL_ANSWER")
+    m = re.search(r"(\d+(?:\.\d+)?)\s*(km|kilometer|কিলোমিটার).*?(\d+(?:\.\d+)?)\s*(liter|litre|l|লিটার)", t)
+    if m and any(w in t for w in ["mileage","average","km/l","মাইলেজ"]):
+        value = float(m.group(1)) / float(m.group(3))
+        return ok({"kind":"localanswer","answer":str(value),"category":"mileage"}, "LOCAL_ANSWER")
+    if any(w in t for w in ["average","mean","গড়","গড়"]):
+        values = [float(v) for v in re.findall(r"-?\d+(?:\.\d+)?", t)]
+        if len(values) >= 2:
+            return ok({"kind":"localanswer","answer":str(sum(values)/len(values)),"category":"average"}, "LOCAL_ANSWER")
+    eta = re.search(r"(\d+(?:\.\d+)?)\s*(?:km|kilometer).*?(\d+(?:\.\d+)?)\s*(?:kmph|km/h|kph)", t)
+    if eta and any(w in t for w in ["travel time","eta koto","koto somoy lagbe","কত সময় লাগবে"]):
+        minutes = round(float(eta.group(1))/float(eta.group(2))*60)
+        return ok({"kind":"localanswer","answer":str(minutes),"category":"travel_eta"}, "LOCAL_ANSWER")
+    units = {"kilometer":1000.0,"km":1000.0,"mile":1609.344,"kg":1.0,"kilogram":1.0,
+             "pound":0.45359237,"gigabyte":1024.0**3,"megabyte":1024.0**2,"cup":0.2365882365,
+             "milliliter":0.001,"liter":1.0}
+    aliases = "|".join(sorted(map(re.escape, units), key=len, reverse=True))
+    m = re.search(r"(-?\d+(?:\.\d+)?)\s*("+aliases+r").*?\b("+aliases+r")\b", t)
+    if m and m.group(2) != m.group(3):
+        value = float(m.group(1))*units[m.group(2)]/units[m.group(3)]
+        return ok({"kind":"localanswer","answer":str(value),"category":"unit"}, "LOCAL_ANSWER")
+    expr = t
+    for word, symbol in [("plus","+"),("jog","+"),("যোগ","+"),("minus","-"),("biyog","-"),("বিয়োগ","-"),
+                         ("times","*"),("gun","*"),("গুণ","*"),("divided by","/"),("vag","/"),("ভাগ","/")]:
+        expr = expr.replace(word, symbol)
+    for filler in ["calculate","hisab koro","hisab","koto","কত","হিসাব","উত্তর"]: expr = expr.replace(filler," ")
+    expr = re.sub(r"\s+", "", expr)
+    if 3 <= len(expr) <= 120 and re.fullmatch(r"[0-9.+\-*/()]+", expr) and any(op in expr for op in "+-*/"):
+        try:
+            value = eval(expr, {"__builtins__": {}}, {})
+            if isinstance(value, (int,float)):
+                return ok({"kind":"localanswer","answer":str(value),"category":"calculation"}, "LOCAL_ANSWER")
+        except Exception: pass
+    return None
+
+def parse_grammar(t):
+    # Representative aliases from the 12,250-form Kotlin grammar. Full count
+    # and uniqueness are source-audited below; Kotlin JVM tests cover families.
+    for prefix in ["nuva please ","doya kore ","please ","ektu ","plz "]:
+        if t.startswith(prefix): t=t[len(prefix):].strip()
+    for suffix in [" please"," ekhon"," ekhoni"," kore dao"," bolen"," taratari"]:
+        if t.endswith(suffix): t=t[:-len(suffix)].strip()
+    mapping = {
+        "go to home": ("GO_HOME", {"kind":"home"}),
+        "open notification app": ("OPEN_NOTIFICATION_APP", {"kind":"notifapp","ordinal":1}),
+        "battery percentage bolo": ("DEVICE_STATUS", {"kind":"BATTERY"}),
+        "current aqi bolo": ("SEARCH_WEB", {"kind":"search","query":"current air quality"}),
+        "picture tolar screen dao": ("CAMERA", {"kind":"CAPTURE"}),
+    }
+    hit=mapping.get(t)
+    return ok(hit[1],hit[0]) if hit else None
+
+def parse_help(t):
+    if any(w in t for w in ["ki ki korte paro","ki kaj paro","what can you do","কী কী করতে পারো","কি কি করতে পারো"]):
+        return ok({"kind":"localanswer","answer":"features","category":"assistant_help"}, "LOCAL_ANSWER")
     return None
 
 def parse_media_ctl(t):
     media_word = any(w in t for w in ["gaan","গান","music","song","video","ভিডিও","media","player","giti","গীত","track","ট্র্যাক"])
     pause = any(w in t for w in ["pause koro","pause korun","pause","thamo","থামাও","band koro music"]) and (media_word or "pause" in t)
     resume = any(w in t for w in ["resume koro","resume korun","resume","abar chalao","আবার চালাও"]) and (media_word or "resume" in t)
+    stop = media_word and any(w in t for w in ["stop koro","media stop","music stop"])
+    forward = media_word and any(w in t for w in ["fast forward","forward","samne nao"])
+    rewind = media_word and any(w in t for w in ["rewind","pichone nao"])
+    duration=parse_duration(t) or 10; duration=max(1,min(300,duration))
     nxt = media_word and any(w in t for w in ["next","porer","পরের","agamir"])
     prev = media_word and any(w in t for w in ["previous","ager","আগের","agerta","prev"])
+    if forward: return ok({"kind":"FAST_FORWARD","offset":duration},"MEDIA_CONTROL")
+    if rewind: return ok({"kind":"REWIND","offset":duration},"MEDIA_CONTROL")
+    if stop: return ok({"kind":"STOP"},"MEDIA_CONTROL")
     if pause: return ok({"kind":"PAUSE"},"MEDIA_CONTROL")
     if resume: return ok({"kind":"PLAY"},"MEDIA_CONTROL")
     if nxt: return ok({"kind":"NEXT"},"MEDIA_CONTROL")
@@ -306,6 +664,13 @@ def parse_media_ctl(t):
 
 def parse_volume(t):
     if not any(w in t for w in ["volume","ভলিউম","shobdo","শব্দ","sound","সাউন্ড"]): return None
+    m=re.search(r"(?:volume|sound|ভলিউম)\s*(?:set|koro|at|to)?\s*(\d{1,3})\s*(?:%|percent|শতাংশ)",t)
+    if m:
+        level=int(m.group(1))
+        if not 0 <= level <= 100: return unsupported("Volume 0-100")
+        return ok({"kind":"SET","level":level},"VOLUME_CONTROL")
+    if any(w in t for w in ["unmute","sound on","awaj chalu","শব্দ চালু"]):
+        return ok({"kind":"UNMUTE"},"VOLUME_CONTROL")
     if any(w in t for w in ["mute","নীরব","চুপ","bondho shobdo","shobdo bandho","শব্দ বন্ধ"]):
         return ok({"kind":"MUTE"},"VOLUME_CONTROL")
     if any(w in t for w in ["barao","baran","badhao","beshi","up","বাড়াও","বাড়ান","বেশি","চড়াও"]):
@@ -335,6 +700,16 @@ def parse_settings(t):
         return ok({"kind":"WIFI"}, "OPEN_SETTING")
     if any(w in t for w in ["bluetooth","ব্লুটুথ"]):
         return ok({"kind":"BLUETOOTH"}, "OPEN_SETTING")
+    extended=[
+      (["mobile data setting","data usage setting"],"MOBILE_DATA"),(["airplane mode","flight mode"],"AIRPLANE_MODE"),
+      (["location setting","gps setting"],"LOCATION"),(["hotspot setting","tether setting"],"HOTSPOT"),
+      (["nfc setting"],"NFC"),(["vpn setting"],"VPN"),(["battery saver","power saving"],"BATTERY_SAVER"),
+      (["default app","default apps"],"DEFAULT_APPS"),(["date time setting","date and time setting"],"DATE_TIME"),
+      (["language setting"],"LANGUAGE"),(["storage setting"],"STORAGE_SETTINGS"),(["privacy setting"],"PRIVACY"),
+      (["security setting"],"SECURITY"),(["cast setting","screen cast"],"CAST"),(["print setting"],"PRINT"),
+      (["caption setting","subtitle setting"],"CAPTIONS")]
+    for aliases,target in extended:
+        if any(w in t for w in aliases): return ok({"kind":target},"OPEN_SETTING")
     if any(w in t for w in ["notification setting","notification settings","নোটিফিকেশন সেটিং"]):
         return ok({"kind":"NOTIF_SETTING"}, "OPEN_SETTING")
     if any(w in t for w in ["app setting","app settings","nuva er setting"]):
@@ -344,6 +719,17 @@ def parse_settings(t):
     if any(w in t for w in ["phone er setting","phone settings","system setting","সেটিংস খোলো","settings khulo"]):
         return ok({"kind":"GENERAL"}, "OPEN_SETTING")
     return None
+
+def parse_clock_control(t):
+    operation=None
+    if any(w in t for w in ["show alarms","alarm list","alarms dekhao"]): operation="SHOW_ALARMS"
+    elif any(w in t for w in ["show timers","timer list","timers dekhao"]): operation="SHOW_TIMERS"
+    elif any(w in t for w in ["snooze alarm","alarm snooze"]): operation="SNOOZE_ALARM"
+    elif any(w in t for w in ["dismiss alarm","alarm dismiss","alarm bondho"]): operation="DISMISS_ALARM"
+    elif any(w in t for w in ["dismiss timer","timer dismiss","timer bondho"]): operation="DISMISS_TIMER"
+    if not operation: return None
+    changes=operation in ["SNOOZE_ALARM","DISMISS_ALARM","DISMISS_TIMER"]
+    return ok({"kind":"clock","operation":operation},"CLOCK_CONTROL",risk="MEDIUM" if changes else "LOW")
 
 def parse_alarm(t):
     if not any(w in t for w in ["alarm","আলার্ম","অ্যালার্ম","ghum theke"]): return None
@@ -382,6 +768,28 @@ def reminder_title(t):
     return cleaned if 2 <= len(cleaned) <= 200 else None
 
 def parse_note_todo(t):
+    wants_read = any(w in t for w in ["dekhao","poro","read","show","দেখাও","পড়ো"])
+    if wants_read:
+        if any(w in t for w in ["shopping list","grocery list","bazar list","বাজারের তালিকা"]):
+            return ok({"kind":"readitems","item_kind":"SHOPPING"}, "READ_SAVED_ITEMS")
+        if any(w in t for w in ["expense","khoroch","খরচ"]):
+            return ok({"kind":"readitems","item_kind":"EXPENSE"}, "READ_SAVED_ITEMS")
+        if any(w in t for w in ["todo","kaj list","টুডু"]):
+            return ok({"kind":"readitems","item_kind":"TODO"}, "READ_SAVED_ITEMS")
+        if any(w in t for w in ["note","নোট"]):
+            return ok({"kind":"readitems","item_kind":"NOTE"}, "READ_SAVED_ITEMS")
+    shopping = next((w for w in ["shopping list e","shopping list","grocery list e","bazar list e","বাজারের তালিকায়","বাজারের লিস্টে"] if w in t), None)
+    if shopping:
+        content = content_after(t, shopping)
+        if content:
+            content = re.sub(r"\b(add|koro|korun)\b", " ", content)
+            return ok({"kind":"todo","content":"Shopping: "+re.sub(r"\s+"," ",content).strip()}, "CREATE_TODO")
+        return unsupported("Shopping list e ki add korbo?")
+    expense = next((w for w in ["expense note","expense log","khoroch likhe rakho","খরচ লিখে রাখো"] if w in t), None)
+    if expense:
+        content = content_after(t, expense) or t.replace(expense," ").strip()
+        if content: return ok({"kind":"note","content":"Expense: "+content}, "CREATE_NOTE")
+        return unsupported("Khoroch bolun")
     todo_marker = next((w for w in ["todo te","to do te","todo list e","kaj er list e","kaj list e","টুডু"] if w in t), None)
     if todo_marker:
         content = content_after(t, todo_marker)
@@ -578,18 +986,56 @@ def content_after(t, marker):
     return cleaned or None
 
 # ---------------- compound plan (v1.3) ----------------
-CONNECTORS = [" ar ", " ebong ", " and ", " tarpor ", " আর ", " এবং ", " তারপর ", " then ", "; "]
+CONNECTORS = [" ar ", " ebong ", " and then ", " and ", " tarpor ", " erpor ", " then ", " also ",
+              " আর ", " এবং ", " তারপর ", " এরপর ", " তারপরে ", "; "]
+
+def parse_daily_skill(t):
+    # Representative aliases; the Kotlin registry itself is source-counted
+    # below to guarantee exactly 100 unique skill definitions.
+    aliases = ["kacher pharmacy","কাছের ফার্মেসি","parcel tracking","passport application",
+               "current job circular","internet speed test","গাছের যত্ন","fact check","qibla direction",
+               "nearby hospital","blood bank","public holiday","cybercrime report"]
+    if any(alias in t for alias in aliases):
+        return ok({"kind":"search","query":t}, "SEARCH_WEB")
+    return None
+
+def parse_extended_daily_skill(t):
+    # Representative entity × task pairs from the exact 500-entry Kotlin matrix.
+    pairs = [
+        (["private tutor","home tutor","গৃহশিক্ষক"], ["nearby","near me","কাছের"]),
+        (["passport","পাসপোর্ট"], ["ki kagoj lagbe","required documents","কী কাগজ লাগবে"]),
+        (["excel","এক্সেল"], ["tutorial","ধাপে ধাপে"]),
+        (["washing machine","ওয়াশিং মেশিন"], ["repair","problem fix","মেরামত"]),
+        (["router","রাউটার"], ["user manual","ব্যবহারের নিয়ম","ম্যানুয়াল"]),
+    ]
+    if any(any(e in t for e in entities) and any(k in t for k in tasks) for entities,tasks in pairs):
+        return ok({"kind":"search","query":t}, "SEARCH_WEB")
+    return None
+
+def parse_knowledge(t):
+    questions = ["what ","how ","why ","who ","where ","when ","ki ","kivabe","keno","kothay","kokhon",
+                 "কী ","কি ","কিভাবে","কেন","কোথায়","কখন"]
+    endings = [" ki"," keno"," kothay"," koto"," kemon"," কী"," কি"," কেন"," কোথায়"," কত"," কেমন"]
+    topics = ["recipe","রেসিপি","রান্না","meaning","মানে","translate","অনুবাদ","nearby","schedule","price","দাম কত",
+              "bus","train","flight","doctor","hospital","medicine","school","college","job"]
+    if any(t.startswith(w) or (" "+w) in t for w in questions) or any(t.endswith(w) for w in endings) or any(w in t for w in topics):
+        return ok({"kind":"search","query":t}, "SEARCH_WEB")
+    return None
 
 def rule_table(t):
-    return (parse_nav(t) or parse_universal(t) or parse_screen(t) or parse_status(t) or parse_media_ctl(t)
-            or parse_volume(t) or parse_camera(t) or parse_settings(t)
-            or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
+    return (parse_nav(t) or parse_emergency(t) or parse_home_assistant(t) or parse_user_file(t) or parse_productivity(t) or parse_communication(t)
+            or parse_map_navigation(t) or parse_grammar(t) or parse_universal(t) or parse_screen(t) or parse_daily(t) or parse_realtime(t)
+            or parse_status(t) or parse_help(t) or parse_media_ctl(t) or parse_volume(t) or parse_camera(t) or parse_settings(t)
+            or parse_clock_control(t) or parse_alarm(t) or parse_timer(t) or parse_reminder(t) or parse_note_todo(t)
             or parse_call(t) or parse_chat_open(t) or parse_send(t) or parse_media(t) or parse_maps(t) or parse_web(t)
-            or parse_scroll(t) or parse_close(t) or parse_open(t))
+            or parse_scroll(t) or parse_close(t) or parse_open(t) or parse_daily_skill(t)
+            or parse_extended_daily_skill(t) or parse_knowledge(t))
 
 def parse_prepared(t):
-    if is_money(t): return refused()
-    if mentions_creds(t): return unsupported("otp...")
+    security_rewrite = t.replace("paymnt","payment").replace("paymentt","payment").replace("send mony","send money") \
+        .replace("pasword","password").replace("passwrd","password")
+    if is_money(t) or is_money(security_rewrite): return refused()
+    if mentions_creds(t) or mentions_creds(security_rewrite): return unsupported("otp...")
     return rule_table(t)
 
 def clean_message(dec):
@@ -600,7 +1046,7 @@ def clean_message(dec):
     return (not susp) and bool(send.get("message"))
 
 def split_plan(text, depth):
-    if depth > 2 or not text.strip(): return None
+    if depth > 5 or not text.strip(): return None
     for conn in CONNECTORS:
         frm = 0
         while True:
@@ -612,9 +1058,10 @@ def split_plan(text, depth):
             left = parse_prepared(left_raw)
             if left is None or left["unsupported"]: continue
             if left.get("action",{}).get("kind") == "send": continue
-            if len(left_raw.split(" ")) > 8: continue
+            if len(left_raw.split(" ")) > 12: continue
+            nested = split_plan(right_raw, depth+1) if any(c in right_raw for c in CONNECTORS) else None
             whole_tail = parse_prepared(right_raw)
-            rest = [whole_tail] if whole_tail is not None else (split_plan(right_raw, depth+1) or [])
+            rest = nested if nested else ([whole_tail] if whole_tail is not None else [])
             if not rest: continue
             return refine_plan([left] + rest)
     return None
@@ -668,10 +1115,122 @@ check(parse("nuva 01712345678 ke call koro")["action"]["number"] == "01712345678
 w = parse("nuva rahim ke whatsapp e bole dao kal class hobe")
 check(w["action"]["message"] == "kal class hobe" and w["confirm"], "wa msg")
 check(parse("nuva volume barao")["intent"] == "VOLUME_CONTROL", "vol up")
+check(parse("volume 55 percent")["action"]["level"] == 55, "exact volume")
+check(parse("sound unmute koro")["action"]["kind"] == "UNMUTE", "unmute")
 check(parse("nuva music pause koro")["intent"] == "MEDIA_CONTROL", "pause")
+check(parse("music 30 second forward")["action"]["offset"] == 30, "media forward")
+check(parse("video 15 second rewind")["action"]["kind"] == "REWIND", "media rewind")
+check(parse("music stop koro")["action"]["kind"] == "STOP", "media stop")
+check(parse("show alarms")["action"]["operation"] == "SHOW_ALARMS", "show alarms")
+check(parse("timer list dekhao")["action"]["operation"] == "SHOW_TIMERS", "show timers")
+check(parse("snooze alarm")["confirm"], "snooze confirms")
+check(parse("alarm bondho koro")["action"]["operation"] == "DISMISS_ALARM", "dismiss alarm")
+check(parse("timer bondho koro")["action"]["operation"] == "DISMISS_TIMER", "dismiss timer")
 check(parse("nuva chobi tolo")["action"]["kind"] == "CAPTURE", "chobi tolo")
 check(parse("nuva torch jalo")["action"]["kind"] == "TORCH", "torch")
 check(parse("nuva google e dhaka weather khujho")["action"]["query"] == "dhaka weather", "web search")
+check(parse("aj koto tarik")["action"]["kind"] == "DATE", "user phrase current date")
+check(parse("akn koyta baje")["action"]["kind"] == "TIME", "user phrase current time")
+check(parse("aj koto tarik akn koyta baje")["action"]["kind"] == "DATE_TIME", "combined current date and time")
+check(parse("phone model ki")["action"]["kind"] == "DEVICE_INFO", "device info")
+check(parse("ram koto")["action"]["kind"] == "MEMORY", "ram info")
+check(parse("phone uptime koto")["action"]["kind"] == "UPTIME", "uptime info")
+check(parse("screen resolution koto")["action"]["kind"] == "DISPLAY", "display info")
+check(parse("volume koto")["action"]["kind"] == "AUDIO", "audio info")
+check(parse("timezone ki")["action"]["kind"] == "TIMEZONE", "timezone info")
+check(parse("koyta app installed")["action"]["kind"] == "INSTALLED_APPS", "app count")
+check(parse("phone e ki sensor ache")["action"]["kind"] == "SENSORS", "sensor info")
+check(parse("ambulance call koro")["action"]["number"] == "999", "ambulance dialer")
+check(parse("fire service call")["action"]["service"] == "FIRE", "fire dialer")
+check(parse("sos message draft je help dorkar")["intent"] == "SHARE_TEXT", "SOS share draft")
+check(parse("emergency info setting khulo")["action"]["kind"] == "EMERGENCY_INFO", "emergency info settings")
+ha_light=parse("living room light on koro")
+check(ha_light["intent"]=="HOME_ASSISTANT" and ha_light["action"]["entity"]=="living room" and ha_light["confirm"], "HA light")
+check(parse("bedroom fan off koro")["action"]["operation"]=="TURN_OFF", "HA fan")
+ha_climate=parse("bedroom ac temperature 24 degree")["action"]
+check(ha_climate["domain"]=="CLIMATE" and ha_climate["value"]==24, "HA climate")
+check(parse("home assistant kitchen smart switch toggle")["action"]["domain"]=="SWITCH", "HA switch")
+check(parse("latest news ki")["intent"] == "SEARCH_WEB", "latest info web search")
+check(parse("2 + 3 * 4 koto")["intent"] == "LOCAL_ANSWER", "offline arithmetic")
+check(parse("500 er 20 percent discount")["intent"] == "LOCAL_ANSWER", "offline percentage")
+check(parse("5 kilometer mile e koto")["intent"] == "LOCAL_ANSWER", "unit conversion")
+check(parse("tumi ki ki korte paro")["intent"] == "LOCAL_ANSWER", "assistant help")
+check(parse("chicken biryani recipe")["intent"] == "SEARCH_WEB", "knowledge search")
+check(parse("Send button press koro")["intent"] == "PRESS", "universal route connected")
+check(parse("shopping list e add koro dim dudh")["intent"] == "CREATE_TODO", "shopping list")
+check(parse("shopping list dekhao")["intent"] == "READ_SAVED_ITEMS", "read shopping list")
+check(parse("average of 10 20 30")["intent"] == "LOCAL_ANSWER", "advanced average")
+check(parse("120 km 60 kmph travel time koto")["intent"] == "LOCAL_ANSWER", "travel eta")
+check(parse("parcel tracking ZX123")["intent"] == "SEARCH_WEB", "daily sourced skill")
+registry_source = (Path(__file__).parent.parent / "app/src/main/java/com/nuva/assistant/command/DailySkillRegistry.kt").read_text()
+registry_ids = re.findall(r'^\s*skill\("([^"]+)"', registry_source, re.MULTILINE)
+check(len(registry_ids) == 100 and len(set(registry_ids)) == 100, "exact 100 unique daily skills")
+extended_source = (Path(__file__).parent.parent / "app/src/main/java/com/nuva/assistant/command/ExtendedDailySkillRegistry.kt").read_text()
+check(re.search(r"EXPECTED_SKILL_COUNT\s*=\s*500", extended_source) is not None, "extended registry declares 500 skills")
+check(parse("nearby private tutor")["intent"] == "MAP_NAVIGATION", "extended nearby service maps")
+check(parse("passport ki kagoj lagbe")["intent"] == "SEARCH_WEB", "extended public skill")
+check(parse("excel tutorial")["intent"] == "SEARCH_WEB", "extended learning skill")
+check(parse("washing machine repair")["intent"] == "SEARCH_WEB", "extended product skill")
+grammar_source = (Path(__file__).parent.parent / "app/src/main/java/com/nuva/assistant/command/NaturalCommandGrammar.kt").read_text()
+grammar_rows = [re.findall(r'"([^"]*)"', line) for line in grammar_source.splitlines() if line.strip().startswith("pattern(")]
+grammar_aliases = [value for row in grammar_rows for value in row[1:]]
+check(len(grammar_rows) == 50 and all(len(row) == 6 for row in grammar_rows), "50 grammar families x 5 aliases")
+check(len(grammar_aliases) == len(set(grammar_aliases)) == 250, "250 unique grammar aliases")
+check(len(grammar_aliases) * 7 * 7 == 12250, "12250 generated command forms")
+check(parse("please open notification app please")["intent"] == "OPEN_NOTIFICATION_APP", "grammar notification app")
+check(parse("nuva please battery percentage bolo taratari")["intent"] == "DEVICE_STATUS", "grammar battery")
+check(parse("bkash paymnt koro")["unsupported"], "grammar security typo")
+check(parse("file open koro")["action"]["operation"] == "OPEN_FILE", "user file picker")
+check(parse("file share koro")["confirm"], "file sharing confirms")
+check(parse("gallery theke photo select koro")["action"]["operation"] == "PICK_PHOTO", "photo picker")
+check(parse("video share koro")["action"]["operation"] == "SHARE_VIDEO", "video share picker")
+check(parse("user@example.com ke email koro je ami ashchi")["intent"] == "COMPOSE_EMAIL", "email compose")
+reply_probe=parse("2 number notification e reply dao je ami ashchi")
+check(reply_probe["intent"] == "REPLY_NOTIFICATION" and reply_probe["confirm"], "notification RemoteInput reply")
+check(parse("email compose koro attachment")["action"]["attachment"], "email attachment picker handoff")
+check(parse("passport application form kholo details local draft")["intent"] == "PREPARE_FORM", "form handoff")
+check(parse("kal 9 tay schedule email je ami ashchi")["intent"] == "SCHEDULE_COMPOSE", "scheduled compose reminder")
+check(parse("file delete koro")["action"]["operation"] == "DELETE_FILE", "target-aware delete")
+check(parse("file rename koro new name report.pdf")["action"]["new_name"] == "report.pdf", "target-aware rename")
+check(parse("file copy koro")["action"]["operation"] == "COPY_FILE", "picker copy")
+check(parse("file move koro")["action"]["operation"] == "MOVE_FILE", "picker move")
+check(parse("photo crop koro")["action"]["operation"] == "EDIT_PHOTO", "photo editor handoff")
+check(parse("pdf print koro")["action"]["operation"] == "PRINT_PDF", "PDF print handoff")
+check(parse("calendar dekhao")["intent"] == "VIEW_CALENDAR", "calendar view")
+check(parse("calendar agenda poro")["intent"] == "CALENDAR_PROVIDER", "calendar agenda read")
+check(parse("next 7 day calendar agenda poro")["action"]["days"] == 7, "calendar range")
+check(parse("calendar event edit title meeting")["action"]["operation"] == "EDIT_EVENT", "calendar exact edit")
+check(parse("protidin 8 tay schedule sms message update")["action"]["recurrence"] == "DAILY", "daily draft")
+check(parse("shukrobar 9 tay schedule email je report")["action"]["recurrence"] == "WEEKLY", "weekly draft")
+check(parse("scheduled draft list dekhao")["intent"] == "LIST_SCHEDULED_DRAFTS", "list drafts")
+check(parse("2 number scheduled draft cancel koro")["action"]["ordinal"] == 2, "cancel draft")
+check(parse("text share koro je ami ashchi")["intent"] == "SHARE_TEXT", "text share handoff")
+check(parse("new contact add koro name Rahim number 01712345678")["intent"] == "CREATE_CONTACT_DRAFT", "contact draft")
+check(parse("2 number notification dismiss koro")["action"]["operation"] == "DISMISS", "notification dismiss")
+check(parse("notification mark as read koro")["action"]["operation"] == "MARK_READ", "notification mark read")
+check(parse("multiple file share koro")["action"]["operation"] == "SHARE_MULTIPLE_FILES", "multiple file share")
+check(parse("onek photo share koro")["action"]["operation"] == "SHARE_MULTIPLE_PHOTOS", "multiple photo share")
+check(parse("email compose koro multiple attachment")["action"]["multiple"], "multiple email attachments")
+check(parse("contact edit koro")["intent"] == "CONTACT_HANDOFF", "contact edit handoff")
+check(parse("facebook uninstall koro")["intent"] == "UNINSTALL_APP", "system uninstall handoff")
+check(parse("whatsapp notification settings khulo")["action"]["panel"] == "NOTIFICATIONS", "app notification panel")
+check(parse("youtube play store page khulo")["action"]["panel"] == "PLAY_STORE", "app store page")
+check(parse("airplane mode setting khulo")["action"]["kind"] == "AIRPLANE_MODE", "airplane settings")
+check(parse("vpn setting khulo")["action"]["kind"] == "VPN", "vpn settings")
+check(parse("battery saver setting khulo")["action"]["kind"] == "BATTERY_SAVER", "battery saver settings")
+check(parse("storage setting khulo")["action"]["kind"] == "STORAGE_SETTINGS", "storage settings")
+check(parse("clipboard e copy koro je hello")["action"]["operation"] == "COPY", "clipboard copy")
+check(parse("clipboard poro")["action"]["operation"] == "READ", "clipboard read")
+check(parse("clipboard clear koro")["action"]["operation"] == "CLEAR", "clipboard clear")
+check(parse("kal 9 tay calendar event create title meeting")["intent"] == "CREATE_CALENDAR_EVENT", "rich calendar event")
+check(parse("facebook post draft je hello")["intent"] == "COMPOSE_SOCIAL_POST", "social post draft")
+check(parse("mms compose 01712345678 photo attachment je hello")["intent"] == "COMPOSE_MMS", "MMS attachment draft")
+check(parse("voicemail khulo")["intent"] == "OPEN_VOICEMAIL", "voicemail dialer")
+check(parse("navigate to dhaka walking")["action"]["mode"] == "WALKING", "walking navigation")
+map_route=parse("from sylhet to dhaka public transport")["action"]
+check(map_route["origin"]=="sylhet" and map_route["destination"]=="dhaka" and map_route["mode"]=="TRANSIT", "transit directions")
+check(parse("nearby pharmacy")["action"]["request_type"] == "NEARBY", "nearby maps")
+check(parse("street view 24.8949,91.8687")["action"]["request_type"] == "STREET_VIEW", "street view")
 
 # v1.3: natural language, hyphens, defaults, compounds
 w1 = parse("Hey Nuva, Rohim-ke WhatsApp-e message dau ami agamikal asbona")

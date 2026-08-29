@@ -2,13 +2,11 @@ package com.nuva.assistant.automation
 
 import android.content.Context
 import android.media.AudioManager
+import com.nuva.assistant.command.NuvaAction
 import com.nuva.assistant.command.VolumeCommand
+import kotlin.math.roundToInt
 
-/**
- * Direct volume control (v1.2). Android permits third-party apps to change
- * media volume (raising is capped by safe-volume rules on some devices), so
- * NUVA changes it directly instead of detouring to the settings screen.
- */
+/** Direct bounded media-volume control through AudioManager. */
 object VolumeController {
 
     sealed interface Result {
@@ -16,23 +14,35 @@ object VolumeController {
         data class Failed(val userReason: String) : Result
     }
 
-    fun control(context: Context, command: VolumeCommand): Result = try {
+    fun control(context: Context, action: NuvaAction.VolumeControl): Result = try {
         val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val flags = AudioManager.FLAG_SHOW_UI
-        when (command) {
+        when (action.command) {
             VolumeCommand.UP -> audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, flags)
             VolumeCommand.DOWN -> audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, flags)
             VolumeCommand.MUTE -> audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, flags)
+            VolumeCommand.UNMUTE -> audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, flags)
+            VolumeCommand.SET -> {
+                val level = action.levelPercent ?: return Result.Failed("Volume level missing.")
+                val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                audio.setStreamVolume(AudioManager.STREAM_MUSIC, indexForPercent(max, level), flags)
+            }
         }
         val percent = streamVolumePercent(audio)
         Result.Done(
-            when (command) {
-                VolumeCommand.MUTE -> "Sound mute korlam."
-                else -> "Volume ekhon $percent%."
+            when (action.command) {
+                VolumeCommand.MUTE -> "Sound mute korechi."
+                VolumeCommand.UNMUTE -> "Sound unmute korechi; volume $percent percent."
+                else -> "Volume ekhon $percent percent."
             },
         )
-    } catch (err: Exception) {
+    } catch (_: Exception) {
         Result.Failed("Volume change korte parini.")
+    }
+
+    fun indexForPercent(maxIndex: Int, percent: Int): Int {
+        val max = maxIndex.coerceAtLeast(1)
+        return (max * percent.coerceIn(0, 100) / 100.0).roundToInt().coerceIn(0, max)
     }
 
     private fun streamVolumePercent(audio: AudioManager): Int {

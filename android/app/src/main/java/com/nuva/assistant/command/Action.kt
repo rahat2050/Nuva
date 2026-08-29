@@ -104,12 +104,12 @@ sealed interface NuvaAction {
     }
 
     /** Media playback control via the active MediaSession (v1.2). */
-    data class MediaControl(val command: MediaCommand) : NuvaAction {
+    data class MediaControl(val command: MediaCommand, val offsetSeconds: Int? = null) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.MEDIA_CONTROL
     }
 
-    /** Direct volume changes — permitted by Android, no settings detour (v1.2). */
-    data class VolumeControl(val command: VolumeCommand) : NuvaAction {
+    /** Direct media-volume changes — permitted by Android, no settings detour. */
+    data class VolumeControl(val command: VolumeCommand, val levelPercent: Int? = null) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.VOLUME_CONTROL
     }
 
@@ -168,6 +168,160 @@ sealed interface NuvaAction {
 
     data class DeviceStatusQuery(val query: DeviceStatusKind) : NuvaAction {
         override val intent: NuvaIntent get() = NuvaIntent.DEVICE_STATUS
+    }
+
+    /** A bounded answer calculated locally by [DailyUtilityParser]. */
+    data class LocalAnswer(val answer: String, val category: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.LOCAL_ANSWER
+    }
+
+    data class ReadSavedItems(val kind: SavedItemKind) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.READ_SAVED_ITEMS
+    }
+
+    /** Opens a system picker; the user always chooses the concrete file/media. */
+    data class UserFile(val operation: UserFileOperation, val newName: String? = null) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.USER_FILE
+    }
+
+    /** Opens an email composer; the user reviews and taps Send. */
+    data class ComposeEmail(
+        val recipient: String?,
+        val subject: String?,
+        val body: String?,
+        val attachmentRequested: Boolean = false,
+        val multipleAttachments: Boolean = false,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.COMPOSE_EMAIL
+    }
+
+    /** Sends through a notification's official RemoteInput action after confirmation. */
+    data class ReplyNotification(val ordinal: Int, val message: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.REPLY_NOTIFICATION
+    }
+
+    data class PrepareForm(val kind: FormKind, val details: String?) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.PREPARE_FORM
+    }
+
+    data class ScheduleCompose(
+        val channel: ComposeChannel,
+        val recipient: String?,
+        val subject: String?,
+        val body: String,
+        val triggerAt: Long,
+        val recurrence: ComposeRecurrence = ComposeRecurrence.ONCE,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.SCHEDULE_COMPOSE
+    }
+
+    data object ListScheduledDrafts : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.LIST_SCHEDULED_DRAFTS
+    }
+
+    data class CancelScheduledDraft(val ordinal: Int) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CANCEL_SCHEDULED_DRAFT
+    }
+
+    data class ShareText(val text: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.SHARE_TEXT
+    }
+
+    data class CreateContactDraft(
+        val name: String,
+        val phone: String?,
+        val email: String?,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CREATE_CONTACT_DRAFT
+    }
+
+    data class ManageNotification(
+        val ordinal: Int,
+        val operation: NotificationManageOperation,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.MANAGE_NOTIFICATION
+    }
+
+    data class ContactHandoff(val operation: ContactHandoffOperation) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CONTACT_HANDOFF
+    }
+
+    data class UninstallApp(val app: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.UNINSTALL_APP
+    }
+
+    data class OpenAppManagement(val app: String, val panel: AppManagementPanel) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_APP_MANAGEMENT
+    }
+
+    data class ClipboardAction(val operation: ClipboardOperation, val text: String? = null) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CLIPBOARD_ACTION
+    }
+
+    data class CreateCalendarEvent(
+        val title: String,
+        val beginAt: Long,
+        val endAt: Long,
+        val location: String?,
+        val description: String?,
+        val attendeeEmail: String?,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CREATE_CALENDAR_EVENT
+    }
+
+    data class ComposeSocialPost(val platform: SocialPlatform, val text: String) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.COMPOSE_SOCIAL_POST
+    }
+
+    data class ComposeMms(
+        val recipient: String?,
+        val body: String?,
+        val attachmentRequested: Boolean,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.COMPOSE_MMS
+    }
+
+    data object OpenVoicemail : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.OPEN_VOICEMAIL
+    }
+
+    data class MapNavigation(
+        val requestType: MapRequestType,
+        val destination: String,
+        val origin: String?,
+        val travelMode: TravelMode,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.MAP_NAVIGATION
+    }
+
+    data class EmergencyDialer(val service: EmergencyService) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.EMERGENCY_DIALER
+    }
+
+    data class ClockControl(val operation: ClockOperation) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CLOCK_CONTROL
+    }
+
+    data class ViewCalendar(val focusAt: Long) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.VIEW_CALENDAR
+    }
+
+    data class HomeAssistantControl(
+        val domain: HomeAssistantDomain,
+        val operation: HomeAssistantOperation,
+        val entityQuery: String,
+        val value: Double? = null,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.HOME_ASSISTANT
+    }
+
+    data class CalendarProvider(
+        val operation: CalendarProviderOperation,
+        val rangeStart: Long,
+        val rangeEnd: Long,
+        val eventQuery: String? = null,
+    ) : NuvaAction {
+        override val intent: NuvaIntent get() = NuvaIntent.CALENDAR_PROVIDER
     }
 
     data class OpenSettingScreen(val target: SettingTarget) : NuvaAction {
@@ -286,6 +440,9 @@ enum class MediaCommand(val wireName: String) {
     TOGGLE("toggle"),
     NEXT("next"),
     PREVIOUS("previous"),
+    STOP("stop"),
+    FAST_FORWARD("fast_forward"),
+    REWIND("rewind"),
     ;
 
     companion object {
@@ -299,6 +456,8 @@ enum class VolumeCommand(val wireName: String) {
     UP("up"),
     DOWN("down"),
     MUTE("mute"),
+    UNMUTE("unmute"),
+    SET("set"),
     ;
 
     companion object {
@@ -324,13 +483,274 @@ enum class CaptureMode(val wireName: String) {
     }
 }
 
+enum class CalendarProviderOperation(val wireName: String) {
+    READ_AGENDA("read_agenda"),
+    OPEN_EVENT("open_event"),
+    EDIT_EVENT("edit_event"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): CalendarProviderOperation? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class HomeAssistantDomain(val wireName: String) {
+    LIGHT("light"),
+    SWITCH("switch"),
+    FAN("fan"),
+    CLIMATE("climate"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): HomeAssistantDomain? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class HomeAssistantOperation(val wireName: String, val serviceName: String) {
+    TURN_ON("turn_on", "turn_on"),
+    TURN_OFF("turn_off", "turn_off"),
+    TOGGLE("toggle", "toggle"),
+    SET_TEMPERATURE("set_temperature", "set_temperature"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): HomeAssistantOperation? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class ClockOperation(val wireName: String) {
+    SHOW_ALARMS("show_alarms"),
+    SHOW_TIMERS("show_timers"),
+    SNOOZE_ALARM("snooze_alarm"),
+    DISMISS_ALARM("dismiss_alarm"),
+    DISMISS_TIMER("dismiss_timer"),
+    ;
+
+    val changesActiveClock: Boolean
+        get() = this == SNOOZE_ALARM || this == DISMISS_ALARM || this == DISMISS_TIMER
+
+    companion object {
+        fun fromWire(value: String?): ClockOperation? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class EmergencyService(val wireName: String, val dialNumber: String) {
+    NATIONAL("national", "999"),
+    POLICE("police", "999"),
+    FIRE("fire", "999"),
+    AMBULANCE("ambulance", "999"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): EmergencyService? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class MapRequestType(val wireName: String) {
+    DIRECTIONS("directions"),
+    NAVIGATION("navigation"),
+    NEARBY("nearby"),
+    STREET_VIEW("street_view"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): MapRequestType? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class TravelMode(val wireName: String, val navigationCode: String) {
+    DRIVING("driving", "d"),
+    WALKING("walking", "w"),
+    BICYCLING("bicycling", "b"),
+    TRANSIT("transit", "d"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): TravelMode? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class SocialPlatform(val wireName: String, val packageName: String) {
+    FACEBOOK("facebook", "com.facebook.katana"),
+    INSTAGRAM("instagram", "com.instagram.android"),
+    X("x", "com.twitter.android"),
+    LINKEDIN("linkedin", "com.linkedin.android"),
+    REDDIT("reddit", "com.reddit.frontpage"),
+    THREADS("threads", "com.instagram.barcelona"),
+    TIKTOK("tiktok", "com.zhiliaoapp.musically"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): SocialPlatform? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class ClipboardOperation(val wireName: String) {
+    COPY("copy"),
+    READ("read"),
+    CLEAR("clear"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): ClipboardOperation? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class AppManagementPanel(val wireName: String) {
+    APP_INFO("app_info"),
+    NOTIFICATIONS("notifications"),
+    PLAY_STORE("play_store"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): AppManagementPanel? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class ContactHandoffOperation(val wireName: String) {
+    VIEW("view"),
+    EDIT("edit"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): ContactHandoffOperation? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class NotificationManageOperation(val wireName: String) {
+    DISMISS("dismiss"),
+    MARK_READ("mark_read"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): NotificationManageOperation? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class ComposeChannel(val wireName: String) {
+    EMAIL("email"),
+    SMS("sms"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): ComposeChannel? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class ComposeRecurrence(val wireName: String, val days: Int) {
+    ONCE("once", 0),
+    DAILY("daily", 1),
+    WEEKLY("weekly", 7),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): ComposeRecurrence? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class FormKind(val wireName: String, val searchLabel: String) {
+    PASSPORT("passport", "Bangladesh official passport application"),
+    NID("nid", "Bangladesh official NID service"),
+    BIRTH_REGISTRATION("birth_registration", "Bangladesh official birth registration"),
+    DRIVING_LICENSE("driving_license", "Bangladesh official driving license application"),
+    VISA("visa", "official visa application"),
+    ADMISSION("admission", "official admission application"),
+    JOB("job", "official job application portal"),
+    DOCTOR("doctor", "doctor appointment booking"),
+    HOTEL("hotel", "hotel booking form"),
+    FLIGHT("flight", "flight booking form"),
+    COURIER("courier", "courier pickup booking form"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): FormKind? = entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+enum class SavedItemKind(val wireName: String) {
+    TODO("todo"),
+    NOTE("note"),
+    SHOPPING("shopping"),
+    EXPENSE("expense"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): SavedItemKind? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
+/** User-present Storage Access Framework / media-picker operations. */
+enum class UserFileOperation(val wireName: String, val mimeType: String, val usesFolderPicker: Boolean = false) {
+    OPEN_FILE("open_file", "*/*"),
+    SHARE_FILE("share_file", "*/*"),
+    READ_TEXT("read_text", "text/*"),
+    OPEN_FOLDER("open_folder", "*/*", usesFolderPicker = true),
+    PICK_PHOTO("pick_photo", "image/*"),
+    SHARE_PHOTO("share_photo", "image/*"),
+    PICK_VIDEO("pick_video", "video/*"),
+    SHARE_VIDEO("share_video", "video/*"),
+    SHARE_MULTIPLE_FILES("share_multiple_files", "*/*"),
+    SHARE_MULTIPLE_PHOTOS("share_multiple_photos", "image/*"),
+    SHARE_MULTIPLE_VIDEOS("share_multiple_videos", "video/*"),
+    EMAIL_ATTACHMENT("email_attachment", "*/*"),
+    EMAIL_ATTACHMENTS("email_attachments", "*/*"),
+    MMS_ATTACHMENT("mms_attachment", "*/*"),
+    PRINT_PDF("print_pdf", "application/pdf"),
+    RENAME_FILE("rename_file", "*/*"),
+    COPY_FILE("copy_file", "*/*"),
+    MOVE_FILE("move_file", "*/*"),
+    DELETE_FILE("delete_file", "*/*"),
+    EDIT_PHOTO("edit_photo", "image/*"),
+    ;
+
+    val sharesOutsideDevice: Boolean
+        get() = this == SHARE_FILE || this == SHARE_PHOTO || this == SHARE_VIDEO ||
+            this == SHARE_MULTIPLE_FILES || this == SHARE_MULTIPLE_PHOTOS || this == SHARE_MULTIPLE_VIDEOS ||
+            this == EMAIL_ATTACHMENT || this == EMAIL_ATTACHMENTS || this == MMS_ATTACHMENT
+
+    val usesMultiplePicker: Boolean
+        get() = this == SHARE_MULTIPLE_FILES || this == SHARE_MULTIPLE_PHOTOS ||
+            this == SHARE_MULTIPLE_VIDEOS || this == EMAIL_ATTACHMENTS
+
+    val changesSelectedContent: Boolean
+        get() = this == RENAME_FILE || this == MOVE_FILE || this == DELETE_FILE || this == EDIT_PHOTO
+
+    val needsWriteGrant: Boolean
+        get() = this == OPEN_FOLDER || this == RENAME_FILE || this == COPY_FILE || this == MOVE_FILE || this == DELETE_FILE || this == EDIT_PHOTO
+
+    val needsBlockingConfirmation: Boolean
+        get() = sharesOutsideDevice || changesSelectedContent || this == COPY_FILE || this == OPEN_FOLDER || this == PRINT_PDF
+
+    companion object {
+        fun fromWire(value: String?): UserFileOperation? =
+            entries.firstOrNull { it.wireName == value?.lowercase() }
+    }
+}
+
 /** Device-status questions answered locally (LOCAL-ONLY intent payload). */
 enum class DeviceStatusKind(val wireName: String) {
     BATTERY("battery"),
     TIME("time"),
     DATE("date"),
+    /** One clock read answers combined questions without timestamps drifting. */
+    DATE_TIME("date_time"),
     NETWORK("network"),
     STORAGE("storage"),
+    DEVICE_INFO("device_info"),
+    MEMORY("memory"),
+    UPTIME("uptime"),
+    DISPLAY("display"),
+    AUDIO("audio"),
+    TIMEZONE("timezone"),
+    LOCALE("locale"),
+    INSTALLED_APPS("installed_apps"),
+    SENSORS("sensors"),
     ;
 
     companion object {
@@ -355,6 +775,23 @@ enum class SettingTarget(val wireName: String) {
     NOTIFICATION_SETTINGS("notification_settings"),
     APP_SETTINGS("app_settings"),
     ACCESSIBILITY_SETTINGS("accessibility_settings"),
+    MOBILE_DATA("mobile_data"),
+    AIRPLANE_MODE("airplane_mode"),
+    LOCATION("location"),
+    HOTSPOT("hotspot"),
+    NFC("nfc"),
+    VPN("vpn"),
+    BATTERY_SAVER("battery_saver"),
+    DEFAULT_APPS("default_apps"),
+    DATE_TIME("date_time"),
+    LANGUAGE("language"),
+    STORAGE_SETTINGS("storage_settings"),
+    PRIVACY("privacy"),
+    SECURITY("security"),
+    CAST("cast"),
+    PRINT("print"),
+    CAPTIONS("captions"),
+    EMERGENCY_INFO("emergency_info"),
     ;
 
     companion object {

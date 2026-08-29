@@ -10,10 +10,12 @@ import com.nuva.assistant.database.dao.CommandHistoryDao
 import com.nuva.assistant.database.dao.LocalMemoryDao
 import com.nuva.assistant.database.dao.NoteDao
 import com.nuva.assistant.database.dao.PendingActionDao
+import com.nuva.assistant.database.dao.ScheduledDraftDao
 import com.nuva.assistant.database.entities.CommandHistoryEntity
 import com.nuva.assistant.database.entities.LocalMemoryEntity
 import com.nuva.assistant.database.entities.NoteEntity
 import com.nuva.assistant.database.entities.PendingActionEntity
+import com.nuva.assistant.database.entities.ScheduledDraftEntity
 
 /**
  * Room database (roadmap step 14): CommandHistory, LocalMemory, PendingAction,
@@ -25,8 +27,9 @@ import com.nuva.assistant.database.entities.PendingActionEntity
         PendingActionEntity::class,
         LocalMemoryEntity::class,
         NoteEntity::class,
+        ScheduledDraftEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingActionDao(): PendingActionDao
     abstract fun localMemoryDao(): LocalMemoryDao
     abstract fun noteDao(): NoteDao
+    abstract fun scheduledDraftDao(): ScheduledDraftDao
 
     companion object {
 
@@ -51,9 +55,23 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v2 → v3: persistent scheduled email/SMS draft reminders. */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `scheduled_drafts` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `channel` TEXT NOT NULL, " +
+                        "`recipient` TEXT, `subject` TEXT, `body` TEXT NOT NULL, `triggerAt` INTEGER NOT NULL, " +
+                        "`recurrence` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_scheduled_drafts_status` ON `scheduled_drafts` (`status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_scheduled_drafts_triggerAt` ON `scheduled_drafts` (`triggerAt`)")
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "nuva.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

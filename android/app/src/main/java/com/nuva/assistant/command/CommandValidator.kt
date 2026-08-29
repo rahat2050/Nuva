@@ -24,6 +24,7 @@ object CommandValidator {
 
     private val PACKAGE_PATTERN = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$")
     private val PHONE_PATTERN = Regex("^\\+?[0-9][0-9 \\-()]{3,23}$")
+    private val EMAIL_PATTERN = Regex("""\A[A-Za-z0-9.!#\x24%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+\z""")
     private const val MAX_TEXT = 1000
     private const val MAX_MESSAGE = 2000
 
@@ -52,6 +53,8 @@ object CommandValidator {
 
     private fun JsonObject.fraction(field: String): Float? =
         this[field]?.jsonPrimitive?.doubleOrNull?.toFloat()?.takeIf { it in 0.0f..1.0f }
+
+    private fun JsonObject.number(field: String): Double? = this[field]?.jsonPrimitive?.doubleOrNull
 
     private fun selector(json: JsonObject?): UiSelector? {
         if (json == null) return null
@@ -124,19 +127,323 @@ object CommandValidator {
             NuvaIntent.OPEN_NOTIFICATIONS -> ValidatedAction.Valid(NuvaAction.OpenNotificationShade)
             NuvaIntent.OPEN_NOTIFICATION_APP -> validateOpenNotificationApp(actionJson)
             NuvaIntent.DESCRIBE_SCREEN -> ValidatedAction.Valid(NuvaAction.DescribeScreen)
+            NuvaIntent.LOCAL_ANSWER -> validateLocalAnswer(actionJson)
+            NuvaIntent.READ_SAVED_ITEMS -> validateReadSavedItems(actionJson)
+            NuvaIntent.USER_FILE -> validateUserFile(actionJson)
+            NuvaIntent.COMPOSE_EMAIL -> validateComposeEmail(actionJson)
+            NuvaIntent.REPLY_NOTIFICATION -> validateReplyNotification(actionJson)
+            NuvaIntent.PREPARE_FORM -> validatePrepareForm(actionJson)
+            NuvaIntent.SCHEDULE_COMPOSE -> validateScheduleCompose(actionJson)
+            NuvaIntent.LIST_SCHEDULED_DRAFTS -> ValidatedAction.Valid(NuvaAction.ListScheduledDrafts)
+            NuvaIntent.CANCEL_SCHEDULED_DRAFT -> validateCancelScheduledDraft(actionJson)
+            NuvaIntent.SHARE_TEXT -> validateShareText(actionJson)
+            NuvaIntent.CREATE_CONTACT_DRAFT -> validateCreateContactDraft(actionJson)
+            NuvaIntent.MANAGE_NOTIFICATION -> validateManageNotification(actionJson)
+            NuvaIntent.CONTACT_HANDOFF -> validateContactHandoff(actionJson)
+            NuvaIntent.UNINSTALL_APP -> validateUninstallApp(actionJson)
+            NuvaIntent.OPEN_APP_MANAGEMENT -> validateOpenAppManagement(actionJson)
+            NuvaIntent.CLIPBOARD_ACTION -> validateClipboardAction(actionJson)
+            NuvaIntent.CREATE_CALENDAR_EVENT -> validateCalendarEvent(actionJson)
+            NuvaIntent.COMPOSE_SOCIAL_POST -> validateSocialPost(actionJson)
+            NuvaIntent.COMPOSE_MMS -> validateMms(actionJson)
+            NuvaIntent.OPEN_VOICEMAIL -> ValidatedAction.Valid(NuvaAction.OpenVoicemail)
+            NuvaIntent.MAP_NAVIGATION -> validateMapNavigation(actionJson)
+            NuvaIntent.EMERGENCY_DIALER -> validateEmergencyDialer(actionJson)
+            NuvaIntent.CLOCK_CONTROL -> validateClockControl(actionJson)
+            NuvaIntent.VIEW_CALENDAR -> validateViewCalendar(actionJson)
+            NuvaIntent.HOME_ASSISTANT -> validateHomeAssistant(actionJson)
+            NuvaIntent.CALENDAR_PROVIDER -> validateCalendarProvider(actionJson)
         }
+    }
+
+    private fun validateCalendarProvider(json: JsonObject): ValidatedAction {
+        val operation = CalendarProviderOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("CALENDAR_PROVIDER requires operation"))
+        val start = json.long("range_start")?.takeIf { it in 1..4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("calendar provider requires range_start"))
+        val end = json.long("range_end")?.takeIf { it > start && it <= 4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("calendar provider requires valid range_end"))
+        if (end - start > 31L * 86_400_000L) {
+            return ValidatedAction.Invalid(listOf("calendar provider range is capped at 31 days"))
+        }
+        val query = json.str("event_query")?.takeIf { it.length in 1..200 }
+        if (operation != CalendarProviderOperation.READ_AGENDA && query == null) {
+            return ValidatedAction.Invalid(listOf("event open/edit requires event_query"))
+        }
+        if (operation == CalendarProviderOperation.READ_AGENDA && query != null) {
+            return ValidatedAction.Invalid(listOf("agenda read does not accept event_query"))
+        }
+        return ValidatedAction.Valid(NuvaAction.CalendarProvider(operation, start, end, query))
+    }
+
+    private fun validateHomeAssistant(json: JsonObject): ValidatedAction {
+        val domain = HomeAssistantDomain.fromWire(json.str("domain"))
+            ?: return ValidatedAction.Invalid(listOf("HOME_ASSISTANT requires allowed domain"))
+        val operation = HomeAssistantOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("HOME_ASSISTANT requires allowed operation"))
+        val entity = json.str("entity_query")?.takeIf { it.length in 1..120 }
+            ?: return ValidatedAction.Invalid(listOf("HOME_ASSISTANT requires entity_query"))
+        val value = json.number("value")
+        val settingTemperature = operation == HomeAssistantOperation.SET_TEMPERATURE
+        if (settingTemperature && (domain != HomeAssistantDomain.CLIMATE || value == null || value !in 10.0..32.0)) {
+            return ValidatedAction.Invalid(listOf("temperature requires climate and value 10..32"))
+        }
+        if (!settingTemperature && value != null) {
+            return ValidatedAction.Invalid(listOf("value only allowed for set_temperature"))
+        }
+        if (domain == HomeAssistantDomain.CLIMATE && operation == HomeAssistantOperation.TOGGLE) {
+            return ValidatedAction.Invalid(listOf("climate toggle is not allowlisted"))
+        }
+        if (domain != HomeAssistantDomain.CLIMATE && operation == HomeAssistantOperation.SET_TEMPERATURE) {
+            return ValidatedAction.Invalid(listOf("set_temperature only allowed for climate"))
+        }
+        return ValidatedAction.Valid(NuvaAction.HomeAssistantControl(domain, operation, entity, value))
+    }
+
+    private fun validateViewCalendar(json: JsonObject): ValidatedAction {
+        val focusAt = json.long("focus_at")?.takeIf { it in 1..4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("VIEW_CALENDAR requires focus_at"))
+        return ValidatedAction.Valid(NuvaAction.ViewCalendar(focusAt))
+    }
+
+    private fun validateClockControl(json: JsonObject): ValidatedAction {
+        val operation = ClockOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("CLOCK_CONTROL requires operation"))
+        return ValidatedAction.Valid(NuvaAction.ClockControl(operation))
+    }
+
+    private fun validateEmergencyDialer(json: JsonObject): ValidatedAction {
+        val service = EmergencyService.fromWire(json.str("service"))
+            ?: return ValidatedAction.Invalid(listOf("EMERGENCY_DIALER requires service"))
+        return ValidatedAction.Valid(NuvaAction.EmergencyDialer(service))
+    }
+
+    private fun validateMapNavigation(json: JsonObject): ValidatedAction {
+        val requestType = MapRequestType.fromWire(json.str("request_type"))
+            ?: return ValidatedAction.Invalid(listOf("MAP_NAVIGATION requires request_type"))
+        val destination = json.str("destination")?.takeIf { it.length in 1..300 }
+            ?: return ValidatedAction.Invalid(listOf("MAP_NAVIGATION requires destination"))
+        val origin = json.str("origin")?.takeIf { it.isNotEmpty() && it.length <= 300 }
+        val mode = TravelMode.fromWire(json.str("travel_mode")) ?: TravelMode.DRIVING
+        return ValidatedAction.Valid(NuvaAction.MapNavigation(requestType, destination, origin, mode))
+    }
+
+    private fun validateSocialPost(json: JsonObject): ValidatedAction {
+        val platform = SocialPlatform.fromWire(json.str("platform"))
+            ?: return ValidatedAction.Invalid(listOf("COMPOSE_SOCIAL_POST requires platform"))
+        val text = json.str("text")?.takeIf { it.isNotEmpty() && it.length <= 5_000 }
+            ?: return ValidatedAction.Invalid(listOf("COMPOSE_SOCIAL_POST requires text"))
+        return ValidatedAction.Valid(NuvaAction.ComposeSocialPost(platform, text))
+    }
+
+    private fun validateMms(json: JsonObject): ValidatedAction {
+        val rawRecipient = json.str("recipient")
+        val recipient = rawRecipient?.takeIf { PHONE_PATTERN.matches(it) }
+        if (rawRecipient != null && recipient == null) {
+            return ValidatedAction.Invalid(listOf("COMPOSE_MMS recipient is invalid"))
+        }
+        val body = json.str("body")?.takeIf { it.isNotEmpty() && it.length <= 2_000 }
+        val attachment = json.bool("attachment_requested") ?: false
+        if (body == null && !attachment) {
+            return ValidatedAction.Invalid(listOf("COMPOSE_MMS requires body or attachment"))
+        }
+        return ValidatedAction.Valid(NuvaAction.ComposeMms(recipient, body, attachment))
+    }
+
+    private fun validateClipboardAction(json: JsonObject): ValidatedAction {
+        val operation = ClipboardOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("CLIPBOARD_ACTION requires operation"))
+        val text = json.str("text")
+        if (operation == ClipboardOperation.COPY && (text.isNullOrEmpty() || text.length > 5_000)) {
+            return ValidatedAction.Invalid(listOf("clipboard copy requires text"))
+        }
+        if (operation != ClipboardOperation.COPY && text != null) {
+            return ValidatedAction.Invalid(listOf("clipboard text is only allowed for copy"))
+        }
+        return ValidatedAction.Valid(NuvaAction.ClipboardAction(operation, text))
+    }
+
+    private fun validateCalendarEvent(json: JsonObject): ValidatedAction {
+        val title = json.str("title")?.takeIf { it.length in 1..200 }
+            ?: return ValidatedAction.Invalid(listOf("calendar event requires title"))
+        val begin = json.long("begin_at")?.takeIf { it in 1..4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("calendar event requires begin_at"))
+        val end = json.long("end_at")?.takeIf { it > begin && it <= 4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("calendar event requires end_at after begin_at"))
+        val location = json.str("location")?.takeIf { it.isNotEmpty() && it.length <= 300 }
+        val description = json.str("description")?.takeIf { it.isNotEmpty() && it.length <= 2_000 }
+        val rawAttendee = json.str("attendee_email")
+        val attendee = rawAttendee?.takeIf { EMAIL_PATTERN.matches(it) }
+        if (rawAttendee != null && attendee == null) {
+            return ValidatedAction.Invalid(listOf("calendar attendee email is invalid"))
+        }
+        return ValidatedAction.Valid(NuvaAction.CreateCalendarEvent(title, begin, end, location, description, attendee))
+    }
+
+    private fun validateOpenAppManagement(json: JsonObject): ValidatedAction {
+        val app = json.str("app")?.takeIf { it.length in 1..80 }
+            ?: return ValidatedAction.Invalid(listOf("OPEN_APP_MANAGEMENT requires app"))
+        val panel = AppManagementPanel.fromWire(json.str("panel"))
+            ?: return ValidatedAction.Invalid(listOf("OPEN_APP_MANAGEMENT requires panel"))
+        return ValidatedAction.Valid(NuvaAction.OpenAppManagement(app, panel))
+    }
+
+    private fun validateContactHandoff(json: JsonObject): ValidatedAction {
+        val operation = ContactHandoffOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("CONTACT_HANDOFF requires operation"))
+        return ValidatedAction.Valid(NuvaAction.ContactHandoff(operation))
+    }
+
+    private fun validateUninstallApp(json: JsonObject): ValidatedAction {
+        val app = json.str("app")?.takeIf { it.length in 1..80 }
+            ?: return ValidatedAction.Invalid(listOf("UNINSTALL_APP requires app"))
+        return ValidatedAction.Valid(NuvaAction.UninstallApp(app))
+    }
+
+    private fun validateShareText(json: JsonObject): ValidatedAction {
+        val text = json.str("text")?.takeIf { it.isNotEmpty() && it.length <= 5_000 }
+            ?: return ValidatedAction.Invalid(listOf("SHARE_TEXT requires text"))
+        return ValidatedAction.Valid(NuvaAction.ShareText(text))
+    }
+
+    private fun validateCreateContactDraft(json: JsonObject): ValidatedAction {
+        val name = json.str("name")?.takeIf { it.length in 1..120 }
+            ?: return ValidatedAction.Invalid(listOf("CREATE_CONTACT_DRAFT requires name"))
+        val rawPhone = json.str("phone")
+        val phone = rawPhone?.takeIf { PHONE_PATTERN.matches(it) }
+        if (rawPhone != null && phone == null) return ValidatedAction.Invalid(listOf("contact phone is invalid"))
+        val rawEmail = json.str("email")
+        val email = rawEmail?.takeIf { EMAIL_PATTERN.matches(it) }
+        if (rawEmail != null && email == null) return ValidatedAction.Invalid(listOf("contact email is invalid"))
+        return ValidatedAction.Valid(NuvaAction.CreateContactDraft(name, phone, email))
+    }
+
+    private fun validateManageNotification(json: JsonObject): ValidatedAction {
+        val ordinal = json.int("ordinal")?.takeIf { it in 1..30 } ?: 1
+        val operation = NotificationManageOperation.fromWire(json.str("operation"))
+            ?: return ValidatedAction.Invalid(listOf("MANAGE_NOTIFICATION requires operation"))
+        return ValidatedAction.Valid(NuvaAction.ManageNotification(ordinal, operation))
+    }
+
+    private fun validateCancelScheduledDraft(json: JsonObject): ValidatedAction {
+        val ordinal = json.int("ordinal")?.takeIf { it in 1..100 } ?: 1
+        return ValidatedAction.Valid(NuvaAction.CancelScheduledDraft(ordinal))
+    }
+
+    private fun validatePrepareForm(json: JsonObject): ValidatedAction {
+        val kind = FormKind.fromWire(json.str("kind"))
+            ?: return ValidatedAction.Invalid(listOf("PREPARE_FORM requires a known kind"))
+        val details = json.str("details")?.takeIf { it.isNotEmpty() && it.length <= 1_000 }
+        return ValidatedAction.Valid(NuvaAction.PrepareForm(kind, details))
+    }
+
+    private fun validateScheduleCompose(json: JsonObject): ValidatedAction {
+        val channel = ComposeChannel.fromWire(json.str("channel"))
+            ?: return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE requires channel"))
+        val rawRecipient = json.str("recipient")
+        val recipient = when (channel) {
+            ComposeChannel.EMAIL -> rawRecipient?.takeIf { EMAIL_PATTERN.matches(it) }
+            ComposeChannel.SMS -> rawRecipient?.takeIf { PHONE_PATTERN.matches(it) }
+        }
+        if (rawRecipient != null && recipient == null) {
+            return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE recipient is invalid"))
+        }
+        val subject = json.str("subject")?.takeIf { it.isNotEmpty() && it.length <= 200 }
+        val body = json.str("body")?.takeIf { it.isNotEmpty() && it.length <= 2_000 }
+            ?: return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE requires body"))
+        val triggerAt = json.long("trigger_at")?.takeIf { it in 1..4_102_444_800_000L }
+            ?: return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE requires valid trigger_at"))
+        val rawRecurrence = json.str("recurrence")
+        val recurrence = ComposeRecurrence.fromWire(rawRecurrence) ?: ComposeRecurrence.ONCE
+        if (rawRecurrence != null && ComposeRecurrence.fromWire(rawRecurrence) == null) {
+            return ValidatedAction.Invalid(listOf("SCHEDULE_COMPOSE recurrence is invalid"))
+        }
+        return ValidatedAction.Valid(NuvaAction.ScheduleCompose(channel, recipient, subject, body, triggerAt, recurrence))
+    }
+
+    private fun validateComposeEmail(json: JsonObject): ValidatedAction {
+        val recipient = json.str("recipient")?.takeIf { EMAIL_PATTERN.matches(it) }
+        if (json.str("recipient") != null && recipient == null) {
+            return ValidatedAction.Invalid(listOf("COMPOSE_EMAIL recipient is invalid"))
+        }
+        val subject = json.str("subject")?.takeIf { it.isNotEmpty() && it.length <= 200 }
+        val body = json.str("body")?.takeIf { it.isNotEmpty() && it.length <= 5_000 }
+        val attachmentRequested = json.bool("attachment_requested") ?: false
+        val multipleAttachments = json.bool("multiple_attachments") ?: false
+        if (multipleAttachments && !attachmentRequested) {
+            return ValidatedAction.Invalid(listOf("multiple_attachments requires attachment_requested"))
+        }
+        return ValidatedAction.Valid(
+            NuvaAction.ComposeEmail(recipient, subject, body, attachmentRequested, multipleAttachments),
+        )
+    }
+
+    private fun validateReplyNotification(json: JsonObject): ValidatedAction {
+        val ordinal = json.int("ordinal")?.takeIf { it in 1..30 } ?: 1
+        val message = json.str("message")?.takeIf { it.isNotEmpty() && it.length <= 1_000 }
+            ?: return ValidatedAction.Invalid(listOf("REPLY_NOTIFICATION requires message"))
+        return ValidatedAction.Valid(NuvaAction.ReplyNotification(ordinal, message))
+    }
+
+    private fun validateUserFile(json: JsonObject): ValidatedAction {
+        val operation = UserFileOperation.fromWire(json.str("operation"))
+            ?.takeIf {
+                it != UserFileOperation.EMAIL_ATTACHMENT &&
+                    it != UserFileOperation.EMAIL_ATTACHMENTS &&
+                    it != UserFileOperation.MMS_ATTACHMENT
+            }
+            ?: return ValidatedAction.Invalid(listOf("USER_FILE requires a public picker operation"))
+        val rawName = json.str("new_name")
+        val newName = rawName?.takeIf { name ->
+            name.length in 1..120 && name.none { it == '/' || it == '\\' || it.isISOControl() }
+        }
+        if (operation == UserFileOperation.RENAME_FILE && newName == null) {
+            return ValidatedAction.Invalid(listOf("RENAME_FILE requires safe new_name"))
+        }
+        if (operation != UserFileOperation.RENAME_FILE && rawName != null) {
+            return ValidatedAction.Invalid(listOf("new_name is only allowed for RENAME_FILE"))
+        }
+        return ValidatedAction.Valid(NuvaAction.UserFile(operation, newName))
+    }
+
+    private fun validateReadSavedItems(json: JsonObject): ValidatedAction {
+        val kind = SavedItemKind.fromWire(json.str("kind"))
+            ?: return ValidatedAction.Invalid(listOf("READ_SAVED_ITEMS requires a known kind"))
+        return ValidatedAction.Valid(NuvaAction.ReadSavedItems(kind))
+    }
+
+    private fun validateLocalAnswer(json: JsonObject): ValidatedAction {
+        val answer = json.str("answer")?.takeIf { it.isNotEmpty() && it.length <= 600 }
+            ?: return ValidatedAction.Invalid(listOf("LOCAL_ANSWER requires answer (1..600 chars)"))
+        val category = json.str("category")
+            ?.takeIf { it.matches(Regex("^[a-z0-9_]{1,40}$")) }
+            ?: return ValidatedAction.Invalid(listOf("LOCAL_ANSWER requires a safe category"))
+        return ValidatedAction.Valid(NuvaAction.LocalAnswer(answer, category))
     }
 
     private fun validateMediaControl(json: JsonObject): ValidatedAction {
         val command = MediaCommand.fromWire(json.str("command"))
             ?: return ValidatedAction.Invalid(listOf("MEDIA_CONTROL requires a known command"))
-        return ValidatedAction.Valid(NuvaAction.MediaControl(command))
+        val rawOffset = json.int("offset_seconds")
+        val offset = rawOffset?.takeIf { it in 1..300 }
+        val seekCommand = command == MediaCommand.FAST_FORWARD || command == MediaCommand.REWIND
+        if (seekCommand && offset == null) return ValidatedAction.Invalid(listOf("seek command requires offset_seconds"))
+        if (!seekCommand && rawOffset != null) return ValidatedAction.Invalid(listOf("offset_seconds only allowed for seek"))
+        return ValidatedAction.Valid(NuvaAction.MediaControl(command, offset))
     }
 
     private fun validateVolumeControl(json: JsonObject): ValidatedAction {
         val command = VolumeCommand.fromWire(json.str("command"))
             ?: return ValidatedAction.Invalid(listOf("VOLUME_CONTROL requires a known command"))
-        return ValidatedAction.Valid(NuvaAction.VolumeControl(command))
+        val rawLevel = json.int("level_percent")
+        val level = rawLevel?.takeIf { it in 0..100 }
+        if (command == VolumeCommand.SET && level == null) {
+            return ValidatedAction.Invalid(listOf("volume set requires level_percent"))
+        }
+        if (command != VolumeCommand.SET && rawLevel != null) {
+            return ValidatedAction.Invalid(listOf("level_percent only allowed for volume set"))
+        }
+        return ValidatedAction.Valid(NuvaAction.VolumeControl(command, level))
     }
 
     private fun validateCamera(json: JsonObject): ValidatedAction {

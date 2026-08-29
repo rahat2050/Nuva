@@ -49,6 +49,32 @@ class CommandParserTest {
         assertEquals(NuvaIntent.CLOSE_APP, CommandParser.parse("facebook বন্ধ করো")!!.intent)
     }
 
+    // --- Home Assistant ---------------------------------------------------------------
+
+    @Test
+    fun `safe Home Assistant domains parse with exact entity and confirmation`() {
+        val light = CommandParser.parse("living room light on koro")!!
+        val lightAction = light.action as NuvaAction.HomeAssistantControl
+        assertEquals(HomeAssistantDomain.LIGHT, lightAction.domain)
+        assertEquals(HomeAssistantOperation.TURN_ON, lightAction.operation)
+        assertEquals("living room", lightAction.entityQuery)
+        assertTrue(light.requiresConfirmation)
+
+        val fan = CommandParser.parse("bedroom fan off koro")!!.action as NuvaAction.HomeAssistantControl
+        assertEquals(HomeAssistantOperation.TURN_OFF, fan.operation)
+        assertEquals("bedroom", fan.entityQuery)
+
+        val climate = CommandParser.parse("bedroom ac temperature 24 degree")!!.action as NuvaAction.HomeAssistantControl
+        assertEquals(HomeAssistantDomain.CLIMATE, climate.domain)
+        assertEquals(HomeAssistantOperation.SET_TEMPERATURE, climate.operation)
+        assertEquals(24.0, climate.value!!, 0.01)
+
+        val toggle = CommandParser.parse("home assistant kitchen smart switch toggle")!!.action as NuvaAction.HomeAssistantControl
+        assertEquals(HomeAssistantDomain.SWITCH, toggle.domain)
+        assertEquals(HomeAssistantOperation.TOGGLE, toggle.operation)
+        assertTrue(CommandParser.parse("bedroom ac temperature 50 degree")!!.unsupported)
+    }
+
     // --- Navigation -----------------------------------------------------------------
 
     @Test
@@ -57,6 +83,25 @@ class CommandParserTest {
         assertEquals(NuvaIntent.GO_BACK, CommandParser.parse("go back")!!.intent)
         assertEquals(NuvaIntent.GO_BACK, CommandParser.parse("নুভা পিছনে যাও")!!.intent)
         assertEquals(NuvaIntent.SHOW_RECENTS, CommandParser.parse("nuva recent apps dekhao")!!.intent)
+    }
+
+    // --- Emergency handoffs ------------------------------------------------------------
+
+    @Test
+    fun `emergency commands open user finalized dialer or share draft`() {
+        val ambulance = CommandParser.parse("ambulance call koro")!!.action as NuvaAction.EmergencyDialer
+        assertEquals(EmergencyService.AMBULANCE, ambulance.service)
+        assertEquals("999", ambulance.service.dialNumber)
+
+        val fire = CommandParser.parse("fire service call")!!.action as NuvaAction.EmergencyDialer
+        assertEquals(EmergencyService.FIRE, fire.service)
+
+        val sos = CommandParser.parse("sos message draft je amar help dorkar")!!
+        assertEquals("amar help dorkar", (sos.action as NuvaAction.ShareText).text)
+        assertTrue(sos.requiresConfirmation)
+
+        val info = CommandParser.parse("emergency info setting khulo")!!.action as NuvaAction.OpenSettingScreen
+        assertEquals(SettingTarget.EMERGENCY_INFO, info.target)
     }
 
     // --- Device status ----------------------------------------------------------------
@@ -85,6 +130,443 @@ class CommandParserTest {
         )
     }
 
+    @Test
+    fun `extended device diagnostics map to local status kinds`() {
+        val cases = mapOf(
+            "phone model ki" to DeviceStatusKind.DEVICE_INFO,
+            "ram koto" to DeviceStatusKind.MEMORY,
+            "phone uptime koto" to DeviceStatusKind.UPTIME,
+            "screen resolution koto" to DeviceStatusKind.DISPLAY,
+            "volume koto" to DeviceStatusKind.AUDIO,
+            "timezone ki" to DeviceStatusKind.TIMEZONE,
+            "phone language ki" to DeviceStatusKind.LOCALE,
+            "koyta app installed" to DeviceStatusKind.INSTALLED_APPS,
+            "phone e ki sensor ache" to DeviceStatusKind.SENSORS,
+        )
+        cases.forEach { (phrase, expected) ->
+            val query = CommandParser.parse(phrase)!!.action as NuvaAction.DeviceStatusQuery
+            assertEquals(phrase, expected, query.query)
+        }
+    }
+
+    @Test
+    fun `common banglish spellings get local realtime date and time`() {
+        val date = CommandParser.parse("aj koto tarik")!!.action as NuvaAction.DeviceStatusQuery
+        assertEquals(DeviceStatusKind.DATE, date.query)
+
+        val time = CommandParser.parse("akn koyta baje")!!.action as NuvaAction.DeviceStatusQuery
+        assertEquals(DeviceStatusKind.TIME, time.query)
+
+        val combined = CommandParser.parse("aj koto tarik akn koyta baje")!!.action as NuvaAction.DeviceStatusQuery
+        assertEquals(DeviceStatusKind.DATE_TIME, combined.query)
+    }
+
+    @Test
+    fun `date and time questions tolerate bangla english and asr variants`() {
+        listOf("এখন কয়টা বাজে", "akhon koita baje", "what time is it").forEach { phrase ->
+            val query = CommandParser.parse(phrase)!!.action as NuvaAction.DeviceStatusQuery
+            assertEquals(phrase, DeviceStatusKind.TIME, query.query)
+        }
+        listOf("আজকে কত তারিখ", "ajke koto tarikh", "what is the date today").forEach { phrase ->
+            val query = CommandParser.parse(phrase)!!.action as NuvaAction.DeviceStatusQuery
+            assertEquals(phrase, DeviceStatusKind.DATE, query.query)
+        }
+    }
+
+    @Test
+    fun `fresh external information opens a live web search`() {
+        listOf("ajker weather kemon", "latest news ki", "cricket live score koto").forEach { phrase ->
+            val decision = CommandParser.parse(phrase)
+            assertNotNull(phrase, decision)
+            assertEquals(phrase, NuvaIntent.SEARCH_WEB, decision!!.intent)
+            assertTrue((decision.action as NuvaAction.SearchWeb).query.isNotBlank())
+        }
+    }
+
+    // --- Daily-life utility engine ------------------------------------------------------
+
+    @Test
+    fun `calculations conversions and daily utilities become local answers`() {
+        val probes = listOf(
+            "2 + 3 * 4 koto" to "14",
+            "500 er 20 percent discount" to "400",
+            "5 kilometer mile e koto" to "3.106856",
+            "300 km 20 liter mileage koto" to "15",
+            "average of 10 20 30" to "20",
+            "10000 simple interest 10 percent 2 year" to "2000",
+            "120 km 60 kmph travel time koto" to "2 hour",
+        )
+        probes.forEach { (phrase, expected) ->
+            val decision = CommandParser.parse(phrase)
+            assertEquals(phrase, NuvaIntent.LOCAL_ANSWER, decision!!.intent)
+            assertTrue(phrase, (decision.action as NuvaAction.LocalAnswer).answer.contains(expected))
+            assertFalse(decision.requiresConfirmation)
+        }
+    }
+
+    @Test
+    fun `shopping expense help and factual questions have useful routes`() {
+        val shopping = CommandParser.parse("shopping list e add koro dim dudh")!!.action as NuvaAction.CreateTodo
+        assertTrue(shopping.content.contains("Shopping:"))
+        assertTrue(shopping.content.contains("dim dudh"))
+
+        val expense = CommandParser.parse("expense note lunch 250")!!.action as NuvaAction.CreateNote
+        assertTrue(expense.content.contains("Expense:"))
+
+        val readShopping = CommandParser.parse("shopping list dekhao")!!.action as NuvaAction.ReadSavedItems
+        assertEquals(SavedItemKind.SHOPPING, readShopping.kind)
+        val readExpenses = CommandParser.parse("khoroch gulo poro")!!.action as NuvaAction.ReadSavedItems
+        assertEquals(SavedItemKind.EXPENSE, readExpenses.kind)
+
+        assertEquals(NuvaIntent.LOCAL_ANSWER, CommandParser.parse("tumi ki ki korte paro")!!.intent)
+        assertEquals(NuvaIntent.SEARCH_WEB, CommandParser.parse("chicken biryani recipe")!!.intent)
+        assertEquals(NuvaIntent.SEARCH_WEB, CommandParser.parse("photosynthesis ki")!!.intent)
+    }
+
+    @Test
+    fun `one hundred daily skill shortcuts route to sourced information`() {
+        assertEquals(NuvaIntent.MAP_NAVIGATION, CommandParser.parse("kacher pharmacy")!!.intent)
+        listOf(
+            "parcel tracking ZX123",
+            "passport application",
+            "current job circular",
+            "internet speed test",
+            "গাছের যত্ন",
+        ).forEach { phrase ->
+            val decision = CommandParser.parse(phrase)
+            assertNotNull(phrase, decision)
+            assertEquals(phrase, NuvaIntent.SEARCH_WEB, decision!!.intent)
+        }
+    }
+
+    @Test
+    fun `five hundred matrix generated skills require entity plus task`() {
+        assertEquals(NuvaIntent.MAP_NAVIGATION, CommandParser.parse("nearby private tutor")!!.intent)
+        listOf(
+            "passport ki kagoj lagbe",
+            "excel tutorial",
+            "washing machine repair",
+            "রাউটার ব্যবহারের নিয়ম",
+        ).forEach { phrase ->
+            val decision = CommandParser.parse(phrase)
+            assertNotNull(phrase, decision)
+            assertEquals(phrase, NuvaIntent.SEARCH_WEB, decision!!.intent)
+        }
+        assertNull(CommandParser.parse("required documents"))
+    }
+
+    @Test
+    fun `universal parser is connected to the main rule table`() {
+        assertEquals(NuvaIntent.PRESS, CommandParser.parse("Send button press koro")!!.intent)
+        assertEquals(NuvaIntent.CLEAR_TEXT, CommandParser.parse("lekhata muchhe dao")!!.intent)
+        assertEquals(NuvaIntent.DESCRIBE_SCREEN, CommandParser.parse("button gulo dekhao")!!.intent)
+    }
+
+    // --- User-present files & gallery --------------------------------------------------
+
+    @Test
+    fun `file and media commands always become user picker workflows`() {
+        val cases = listOf(
+            "file open koro" to UserFileOperation.OPEN_FILE,
+            "file share koro" to UserFileOperation.SHARE_FILE,
+            "text file pore shonao" to UserFileOperation.READ_TEXT,
+            "folder select koro" to UserFileOperation.OPEN_FOLDER,
+            "gallery theke photo select koro" to UserFileOperation.PICK_PHOTO,
+            "photo share koro" to UserFileOperation.SHARE_PHOTO,
+            "gallery theke video select koro" to UserFileOperation.PICK_VIDEO,
+            "video share koro" to UserFileOperation.SHARE_VIDEO,
+        )
+        cases.forEach { (phrase, operation) ->
+            val decision = CommandParser.parse(phrase)
+            assertEquals(phrase, NuvaIntent.USER_FILE, decision!!.intent)
+            assertEquals(phrase, operation, (decision.action as NuvaAction.UserFile).operation)
+        }
+    }
+
+    @Test
+    fun `target aware file mutations and photo editor handoff parse safely`() {
+        val rename = CommandParser.parse("file rename koro new name report.pdf")!!
+        val renameAction = rename.action as NuvaAction.UserFile
+        assertEquals(UserFileOperation.RENAME_FILE, renameAction.operation)
+        assertEquals("report.pdf", renameAction.newName)
+        assertTrue(rename.requiresConfirmation)
+
+        assertEquals(UserFileOperation.COPY_FILE, (CommandParser.parse("file copy koro")!!.action as NuvaAction.UserFile).operation)
+        assertEquals(UserFileOperation.MOVE_FILE, (CommandParser.parse("file move koro")!!.action as NuvaAction.UserFile).operation)
+        assertEquals(UserFileOperation.DELETE_FILE, (CommandParser.parse("file delete koro")!!.action as NuvaAction.UserFile).operation)
+        assertEquals(UserFileOperation.EDIT_PHOTO, (CommandParser.parse("photo crop koro")!!.action as NuvaAction.UserFile).operation)
+        assertEquals(UserFileOperation.PRINT_PDF, (CommandParser.parse("pdf print koro")!!.action as NuvaAction.UserFile).operation)
+        assertTrue(CommandParser.parse("file rename koro")!!.unsupported)
+    }
+
+    @Test
+    fun `sharing mutations and folder access confirm while read only selection does not`() {
+        assertTrue(CommandParser.parse("file share koro")!!.requiresConfirmation)
+        assertTrue(CommandParser.parse("folder access dao")!!.requiresConfirmation)
+        assertTrue(CommandParser.parse("file delete koro")!!.requiresConfirmation)
+        assertTrue(CommandParser.parse("file copy koro")!!.requiresConfirmation)
+        assertTrue(CommandParser.parse("photo edit koro")!!.requiresConfirmation)
+        assertTrue(CommandParser.parse("pdf print koro")!!.requiresConfirmation)
+        assertFalse(CommandParser.parse("file open koro")!!.requiresConfirmation)
+        assertFalse(CommandParser.parse("text file poro")!!.requiresConfirmation)
+    }
+
+    @Test
+    fun `multiple files media and email attachments use bounded multi picker`() {
+        assertEquals(
+            UserFileOperation.SHARE_MULTIPLE_FILES,
+            (CommandParser.parse("multiple file share koro")!!.action as NuvaAction.UserFile).operation,
+        )
+        assertEquals(
+            UserFileOperation.SHARE_MULTIPLE_PHOTOS,
+            (CommandParser.parse("onek photo share koro")!!.action as NuvaAction.UserFile).operation,
+        )
+        assertEquals(
+            UserFileOperation.SHARE_MULTIPLE_VIDEOS,
+            (CommandParser.parse("multiple video share koro")!!.action as NuvaAction.UserFile).operation,
+        )
+        val email = CommandParser.parse("email compose koro multiple attachment")!!.action as NuvaAction.ComposeEmail
+        assertTrue(email.attachmentRequested)
+        assertTrue(email.multipleAttachments)
+        assertNull(email.body)
+    }
+
+    @Test
+    fun `social post mms and voicemail stay visible and user finalized`() {
+        val social = CommandParser.parse("facebook post draft je aj meeting ache")!!
+        val post = social.action as NuvaAction.ComposeSocialPost
+        assertEquals(SocialPlatform.FACEBOOK, post.platform)
+        assertEquals("aj meeting ache", post.text)
+        assertTrue(social.requiresConfirmation)
+
+        val mms = CommandParser.parse("mms compose 01712345678 photo attachment je ami ashchi")!!
+        val mmsAction = mms.action as NuvaAction.ComposeMms
+        assertEquals("01712345678", mmsAction.recipient)
+        assertEquals("ami ashchi", mmsAction.body)
+        assertTrue(mmsAction.attachmentRequested)
+        assertTrue(mms.requiresConfirmation)
+
+        assertEquals(NuvaIntent.OPEN_VOICEMAIL, CommandParser.parse("voicemail khulo")!!.intent)
+        assertTrue(CommandParser.parse("facebook post draft")!!.unsupported)
+    }
+
+    // --- Maps/navigation ---------------------------------------------------------------
+
+    @Test
+    fun `directions navigation nearby and street view preserve dynamic places`() {
+        val navigation = CommandParser.parse("navigate to dhaka walking")!!.action as NuvaAction.MapNavigation
+        assertEquals(MapRequestType.NAVIGATION, navigation.requestType)
+        assertEquals("dhaka", navigation.destination)
+        assertEquals(TravelMode.WALKING, navigation.travelMode)
+
+        val directions = CommandParser.parse("from sylhet to dhaka public transport")!!.action as NuvaAction.MapNavigation
+        assertEquals("sylhet", directions.origin)
+        assertEquals("dhaka", directions.destination)
+        assertEquals(TravelMode.TRANSIT, directions.travelMode)
+
+        val nearby = CommandParser.parse("nearby pharmacy")!!.action as NuvaAction.MapNavigation
+        assertEquals(MapRequestType.NEARBY, nearby.requestType)
+        assertEquals("pharmacy", nearby.destination)
+
+        val street = CommandParser.parse("street view 24.8949,91.8687")!!.action as NuvaAction.MapNavigation
+        assertEquals(MapRequestType.STREET_VIEW, street.requestType)
+        assertEquals("24.8949,91.8687", street.destination)
+    }
+
+    // --- Email compose & notification RemoteInput -------------------------------------
+
+    @Test
+    fun `email commands create user reviewed compose drafts`() {
+        val decision = CommandParser.parse(
+            "user@example.com ke email koro subject meeting je kal 9 tay asben",
+        )!!
+        val email = decision.action as NuvaAction.ComposeEmail
+        assertEquals("user@example.com", email.recipient)
+        assertEquals("meeting", email.subject)
+        assertEquals("kal 9 tay asben", email.body)
+        assertTrue(decision.requiresConfirmation)
+
+        val blank = CommandParser.parse("email compose koro")!!.action as NuvaAction.ComposeEmail
+        assertNull(blank.recipient)
+        assertNull(blank.body)
+
+        val attachment = CommandParser.parse("user@example.com ke email compose koro attachment")!!
+            .action as NuvaAction.ComposeEmail
+        assertTrue(attachment.attachmentRequested)
+        assertNull(attachment.body)
+    }
+
+    @Test
+    fun `notification reply extracts ordinal and exact message`() {
+        val decision = CommandParser.parse("2 number notification e reply dao je ami 10 minute e ashchi")!!
+        val reply = decision.action as NuvaAction.ReplyNotification
+        assertEquals(2, reply.ordinal)
+        assertEquals("ami 10 minute e ashchi", reply.message)
+        assertTrue(decision.requiresConfirmation)
+
+        val missing = CommandParser.parse("notification reply koro")
+        assertTrue(missing!!.unsupported)
+
+        val credential = CommandParser.parse("notification reply dao je otp 1234")
+        assertTrue(credential!!.unsupported)
+        assertNull(credential.action)
+    }
+
+    // --- Share, contact draft & notification management -------------------------------
+
+    @Test
+    fun `text share and contact creation stay user finalized`() {
+        val share = CommandParser.parse("text share koro je ami ashchi")!!
+        assertEquals("ami ashchi", (share.action as NuvaAction.ShareText).text)
+        assertTrue(share.requiresConfirmation)
+
+        val contact = CommandParser.parse(
+            "new contact add koro name Rahim number 01712345678 email rahim@example.com",
+        )!!
+        val draft = contact.action as NuvaAction.CreateContactDraft
+        assertEquals("rahim", draft.name.lowercase())
+        assertEquals("01712345678", draft.phone)
+        assertEquals("rahim@example.com", draft.email)
+        assertTrue(contact.requiresConfirmation)
+    }
+
+    @Test
+    fun `contact picker handoff and uninstall stay system finalized`() {
+        val edit = CommandParser.parse("contact edit koro")!!
+        assertEquals(ContactHandoffOperation.EDIT, (edit.action as NuvaAction.ContactHandoff).operation)
+        assertTrue(edit.requiresConfirmation)
+
+        val uninstall = CommandParser.parse("facebook uninstall koro")!!
+        assertEquals("facebook", (uninstall.action as NuvaAction.UninstallApp).app)
+        assertTrue(uninstall.requiresConfirmation)
+
+        val financial = CommandParser.parse("bkash uninstall koro")
+        assertTrue(financial!!.unsupported)
+
+        val info = CommandParser.parse("facebook app info khulo")!!.action as NuvaAction.OpenAppManagement
+        assertEquals(AppManagementPanel.APP_INFO, info.panel)
+        val notifications = CommandParser.parse("whatsapp notification settings khulo")!!.action as NuvaAction.OpenAppManagement
+        assertEquals("whatsapp", notifications.app)
+        assertEquals(AppManagementPanel.NOTIFICATIONS, notifications.panel)
+        val store = CommandParser.parse("youtube play store page khulo")!!.action as NuvaAction.OpenAppManagement
+        assertEquals(AppManagementPanel.PLAY_STORE, store.panel)
+    }
+
+    @Test
+    fun `clipboard operations are explicit bounded and confirmation gated`() {
+        val copy = CommandParser.parse("clipboard e copy koro je meeting kal 9 tay")!!
+        val copyAction = copy.action as NuvaAction.ClipboardAction
+        assertEquals(ClipboardOperation.COPY, copyAction.operation)
+        assertEquals("meeting kal 9 tay", copyAction.text)
+        assertTrue(copy.requiresConfirmation)
+
+        assertEquals(ClipboardOperation.READ, (CommandParser.parse("clipboard poro")!!.action as NuvaAction.ClipboardAction).operation)
+        assertEquals(ClipboardOperation.CLEAR, (CommandParser.parse("clipboard clear koro")!!.action as NuvaAction.ClipboardAction).operation)
+        assertTrue(CommandParser.parse("copy to clipboard")!!.unsupported)
+    }
+
+    @Test
+    fun `calendar provider agenda and exact event handoff parse safely`() {
+        val agenda = CommandParser.parse("calendar agenda poro")!!
+        val agendaAction = agenda.action as NuvaAction.CalendarProvider
+        assertEquals(CalendarProviderOperation.READ_AGENDA, agendaAction.operation)
+        assertNull(agendaAction.eventQuery)
+        assertTrue(agenda.requiresConfirmation)
+
+        val week = CommandParser.parse("next 7 day calendar agenda poro")!!.action as NuvaAction.CalendarProvider
+        val days = (week.rangeEnd - week.rangeStart) / 86_400_000L
+        assertEquals(7L, days)
+
+        val edit = CommandParser.parse("calendar event edit title project meeting")!!.action as NuvaAction.CalendarProvider
+        assertEquals(CalendarProviderOperation.EDIT_EVENT, edit.operation)
+        assertEquals("project meeting", edit.eventQuery)
+
+        val open = CommandParser.parse("calendar event kholo title dentist")!!.action as NuvaAction.CalendarProvider
+        assertEquals(CalendarProviderOperation.OPEN_EVENT, open.operation)
+        assertEquals("dentist", open.eventQuery)
+    }
+
+    @Test
+    fun `calendar view opens requested relative day without reading events`() {
+        val today = CommandParser.parse("calendar dekhao")!!.action as NuvaAction.ViewCalendar
+        val tomorrow = CommandParser.parse("tomorrow calendar dekhao")!!.action as NuvaAction.ViewCalendar
+        val deltaHours = (tomorrow.focusAt - today.focusAt) / 3_600_000
+        assertTrue(deltaHours in 23..25)
+    }
+
+    @Test
+    fun `rich calendar event parses title duration location description and attendee`() {
+        val decision = CommandParser.parse(
+            "kal 9 tay 2 hour calendar event create title project meeting location khulna description roadmap attendee user@example.com",
+        )!!
+        val event = decision.action as NuvaAction.CreateCalendarEvent
+        assertEquals("project meeting", event.title)
+        assertEquals("khulna", event.location)
+        assertEquals("roadmap", event.description)
+        assertEquals("user@example.com", event.attendeeEmail)
+        assertEquals(7_200_000L, event.endAt - event.beginAt)
+        assertTrue(decision.requiresConfirmation)
+    }
+
+    @Test
+    fun `one safe notification can be dismissed or marked read after confirmation`() {
+        val dismiss = CommandParser.parse("2 number notification dismiss koro")!!
+        val dismissAction = dismiss.action as NuvaAction.ManageNotification
+        assertEquals(2, dismissAction.ordinal)
+        assertEquals(NotificationManageOperation.DISMISS, dismissAction.operation)
+        assertTrue(dismiss.requiresConfirmation)
+
+        val markRead = CommandParser.parse("notification mark as read koro")!!
+        assertEquals(
+            NotificationManageOperation.MARK_READ,
+            (markRead.action as NuvaAction.ManageNotification).operation,
+        )
+    }
+
+    // --- Forms & scheduled compose -----------------------------------------------------
+
+    @Test
+    fun `form handoff stores only explicit local details and requires confirmation`() {
+        val decision = CommandParser.parse("passport application form kholo details name address draft")!!
+        val form = decision.action as NuvaAction.PrepareForm
+        assertEquals(FormKind.PASSPORT, form.kind)
+        assertEquals("name address draft", form.details)
+        assertTrue(decision.requiresConfirmation)
+    }
+
+    @Test
+    fun `scheduled email and sms become reminders not automatic sends`() {
+        val emailDecision = CommandParser.parse(
+            "kal shokal 9 tay schedule email user@example.com subject meeting je ami ashchi",
+        )!!
+        val email = emailDecision.action as NuvaAction.ScheduleCompose
+        assertEquals(ComposeChannel.EMAIL, email.channel)
+        assertEquals("user@example.com", email.recipient)
+        assertEquals("meeting", email.subject)
+        assertEquals("ami ashchi", email.body)
+        assertTrue(emailDecision.requiresConfirmation)
+        assertTrue(email.triggerAt > System.currentTimeMillis())
+
+        val sms = CommandParser.parse("kal 8 tay schedule sms 01712345678 message ami ashchi")!!
+            .action as NuvaAction.ScheduleCompose
+        assertEquals(ComposeChannel.SMS, sms.channel)
+        assertEquals("01712345678", sms.recipient)
+
+        val daily = CommandParser.parse("protidin 8 tay schedule sms message standup update")!!
+            .action as NuvaAction.ScheduleCompose
+        assertEquals(ComposeRecurrence.DAILY, daily.recurrence)
+        val weekly = CommandParser.parse("shukrobar 9 tay schedule email je weekly report")!!
+            .action as NuvaAction.ScheduleCompose
+        assertEquals(ComposeRecurrence.WEEKLY, weekly.recurrence)
+
+        assertEquals(NuvaIntent.LIST_SCHEDULED_DRAFTS, CommandParser.parse("scheduled draft list dekhao")!!.intent)
+        val cancel = CommandParser.parse("2 number scheduled draft cancel koro")!!
+        assertEquals(2, (cancel.action as NuvaAction.CancelScheduledDraft).ordinal)
+        assertTrue(cancel.requiresConfirmation)
+
+        assertTrue(CommandParser.parse("schedule email kal 9 tay")!!.unsupported)
+    }
+
     // --- Settings ----------------------------------------------------------------------
 
     @Test
@@ -105,9 +587,49 @@ class CommandParserTest {
             SettingTarget.BRIGHTNESS,
             (CommandParser.parse("brightness kom koro")!!.action as NuvaAction.OpenSettingScreen).target,
         )
+        val extended = mapOf(
+            "mobile data setting khulo" to SettingTarget.MOBILE_DATA,
+            "airplane mode setting khulo" to SettingTarget.AIRPLANE_MODE,
+            "location setting khulo" to SettingTarget.LOCATION,
+            "hotspot setting khulo" to SettingTarget.HOTSPOT,
+            "nfc setting khulo" to SettingTarget.NFC,
+            "vpn setting khulo" to SettingTarget.VPN,
+            "battery saver setting khulo" to SettingTarget.BATTERY_SAVER,
+            "default apps setting khulo" to SettingTarget.DEFAULT_APPS,
+            "date time setting khulo" to SettingTarget.DATE_TIME,
+            "language setting khulo" to SettingTarget.LANGUAGE,
+            "storage setting khulo" to SettingTarget.STORAGE_SETTINGS,
+            "privacy setting khulo" to SettingTarget.PRIVACY,
+            "security setting khulo" to SettingTarget.SECURITY,
+            "cast setting khulo" to SettingTarget.CAST,
+            "print setting khulo" to SettingTarget.PRINT,
+            "caption setting khulo" to SettingTarget.CAPTIONS,
+        )
+        extended.forEach { (phrase, target) ->
+            assertEquals(phrase, target, (CommandParser.parse(phrase)!!.action as NuvaAction.OpenSettingScreen).target)
+        }
     }
 
-    // --- Alarm / timer --------------------------------------------------------------------
+    // --- Clock management, alarm & timer -------------------------------------------------
+
+    @Test
+    fun `existing alarm and timer actions parse with risk gates`() {
+        val showAlarms = CommandParser.parse("show alarms")!!
+        assertEquals(ClockOperation.SHOW_ALARMS, (showAlarms.action as NuvaAction.ClockControl).operation)
+        assertFalse(showAlarms.requiresConfirmation)
+
+        val showTimers = CommandParser.parse("timer list dekhao")!!
+        assertEquals(ClockOperation.SHOW_TIMERS, (showTimers.action as NuvaAction.ClockControl).operation)
+
+        val snooze = CommandParser.parse("snooze alarm")!!
+        assertEquals(ClockOperation.SNOOZE_ALARM, (snooze.action as NuvaAction.ClockControl).operation)
+        assertTrue(snooze.requiresConfirmation)
+
+        val dismiss = CommandParser.parse("alarm bondho koro")!!
+        assertEquals(ClockOperation.DISMISS_ALARM, (dismiss.action as NuvaAction.ClockControl).operation)
+        assertTrue(dismiss.requiresConfirmation)
+        assertEquals(ClockOperation.DISMISS_TIMER, (CommandParser.parse("timer bondho koro")!!.action as NuvaAction.ClockControl).operation)
+    }
 
     @Test
     fun `alarm parses banglish morning time`() {
@@ -308,6 +830,14 @@ class CommandParserTest {
 
         val bangla = CommandParser.parse("গান থামাও")
         assertEquals(MediaCommand.PAUSE, (bangla!!.action as NuvaAction.MediaControl).command)
+
+        val forward = CommandParser.parse("music 30 second forward")!!.action as NuvaAction.MediaControl
+        assertEquals(MediaCommand.FAST_FORWARD, forward.command)
+        assertEquals(30, forward.offsetSeconds)
+        val rewind = CommandParser.parse("video 15 second rewind")!!.action as NuvaAction.MediaControl
+        assertEquals(MediaCommand.REWIND, rewind.command)
+        assertEquals(15, rewind.offsetSeconds)
+        assertEquals(MediaCommand.STOP, (CommandParser.parse("music stop koro")!!.action as NuvaAction.MediaControl).command)
     }
 
     @Test
@@ -321,6 +851,11 @@ class CommandParserTest {
 
         val mute = CommandParser.parse("nuva sound mute koro")
         assertEquals(VolumeCommand.MUTE, (mute!!.action as NuvaAction.VolumeControl).command)
+        assertEquals(VolumeCommand.UNMUTE, (CommandParser.parse("sound unmute koro")!!.action as NuvaAction.VolumeControl).command)
+        val exact = CommandParser.parse("volume 55 percent")!!.action as NuvaAction.VolumeControl
+        assertEquals(VolumeCommand.SET, exact.command)
+        assertEquals(55, exact.levelPercent)
+        assertTrue(CommandParser.parse("volume 150 percent")!!.unsupported)
 
         // "volume setting" still opens the settings screen instead
         val settings = CommandParser.parse("nuva volume setting khulo")

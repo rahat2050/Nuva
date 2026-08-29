@@ -1,6 +1,8 @@
 package com.nuva.assistant.command
 
 import android.content.Context
+import android.content.Intent
+import com.nuva.assistant.MainActivity
 import com.nuva.assistant.ai.AIRepository
 import com.nuva.assistant.automation.AppLauncher
 import com.nuva.assistant.automation.BrowserAutomation
@@ -17,12 +19,17 @@ import com.nuva.assistant.database.dao.PendingActionDao
 import com.nuva.assistant.database.dao.NoteDao
 import com.nuva.assistant.database.dao.insert
 import com.nuva.assistant.database.entities.NoteEntity
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import com.nuva.assistant.memory.UserPreferences
 import com.nuva.assistant.service.NuvaNotificationListener
 import com.nuva.assistant.supabase.SupabaseRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * THE COMMAND ENGINE — the only class that turns a validated decision into
@@ -87,13 +94,33 @@ class CommandExecutor(
      */
     private val planQueue = ArrayDeque<CommandDecision>()
     private var planTotalSteps: Int = 0
+    private var planPendingId: Long? = null
+
+    /**
+     * Command processing and confirmation mutate one shared plan/session. They
+     * must never interleave across the app, wake overlay and assistant service.
+     */
+    private val commandMutex = Mutex()
 
     /**
      * Full pipeline for one utterance (voice or typed). Never throws — every
      * failure becomes a [Step.Failed] with a user-sayable reason.
      */
-    suspend fun process(text: String): Step {
+    suspend fun process(text: String): Step = commandMutex.withLock {
+        processLocked(text)
+    }
+
+    private suspend fun processLocked(text: String): Step {
         if (text.isBlank()) return Step.Failed("Kichu bolejni. Ar ektu jore bolen.")
+        clearActivePlan()
+        // Secrets and transaction requests stop before AI, contacts and local
+        // history. A refusal must not itself persist the sensitive utterance.
+        if (SensitiveAppPolicy.mentionsCredentials(text)) {
+            return Step.Failed(SensitiveAppPolicy.CREDENTIAL_REFUSAL)
+        }
+        SensitiveAppPolicy.refusalForText(text)?.let { refusal ->
+            return Step.Failed(refusal.speech)
+        }
         _busy.value = true
         try {
             // Multi-step plan? ("WhatsApp kholo ar Rohim-ke message dau …")
@@ -111,6 +138,8 @@ class CommandExecutor(
                 "পুরো command-টা বুঝিনি — আপনি কি বলতে চাচ্ছেন অন্য কিছু? একটু অন্যভাবে বলুন বা লিখে দিন।",
             )
             return handleDecision(text, decision)
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (err: AIRepository.ApiCallException) {
             return Step.Failed(
                 "ইন্টারনেট লাগবে এই command-এর জন্য। লোকাল কাজ (app open, torch, alarm, timer, volume, battery) অফলাইনেই চলে।",
@@ -127,6 +156,12 @@ class CommandExecutor(
      * needs confirmation PAUSES the plan (its own dialog); after the user
      * confirms, [confirm] resumes the queue. A failed step aborts the rest.
      */
+    private fun clearActivePlan() {
+        planQueue.clear()
+        planTotalSteps = 0
+        planPendingId = null
+    }
+
     private suspend fun drainPlan(step: Step): Step {
         var current = step
         var index = planTotalSteps - planQueue.size
@@ -141,8 +176,9 @@ class CommandExecutor(
                 handleDecision(label, next)
             }
         }
-        if (planQueue.isEmpty() && current is Step.Done && planTotalSteps > 1) {
-            planTotalSteps = 0
+        when {
+            current is Step.Failed -> clearActivePlan()
+            planQueue.isEmpty() && current is Step.Done -> clearActivePlan()
         }
         return current
     }
@@ -159,7 +195,7 @@ class CommandExecutor(
         // Local parser explicitly asked for more info (or refused) — respect it.
         if (local != null && local.source == "offline-security") return local
 
-        val language = preferences.languageBlocking()
+        val language = preferences.language.first()
         return try {
             val remote = aiRepository.interpret(text, language)
             if (remote.unsupported) {
@@ -169,6 +205,8 @@ class CommandExecutor(
             } else {
                 remote
             }
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (err: Exception) {
             local ?: throw err
         }
@@ -191,6 +229,16 @@ class CommandExecutor(
         }
 
         var action = applyContext(text, decision.action)
+
+        // Re-check the structured action itself. A compromised/misconfigured
+        // backend must not inject credential or transaction text that was not
+        // present in the user's original command.
+        SensitiveAppPolicy.refusalForAction(action)?.let { refusal ->
+            history.updateStatusAndError(localId, "blocked", refusal.reason)
+            reportRemote(decision, "blocked", refusal.reason)
+            clearActivePlan()
+            return Step.Failed(refusal.speech)
+        }
 
         // Contact resolution for calls/messages/chats BEFORE anything is
         // confirmed, so the confirmation dialog always shows a real number.
@@ -320,14 +368,17 @@ class CommandExecutor(
                 ContactStep.Resolved(r.match.phone, r.match.displayName)
 
             is ContactResolver.Resolution.Ambiguous -> {
+                val unresolvedAction = decision.action
+                    ?: return ContactStep.Fail("Action ta ar valid nei.", "missing contact action")
                 val pendingId = pendingActions.insert(
                     localCommandId = localId,
                     commandText = text,
-                    actionJson = ActionJson.encode(decision.action!!),
+                    actionJson = ActionJson.encode(unresolvedAction),
                     risk = decision.risk.name.lowercase(),
                     serverCommandId = decision.commandId,
                 )
                 history.updateStatus(localId, "pending_choice")
+                if (planQueue.isNotEmpty()) planPendingId = pendingId
                 ContactStep.Choice(Step.AwaitingContactChoice(pendingId, decision, r.matches))
             }
         }
@@ -341,7 +392,7 @@ class CommandExecutor(
     ): Step {
         val mustConfirm = com.nuva.assistant.core.security.SecurityPolicy.mustConfirm(
             decision.risk,
-            preferences.confirmationAlwaysBlocking(),
+            preferences.confirmationAlways.first(),
         ) || decision.requiresConfirmation
 
         return if (mustConfirm) {
@@ -353,6 +404,7 @@ class CommandExecutor(
                 serverCommandId = decision.commandId,
             )
             history.updateStatus(localId, "pending_confirmation")
+            if (planQueue.isNotEmpty()) planPendingId = pendingId
             Step.AwaitingConfirmation(pendingId, decision)
         } else {
             executeDecision(decision, action, localId)
@@ -360,77 +412,145 @@ class CommandExecutor(
     }
 
     /** The user picked one of several matching contacts → park it and confirm. */
-    suspend fun chooseContact(pendingId: Long, match: ContactResolver.ContactMatch): Step {
+    suspend fun chooseContact(pendingId: Long, match: ContactResolver.ContactMatch): Step =
+        commandMutex.withLock { chooseContactLocked(pendingId, match) }
+
+    private suspend fun chooseContactLocked(
+        pendingId: Long,
+        match: ContactResolver.ContactMatch,
+    ): Step {
         val pending = pendingActions.get(pendingId) ?: return Step.Failed("Action ar pending nei.")
-        val action = ActionJson.decode(pending.actionJson) ?: return Step.Failed("Action ta ar valid nei.")
+        if (pending.status != "pending") return Step.Failed("Action ta already handle hoye geche.")
+        if (!PendingActionPolicy.isFresh(pending.createdAt)) return expirePending(pending)
+        val action = ActionJson.decode(pending.actionJson)
+            ?: return blockPending(pending, "pending action failed validation")
         val updated: NuvaAction = when (action) {
             is NuvaAction.CallContact -> action.copy(contact = match.displayName, phoneNumber = match.phone)
             is NuvaAction.SendMessage -> action.copy(contact = match.displayName, phoneNumber = match.phone)
-            else -> action
+            is NuvaAction.OpenChat -> action.copy(contact = match.displayName, phoneNumber = match.phone)
+            else -> return blockPending(pending, "pending action does not support contact choice")
         }
-        // Park the RESOLVED action — confirm() decodes from the DB row.
-        pendingActions.updateAction(pendingId, ActionJson.encode(updated))
-        pendingActions.updateStatus(pendingId, "pending")
+        // Round-trip the selected contact through the same validator before it
+        // is persisted. The old OpenChat path silently ignored the selection.
+        val validated = ActionJson.decode(ActionJson.encode(updated))
+            ?: return blockPending(pending, "selected contact failed validation")
+        if (pendingActions.updatePendingAction(pendingId, ActionJson.encode(validated)) != 1) {
+            return Step.Failed("Action ta already handle hoye geche.")
+        }
+        val risk = CommandValidator.recomputeRisk(
+            validated,
+            pending.commandText,
+            NuvaRisk.fromWire(pending.risk),
+        )
         val decision = CommandDecision(
-            intent = updated.intent,
-            action = updated,
+            intent = validated.intent,
+            action = validated,
             unsupported = false,
-            risk = NuvaRisk.valueOf(pending.risk.uppercase()),
+            risk = risk,
             requiresConfirmation = true,
             speech = "",
             reasons = emptyList(),
             commandId = pending.serverCommandId,
             source = "contact-choice",
         )
-        // Re-enter the confirmation gate with the resolved number.
-        val mustConfirm = com.nuva.assistant.core.security.SecurityPolicy.mustConfirm(
-            decision.risk,
-            preferences.confirmationAlwaysBlocking(),
-        ) || decision.requiresConfirmation
-        return if (mustConfirm) {
-            Step.AwaitingConfirmation(pendingId, decision)
-        } else {
-            confirm(pendingId)
-        }
+        return Step.AwaitingConfirmation(pendingId, decision)
     }
 
     /** Called by the confirmation UI when the user approves a pending action. */
-    suspend fun confirm(pendingId: Long): Step {
+    suspend fun confirm(pendingId: Long): Step = commandMutex.withLock {
+        confirmLocked(pendingId)
+    }
+
+    private suspend fun confirmLocked(pendingId: Long): Step {
         val pending = pendingActions.get(pendingId) ?: return Step.Failed("Action ar pending nei.")
+        if (pending.status != "pending") return Step.Failed("Action ta already handle hoye geche; abar command din.")
+        if (!PendingActionPolicy.isFresh(pending.createdAt)) return expirePending(pending)
         val action = ActionJson.decode(pending.actionJson)
-            ?: return Step.Failed("Action ta ar valid nei.")
-        pendingActions.updateStatus(pendingId, "confirmed")
+            ?: return blockPending(pending, "pending action failed validation")
+        SensitiveAppPolicy.refusalForAction(action)?.let { refusal ->
+            return blockPending(pending, refusal.reason, refusal.speech)
+        }
+        // SQL compare-and-set makes confirmation one-shot even under rapid
+        // double taps or two visible NUVA surfaces racing the same row.
+        if (pendingActions.claimPending(pendingId) != 1) {
+            return Step.Failed("Action ta already handle hoye geche; abar command din.")
+        }
+
+        val continuesPlan = planPendingId == pendingId
+        if (continuesPlan) planPendingId = null
         if (pending.localCommandId != null) {
             history.updateStatus(pending.localCommandId, "confirmed")
         }
+        val risk = CommandValidator.recomputeRisk(
+            action,
+            pending.commandText,
+            NuvaRisk.fromWire(pending.risk),
+        )
         val decision = CommandDecision(
             intent = action.intent,
             action = action,
             unsupported = false,
-            risk = NuvaRisk.valueOf(pending.risk.uppercase()),
+            risk = risk,
             requiresConfirmation = true,
             speech = "",
             reasons = emptyList(),
             commandId = pending.serverCommandId,
             source = "pending",
         )
-        return drainPlan(executeDecision(decision, action, pending.localCommandId ?: 0L))
+        val executed = executeDecision(decision, action, pending.localCommandId ?: 0L)
+        return if (continuesPlan) drainPlan(executed) else executed
     }
 
     /** Called when the user rejects the confirmation dialog. */
-    suspend fun reject(pendingId: Long): Step {
-        val pending = pendingActions.get(pendingId) ?: return Step.Done("Thik ache, koreni.", "rejected")
-        pendingActions.updateStatus(pendingId, "rejected")
+    suspend fun reject(pendingId: Long): Step = commandMutex.withLock {
+        val pending = pendingActions.get(pendingId)
+            ?: return@withLock Step.Done("Thik ache, koreni.", "rejected")
+        if (pendingActions.transitionPending(pendingId, "rejected") != 1) {
+            return@withLock Step.Done("Action ta agei handle hoye geche.", "rejected")
+        }
         if (pending.localCommandId != null) history.updateStatus(pending.localCommandId, "rejected")
         reportRemoteById(pending.serverCommandId, "rejected", null)
-        // Cancelling one step cancels the whole remaining plan — never run
-        // half-approved sequences.
-        if (planQueue.isNotEmpty()) {
-            planQueue.clear()
-            planTotalSteps = 0
-            return Step.Done("Thik ache, koreni — baki plan-er kajgulo o cancel kore dilam.", "rejected")
+        // Only cancel the plan owned by THIS dialog. An old dialog must never
+        // erase or resume a newer command's plan.
+        if (planPendingId == pendingId) {
+            val hadMoreSteps = planQueue.isNotEmpty()
+            clearActivePlan()
+            if (hadMoreSteps) {
+                return@withLock Step.Done(
+                    "Thik ache, koreni — baki plan-er kajgulo o cancel kore dilam.",
+                    "rejected",
+                )
+            }
         }
-        return Step.Done("Thik ache, koreni.", "rejected")
+        Step.Done("Thik ache, koreni.", "rejected")
+    }
+
+    private suspend fun expirePending(
+        pending: com.nuva.assistant.database.entities.PendingActionEntity,
+    ): Step {
+        if (pendingActions.transitionPending(pending.id, "expired") != 1) {
+            return Step.Failed("Action ta already handle hoye geche; abar command din.")
+        }
+        pending.localCommandId?.let {
+            history.updateStatusAndError(it, "expired", "confirmation expired")
+        }
+        reportRemoteById(pending.serverCommandId, "rejected", "confirmation expired")
+        if (planPendingId == pending.id) clearActivePlan()
+        return Step.Failed("Confirmation-er shomoy sesh hoye geche; abar command din.")
+    }
+
+    private suspend fun blockPending(
+        pending: com.nuva.assistant.database.entities.PendingActionEntity,
+        reason: String,
+        speech: String = "Action ta security check pass koreni; abar command din.",
+    ): Step {
+        if (pendingActions.transitionPending(pending.id, "blocked") != 1) {
+            return Step.Failed("Action ta already handle hoye geche; abar command din.")
+        }
+        pending.localCommandId?.let { history.updateStatusAndError(it, "blocked", reason) }
+        reportRemoteById(pending.serverCommandId, "blocked", reason)
+        if (planPendingId == pending.id) clearActivePlan()
+        return Step.Failed(speech)
     }
 
     // --- Execution -------------------------------------------------------------
@@ -586,6 +706,238 @@ class CommandExecutor(
                 }
             }
 
+            is NuvaAction.ComposeSocialPost -> when (
+                val result = com.nuva.assistant.automation.SocialMmsComposer.social(context, action)
+            ) {
+                is com.nuva.assistant.automation.SocialMmsComposer.Result.Opened ->
+                    ExecutionOutcome("completed", result.speech)
+                com.nuva.assistant.automation.SocialMmsComposer.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive ba financial post draft blocked.", "sensitive social draft blocked")
+                is com.nuva.assistant.automation.SocialMmsComposer.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ComposeMms -> if (action.attachmentRequested) {
+                com.nuva.assistant.automation.UserPresentFileWorkflow.requestMmsAttachment(action)
+                val activity = Intent(context, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                if (runCatching { context.startActivity(activity); true }.getOrDefault(false)) {
+                    ExecutionOutcome("completed", "MMS attachment picker khulchi — file apni select korun.")
+                } else {
+                    com.nuva.assistant.automation.UserPresentFileWorkflow.cancel()
+                    ExecutionOutcome("failed", "MMS attachment picker khulte parini.", "activity launch failed")
+                }
+            } else {
+                when (val result = com.nuva.assistant.automation.SocialMmsComposer.mms(context, action)) {
+                    is com.nuva.assistant.automation.SocialMmsComposer.Result.Opened -> ExecutionOutcome("completed", result.speech)
+                    com.nuva.assistant.automation.SocialMmsComposer.Result.SensitiveBlocked ->
+                        ExecutionOutcome("failed", "Sensitive ba financial MMS blocked.", "sensitive MMS blocked")
+                    is com.nuva.assistant.automation.SocialMmsComposer.Result.Failed ->
+                        ExecutionOutcome("failed", result.reason, result.reason)
+                }
+            }
+
+            is NuvaAction.OpenVoicemail -> when (val result = com.nuva.assistant.automation.SocialMmsComposer.openVoicemail(context)) {
+                is com.nuva.assistant.automation.SocialMmsComposer.Result.Opened -> ExecutionOutcome("completed", result.speech)
+                com.nuva.assistant.automation.SocialMmsComposer.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Voicemail action blocked.", "voicemail blocked")
+                is com.nuva.assistant.automation.SocialMmsComposer.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ComposeEmail -> if (action.attachmentRequested) {
+                com.nuva.assistant.automation.UserPresentFileWorkflow.requestEmailAttachment(action)
+                val activity = Intent(context, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                if (runCatching { context.startActivity(activity); true }.getOrDefault(false)) {
+                    ExecutionOutcome("completed", "Attachment picker khulchi — file apni select korun.")
+                } else {
+                    com.nuva.assistant.automation.UserPresentFileWorkflow.cancel()
+                    ExecutionOutcome("failed", "Attachment picker khulte parini.", "activity launch failed")
+                }
+            } else {
+                when (val result = com.nuva.assistant.automation.EmailComposer.compose(context, action)) {
+                    com.nuva.assistant.automation.EmailComposer.Result.Opened ->
+                        ExecutionOutcome("completed", "Email composer khulechi — review kore Send apni chapun.")
+                    is com.nuva.assistant.automation.EmailComposer.Result.Failed ->
+                        ExecutionOutcome("failed", result.reason, result.reason)
+                }
+            }
+
+            is NuvaAction.ClipboardAction -> when (
+                val result = com.nuva.assistant.automation.ClipboardController.execute(context, action)
+            ) {
+                is com.nuva.assistant.automation.ClipboardController.Result.Done ->
+                    ExecutionOutcome("completed", result.speech, screenText = result.content)
+                com.nuva.assistant.automation.ClipboardController.Result.Empty ->
+                    ExecutionOutcome("completed", "Clipboard ekhon khali.")
+                com.nuva.assistant.automation.ClipboardController.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive/financial clipboard content handle korbo na.", "sensitive clipboard blocked")
+                is com.nuva.assistant.automation.ClipboardController.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.HomeAssistantControl -> when (val result = com.nuva.assistant.core.NuvaContainer.homeAssistantClient.control(action)) {
+                is com.nuva.assistant.homeassistant.HomeAssistantClient.Result.Done ->
+                    ExecutionOutcome("completed", result.speech)
+                com.nuva.assistant.homeassistant.HomeAssistantClient.Result.NotConfigured ->
+                    ExecutionOutcome("failed", "Settings-e Home Assistant HTTPS URL o token save korun.", "Home Assistant not configured")
+                is com.nuva.assistant.homeassistant.HomeAssistantClient.Result.NotFound ->
+                    ExecutionOutcome("failed", "${result.query} name-e matching Home Assistant entity paini.", "entity not found")
+                is com.nuva.assistant.homeassistant.HomeAssistantClient.Result.Ambiguous -> {
+                    val names = result.matches.joinToString(", ") { it.friendlyName }
+                    ExecutionOutcome("failed", "Ekadhik entity mileche — aro specific bolun: $names", "ambiguous entity")
+                }
+                is com.nuva.assistant.homeassistant.HomeAssistantClient.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.CalendarProvider -> when (
+                val result = com.nuva.assistant.automation.CalendarProviderController.execute(context, action)
+            ) {
+                is com.nuva.assistant.automation.CalendarProviderController.Result.Agenda ->
+                    ExecutionOutcome("completed", result.speech, screenText = result.screenText)
+                is com.nuva.assistant.automation.CalendarProviderController.Result.Opened ->
+                    ExecutionOutcome("completed", "${result.title} Calendar app-e ${if (result.editing) "edit" else "view"} mode-e khulechi.")
+                com.nuva.assistant.automation.CalendarProviderController.Result.PermissionMissing ->
+                    ExecutionOutcome("failed", "Calendar agenda porte optional READ_CALENDAR permission din.", "calendar permission missing")
+                is com.nuva.assistant.automation.CalendarProviderController.Result.NotFound ->
+                    ExecutionOutcome("failed", "${result.query} title-er event ei range-e paini.", "calendar event not found")
+                is com.nuva.assistant.automation.CalendarProviderController.Result.Ambiguous -> {
+                    val names = result.events.joinToString(", ") { it.title }
+                    ExecutionOutcome("failed", "Ekadhik event mileche — title/date aro specific bolun: $names", "ambiguous calendar event")
+                }
+                is com.nuva.assistant.automation.CalendarProviderController.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ViewCalendar -> when (
+                val result = com.nuva.assistant.automation.CalendarViewHandoff.open(context, action.focusAt)
+            ) {
+                com.nuva.assistant.automation.CalendarViewHandoff.Result.Opened ->
+                    ExecutionOutcome("completed", "Calendar view khulechi.")
+                is com.nuva.assistant.automation.CalendarViewHandoff.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.CreateCalendarEvent -> when (
+                val result = com.nuva.assistant.automation.CalendarEventHandoff.open(context, action)
+            ) {
+                com.nuva.assistant.automation.CalendarEventHandoff.Result.Opened ->
+                    ExecutionOutcome("completed", "Calendar event draft khulechi — final Save apni chapun.")
+                com.nuva.assistant.automation.CalendarEventHandoff.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive ba financial event details blocked.", "sensitive calendar event blocked")
+                is com.nuva.assistant.automation.CalendarEventHandoff.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ShareText -> when (val result = com.nuva.assistant.automation.ProductivityHandoff.shareText(context, action)) {
+                is com.nuva.assistant.automation.ProductivityHandoff.Result.Opened ->
+                    ExecutionOutcome("completed", result.speech)
+                is com.nuva.assistant.automation.ProductivityHandoff.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+                com.nuva.assistant.automation.ProductivityHandoff.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive ba financial text share korbo na.", "sensitive share blocked")
+            }
+
+            is NuvaAction.CreateContactDraft -> when (
+                val result = com.nuva.assistant.automation.ProductivityHandoff.createContactDraft(context, action)
+            ) {
+                is com.nuva.assistant.automation.ProductivityHandoff.Result.Opened ->
+                    ExecutionOutcome("completed", result.speech)
+                is com.nuva.assistant.automation.ProductivityHandoff.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+                com.nuva.assistant.automation.ProductivityHandoff.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive contact draft blocked.", "sensitive contact blocked")
+            }
+
+            is NuvaAction.PrepareForm -> {
+                if (action.details?.let {
+                        com.nuva.assistant.core.security.SensitiveAppPolicy.mentionsCredentials(it) ||
+                            com.nuva.assistant.core.security.SensitiveAppPolicy.refusalForText(it) != null
+                    } == true
+                ) {
+                    return ExecutionOutcome("failed", "Sensitive ba financial details form draft-e rakhbo na.", "sensitive form details blocked")
+                }
+                val dao = notes ?: return ExecutionOutcome("failed", "Form draft save korte parini.", "notes storage unavailable")
+                val localDraft = buildString {
+                    append("Form draft [${action.kind.wireName}]")
+                    action.details?.let { append(": ").append(it) }
+                }
+                val saved = dao.insertRow(NoteEntity(content = localDraft, kind = "note")) > 0
+                when (val web = BrowserAutomation.searchWeb(context, action.kind.searchLabel)) {
+                    is BrowserAutomation.Result.Opened -> ExecutionOutcome(
+                        "completed",
+                        if (saved) "Form details locally save kore official portal search khulechi — final Submit apni korben."
+                        else "Official portal search khulechi — final Submit apni korben.",
+                    )
+                    is BrowserAutomation.Result.Failed -> ExecutionOutcome("failed", web.userReason, web.userReason)
+                }
+            }
+
+            is NuvaAction.ScheduleCompose -> when (
+                val result = com.nuva.assistant.automation.ScheduledComposeScheduler.schedule(context, action)
+            ) {
+                is com.nuva.assistant.automation.ScheduledComposeScheduler.Result.Scheduled ->
+                    ExecutionOutcome("completed", "Compose reminder #${result.id} schedule hoyeche — notification tap korle draft khulbe.")
+                com.nuva.assistant.automation.ScheduledComposeScheduler.Result.NotificationPermissionMissing ->
+                    ExecutionOutcome("failed", "Scheduled draft-er jonno notification permission lagbe.", "notification permission missing")
+                is com.nuva.assistant.automation.ScheduledComposeScheduler.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ListScheduledDrafts -> {
+                val (speech, screen) = com.nuva.assistant.automation.ScheduledComposeScheduler.pendingSpeech()
+                ExecutionOutcome("completed", speech, screenText = screen)
+            }
+
+            is NuvaAction.CancelScheduledDraft -> when (
+                val result = com.nuva.assistant.automation.ScheduledComposeScheduler.cancelByOrdinal(context, action.ordinal)
+            ) {
+                is com.nuva.assistant.automation.ScheduledComposeScheduler.CancelResult.Cancelled ->
+                    ExecutionOutcome("completed", "Scheduled draft cancel korechi.")
+                com.nuva.assistant.automation.ScheduledComposeScheduler.CancelResult.Missing ->
+                    ExecutionOutcome("failed", "Oi number-er pending draft paini.", "scheduled draft missing")
+                is com.nuva.assistant.automation.ScheduledComposeScheduler.CancelResult.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ManageNotification -> when (
+                val result = NuvaNotificationListener.manage(action.ordinal, action.operation)
+            ) {
+                is NuvaNotificationListener.ManageResult.Done ->
+                    ExecutionOutcome("completed", "${result.appLabel} notification ${result.operation.wireName} complete.")
+                NuvaNotificationListener.ManageResult.NeedsAccess -> {
+                    NuvaNotificationListener.openAccessSettings(context)
+                    ExecutionOutcome("failed", "Notification access lagbe — setting khulchi.", "notification access missing")
+                }
+                NuvaNotificationListener.ManageResult.NotificationMissing ->
+                    ExecutionOutcome("failed", "Oi notification ta ar paini.", "notification missing")
+                NuvaNotificationListener.ManageResult.ActionUnavailable ->
+                    ExecutionOutcome("failed", "Ei notification-e requested official action available nei.", "notification action unavailable")
+                NuvaNotificationListener.ManageResult.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive app-er notification manage korbo na.", "sensitive notification blocked")
+                is NuvaNotificationListener.ManageResult.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ReplyNotification -> when (val result = NuvaNotificationListener.reply(action.ordinal, action.message)) {
+                is NuvaNotificationListener.ReplyResult.Sent ->
+                    ExecutionOutcome("completed", "${result.appLabel} notification e reply pathano hoyeche.")
+                NuvaNotificationListener.ReplyResult.NeedsAccess -> {
+                    NuvaNotificationListener.openAccessSettings(context)
+                    ExecutionOutcome("failed", "Notification access lagbe — setting khulchi.", "notification access missing")
+                }
+                NuvaNotificationListener.ReplyResult.NotificationMissing ->
+                    ExecutionOutcome("failed", "Oi notification ta ar paini.", "notification missing")
+                NuvaNotificationListener.ReplyResult.ReplyUnavailable ->
+                    ExecutionOutcome("failed", "Ei notification app official Reply action dey nai.", "RemoteInput unavailable")
+                NuvaNotificationListener.ReplyResult.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Sensitive app ba credential notification e reply korbo na.", "sensitive reply blocked")
+                is NuvaNotificationListener.ReplyResult.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.ReadNotifications -> when (val s = NuvaNotificationListener.summary()) {
                 is NuvaNotificationListener.Summary.Ready ->
                     ExecutionOutcome("completed", screenSpeech(s.text), null, s.text)
@@ -608,8 +960,83 @@ class CommandExecutor(
                 is BrowserAutomation.Result.Failed -> ExecutionOutcome("failed", r.userReason, r.userReason)
             }
 
+            is NuvaAction.MapNavigation -> when (val result = com.nuva.assistant.automation.MapsNavigation.open(context, action)) {
+                com.nuva.assistant.automation.MapsNavigation.Result.Opened ->
+                    ExecutionOutcome("completed", "Maps e ${action.destination} khulechi.")
+                is com.nuva.assistant.automation.MapsNavigation.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.EmergencyDialer -> when (
+                val result = com.nuva.assistant.automation.EmergencyHandoff.openDialer(context, action.service)
+            ) {
+                com.nuva.assistant.automation.EmergencyHandoff.Result.Opened ->
+                    ExecutionOutcome("completed", "${action.service.wireName} emergency dialer 999-e ready — final Call apni chapun.")
+                is com.nuva.assistant.automation.EmergencyHandoff.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.ClockControl -> when (
+                val result = com.nuva.assistant.automation.ClockController.execute(context, action.operation)
+            ) {
+                is com.nuva.assistant.automation.ClockController.Result.Requested ->
+                    ExecutionOutcome("completed", result.speech)
+                is com.nuva.assistant.automation.ClockController.Result.ClockOpened ->
+                    ExecutionOutcome("completed", result.speech)
+                is com.nuva.assistant.automation.ClockController.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
             is NuvaAction.DeviceStatusQuery ->
-                ExecutionOutcome("completed", deviceStatus.answer(action.query))
+                ExecutionOutcome(
+                    "completed",
+                    deviceStatus.answer(action.query, preferences.language.first()),
+                )
+
+            is NuvaAction.LocalAnswer ->
+                ExecutionOutcome("completed", action.answer, screenText = action.answer)
+
+            is NuvaAction.ReadSavedItems -> readSavedItems(action.kind)
+
+            is NuvaAction.UserFile -> launchUserPresentFileWorkflow(context, action)
+
+            is NuvaAction.ContactHandoff -> {
+                com.nuva.assistant.automation.UserPresentContactWorkflow.request(action.operation)
+                val activity = Intent(context, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                if (runCatching { context.startActivity(activity); true }.getOrDefault(false)) {
+                    ExecutionOutcome("completed", "Contact picker khulchi — exact contact apni select korun.")
+                } else {
+                    com.nuva.assistant.automation.UserPresentContactWorkflow.clear()
+                    ExecutionOutcome("failed", "Contact picker khulte parini.", "activity launch failed")
+                }
+            }
+
+            is NuvaAction.UninstallApp -> when (
+                val result = com.nuva.assistant.automation.AppManagement.requestUninstall(context, action.app)
+            ) {
+                is com.nuva.assistant.automation.AppManagement.Result.PromptOpened ->
+                    ExecutionOutcome("completed", "${result.label} uninstall confirmation khulechi — final decision apnar.")
+                com.nuva.assistant.automation.AppManagement.Result.NotFound ->
+                    ExecutionOutcome("failed", "App ta installed list-e paini.", "app not found")
+                com.nuva.assistant.automation.AppManagement.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Financial app uninstall NUVA initiate korbe na.", "sensitive app blocked")
+                is com.nuva.assistant.automation.AppManagement.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
+
+            is NuvaAction.OpenAppManagement -> when (
+                val result = com.nuva.assistant.automation.AppManagement.openPanel(context, action.app, action.panel)
+            ) {
+                is com.nuva.assistant.automation.AppManagement.Result.PromptOpened ->
+                    ExecutionOutcome("completed", "${result.label} er ${action.panel.wireName} screen khulechi.")
+                com.nuva.assistant.automation.AppManagement.Result.NotFound ->
+                    ExecutionOutcome("failed", "App ta installed list-e paini.", "app not found")
+                com.nuva.assistant.automation.AppManagement.Result.SensitiveBlocked ->
+                    ExecutionOutcome("failed", "Ei app management action blocked.", "app action blocked")
+                is com.nuva.assistant.automation.AppManagement.Result.Failed ->
+                    ExecutionOutcome("failed", result.reason, result.reason)
+            }
 
             is NuvaAction.OpenSettingScreen -> when (val r = SettingsOpener.open(context, action.target)) {
                 is SettingsOpener.Result.Done -> ExecutionOutcome("completed", "Kore dilam.")
@@ -714,15 +1141,15 @@ class CommandExecutor(
                 }
             }
 
-            is NuvaAction.MediaControl -> when (val r = com.nuva.assistant.automation.MediaPlaybackControl.control(context, action.command)) {
+            is NuvaAction.MediaControl -> when (val r = com.nuva.assistant.automation.MediaPlaybackControl.control(context, action)) {
                 is com.nuva.assistant.automation.MediaPlaybackControl.Result.Done ->
-                    ExecutionOutcome("completed", "Kore dilam.")
+                    ExecutionOutcome("completed", r.speech)
 
                 is com.nuva.assistant.automation.MediaPlaybackControl.Result.Failed ->
                     ExecutionOutcome("failed", r.userReason, r.userReason)
             }
 
-            is NuvaAction.VolumeControl -> when (val r = com.nuva.assistant.automation.VolumeController.control(context, action.command)) {
+            is NuvaAction.VolumeControl -> when (val r = com.nuva.assistant.automation.VolumeController.control(context, action)) {
                 is com.nuva.assistant.automation.VolumeController.Result.Done ->
                     ExecutionOutcome("completed", r.speech)
 
@@ -743,7 +1170,7 @@ class CommandExecutor(
                 if (number.isNullOrBlank()) {
                     ExecutionOutcome("failed", "${action.contact} er number painai.", "no phone number")
                 } else {
-                    val direct = preferences.directCallBlocking()
+                    val direct = preferences.directCall.first()
                     val ok = AppLauncher.dial(context, number, direct)
                     if (ok) {
                         ExecutionOutcome("completed", "${action.contact}-কে কল করছি।")
@@ -810,6 +1237,72 @@ class CommandExecutor(
                 }
             }
         }
+    }
+
+    private fun launchUserPresentFileWorkflow(context: Context, action: NuvaAction.UserFile): ExecutionOutcome {
+        val operation = action.operation
+        com.nuva.assistant.automation.UserPresentFileWorkflow.request(operation, action.newName)
+        val activity = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val opened = runCatching { context.startActivity(activity); true }.getOrDefault(false)
+        return if (opened) {
+            val what = when (operation) {
+                UserFileOperation.OPEN_FILE -> "file"
+                UserFileOperation.SHARE_FILE -> "share korar file"
+                UserFileOperation.READ_TEXT -> "text file"
+                UserFileOperation.OPEN_FOLDER -> "folder"
+                UserFileOperation.PICK_PHOTO -> "photo"
+                UserFileOperation.SHARE_PHOTO -> "share korar photo"
+                UserFileOperation.PICK_VIDEO -> "video"
+                UserFileOperation.SHARE_VIDEO -> "share korar video"
+                UserFileOperation.SHARE_MULTIPLE_FILES -> "share korar file-gulo"
+                UserFileOperation.SHARE_MULTIPLE_PHOTOS -> "share korar photo-gulo"
+                UserFileOperation.SHARE_MULTIPLE_VIDEOS -> "share korar video-gulo"
+                UserFileOperation.EMAIL_ATTACHMENT -> "email attachment"
+                UserFileOperation.EMAIL_ATTACHMENTS -> "email attachments"
+                UserFileOperation.MMS_ATTACHMENT -> "MMS attachment"
+                UserFileOperation.PRINT_PDF -> "print korar PDF"
+                UserFileOperation.RENAME_FILE -> "rename korar file"
+                UserFileOperation.COPY_FILE -> "copy korar source file"
+                UserFileOperation.MOVE_FILE -> "move korar source file"
+                UserFileOperation.DELETE_FILE -> "delete korar file"
+                UserFileOperation.EDIT_PHOTO -> "edit korar photo"
+            }
+            ExecutionOutcome("completed", "$what picker khulchi — target apni select korun.")
+        } else {
+            com.nuva.assistant.automation.UserPresentFileWorkflow.cancel()
+            ExecutionOutcome("failed", "System picker khulte parini.", "activity launch failed")
+        }
+    }
+
+    private suspend fun readSavedItems(kind: SavedItemKind): ExecutionOutcome {
+        val dao = notes ?: return ExecutionOutcome("failed", "Saved list porte parini.", "notes storage unavailable")
+        val roomKind = if (kind == SavedItemKind.TODO || kind == SavedItemKind.SHOPPING) "todo" else "note"
+        val rows = dao.byKindOnce(roomKind, 50)
+            .filterNot { row -> SensitiveAppPolicy.mentionsCredentials(row.content) }
+            .filter { row ->
+            when (kind) {
+                SavedItemKind.SHOPPING -> row.content.startsWith("Shopping:", ignoreCase = true)
+                SavedItemKind.EXPENSE -> row.content.startsWith("Expense:", ignoreCase = true)
+                SavedItemKind.TODO -> !row.content.startsWith("Shopping:", ignoreCase = true)
+                SavedItemKind.NOTE -> !row.content.startsWith("Expense:", ignoreCase = true)
+            }
+        }
+        if (rows.isEmpty()) {
+            val label = kind.wireName.replaceFirstChar { it.uppercase() }
+            return ExecutionOutcome("completed", "$label list ekhon khali.", screenText = "$label list: empty")
+        }
+        val display = rows.take(20).mapIndexed { index, row ->
+            val content = row.content.substringAfter(':', row.content).trim()
+            val done = if (roomKind == "todo" && row.done) "✓ " else ""
+            "${index + 1}. $done$content"
+        }.joinToString("\n")
+        val label = kind.wireName.replaceFirstChar { it.uppercase() }
+        val spoken = rows.take(8).mapIndexed { index, row ->
+            "${index + 1}, ${row.content.substringAfter(':', row.content).trim()}"
+        }.joinToString("; ")
+        val more = if (rows.size > 8) "; aro ${rows.size - 8} ta screen e dekhacchi" else ""
+        return ExecutionOutcome("completed", "$label list: $spoken$more.", screenText = "$label list\n$display")
     }
 
     /**
@@ -939,7 +1432,9 @@ class CommandExecutor(
         if (commandId == null) return // offline/local-only command — history row suffices
         try {
             supabaseRepository.reportExecution(commandId, status, error)
-        } catch (err: Exception) {
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
             // Best effort: the local Room history is the source of truth offline.
         }
     }

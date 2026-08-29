@@ -30,6 +30,32 @@ class ActionJsonTest {
         assertNull(NuvaIntent.fromWire("OPEN_NOTIFICATIONS"))
         assertNull(NuvaIntent.fromWire("OPEN_NOTIFICATION_APP"))
         assertNull(NuvaIntent.fromWire("DESCRIBE_SCREEN"))
+        assertNull(NuvaIntent.fromWire("LOCAL_ANSWER"))
+        assertNull(NuvaIntent.fromWire("READ_SAVED_ITEMS"))
+        assertNull(NuvaIntent.fromWire("USER_FILE"))
+        assertNull(NuvaIntent.fromWire("COMPOSE_EMAIL"))
+        assertNull(NuvaIntent.fromWire("REPLY_NOTIFICATION"))
+        assertNull(NuvaIntent.fromWire("PREPARE_FORM"))
+        assertNull(NuvaIntent.fromWire("SCHEDULE_COMPOSE"))
+        assertNull(NuvaIntent.fromWire("LIST_SCHEDULED_DRAFTS"))
+        assertNull(NuvaIntent.fromWire("CANCEL_SCHEDULED_DRAFT"))
+        assertNull(NuvaIntent.fromWire("SHARE_TEXT"))
+        assertNull(NuvaIntent.fromWire("CREATE_CONTACT_DRAFT"))
+        assertNull(NuvaIntent.fromWire("MANAGE_NOTIFICATION"))
+        assertNull(NuvaIntent.fromWire("CONTACT_HANDOFF"))
+        assertNull(NuvaIntent.fromWire("UNINSTALL_APP"))
+        assertNull(NuvaIntent.fromWire("OPEN_APP_MANAGEMENT"))
+        assertNull(NuvaIntent.fromWire("CLIPBOARD_ACTION"))
+        assertNull(NuvaIntent.fromWire("CREATE_CALENDAR_EVENT"))
+        assertNull(NuvaIntent.fromWire("COMPOSE_SOCIAL_POST"))
+        assertNull(NuvaIntent.fromWire("COMPOSE_MMS"))
+        assertNull(NuvaIntent.fromWire("OPEN_VOICEMAIL"))
+        assertNull(NuvaIntent.fromWire("MAP_NAVIGATION"))
+        assertNull(NuvaIntent.fromWire("EMERGENCY_DIALER"))
+        assertNull(NuvaIntent.fromWire("CLOCK_CONTROL"))
+        assertNull(NuvaIntent.fromWire("VIEW_CALENDAR"))
+        assertNull(NuvaIntent.fromWire("HOME_ASSISTANT"))
+        assertNull(NuvaIntent.fromWire("CALENDAR_PROVIDER"))
         // …while the frozen 15 still resolve.
         assertEquals(NuvaIntent.OPEN_APP, NuvaIntent.fromWire("OPEN_APP"))
         assertEquals(NuvaIntent.READ_SCREEN, NuvaIntent.fromWire("READ_SCREEN"))
@@ -41,6 +67,69 @@ class ActionJsonTest {
             NuvaAction.ShowRecents,
             NuvaAction.SearchWeb("dhaka weather"),
             NuvaAction.DeviceStatusQuery(DeviceStatusKind.BATTERY),
+            NuvaAction.DeviceStatusQuery(DeviceStatusKind.DATE_TIME),
+            NuvaAction.LocalAnswer("Uttor: 42.", "calculation"),
+            NuvaAction.ReadSavedItems(SavedItemKind.SHOPPING),
+            NuvaAction.UserFile(UserFileOperation.OPEN_FILE),
+            NuvaAction.UserFile(UserFileOperation.SHARE_PHOTO),
+            NuvaAction.UserFile(UserFileOperation.RENAME_FILE, "report.pdf"),
+            NuvaAction.UserFile(UserFileOperation.COPY_FILE),
+            NuvaAction.UserFile(UserFileOperation.MOVE_FILE),
+            NuvaAction.UserFile(UserFileOperation.DELETE_FILE),
+            NuvaAction.UserFile(UserFileOperation.EDIT_PHOTO),
+            NuvaAction.ComposeEmail("user@example.com", "meeting", "kal 9 tay"),
+            NuvaAction.ComposeEmail(null, null, null, attachmentRequested = true),
+            NuvaAction.ReplyNotification(2, "ami ashchi"),
+            NuvaAction.PrepareForm(FormKind.PASSPORT, "name and address draft"),
+            NuvaAction.ScheduleCompose(
+                ComposeChannel.EMAIL,
+                "user@example.com",
+                "meeting",
+                "kal ashben",
+                1_800_000_000_000L,
+                ComposeRecurrence.WEEKLY,
+            ),
+            NuvaAction.ListScheduledDrafts,
+            NuvaAction.CancelScheduledDraft(2),
+            NuvaAction.ShareText("ami ashchi"),
+            NuvaAction.CreateContactDraft("Rahim", "01712345678", "rahim@example.com"),
+            NuvaAction.ManageNotification(2, NotificationManageOperation.DISMISS),
+            NuvaAction.ManageNotification(1, NotificationManageOperation.MARK_READ),
+            NuvaAction.ContactHandoff(ContactHandoffOperation.EDIT),
+            NuvaAction.UninstallApp("facebook"),
+            NuvaAction.OpenAppManagement("whatsapp", AppManagementPanel.NOTIFICATIONS),
+            NuvaAction.ClipboardAction(ClipboardOperation.COPY, "hello"),
+            NuvaAction.ClipboardAction(ClipboardOperation.READ),
+            NuvaAction.CreateCalendarEvent(
+                "meeting", 1_800_000_000_000L, 1_800_003_600_000L, "Khulna", "project", "user@example.com",
+            ),
+            NuvaAction.ComposeSocialPost(SocialPlatform.FACEBOOK, "hello world"),
+            NuvaAction.ComposeMms("01712345678", "hello", attachmentRequested = true),
+            NuvaAction.OpenVoicemail,
+            NuvaAction.MapNavigation(MapRequestType.DIRECTIONS, "Dhaka", "Sylhet", TravelMode.TRANSIT),
+            NuvaAction.EmergencyDialer(EmergencyService.AMBULANCE),
+            NuvaAction.ClockControl(ClockOperation.DISMISS_ALARM),
+            NuvaAction.ClockControl(ClockOperation.SHOW_TIMERS),
+            NuvaAction.ViewCalendar(1_800_000_000_000L),
+            NuvaAction.HomeAssistantControl(HomeAssistantDomain.LIGHT, HomeAssistantOperation.TURN_ON, "living room"),
+            NuvaAction.HomeAssistantControl(HomeAssistantDomain.CLIMATE, HomeAssistantOperation.SET_TEMPERATURE, "bedroom", 24.0),
+            NuvaAction.CalendarProvider(
+                CalendarProviderOperation.READ_AGENDA, 1_800_000_000_000L, 1_800_086_400_000L,
+            ),
+            NuvaAction.CalendarProvider(
+                CalendarProviderOperation.EDIT_EVENT, 1_800_000_000_000L, 1_800_604_800_000L, "meeting",
+            ),
+            NuvaAction.UserFile(UserFileOperation.PRINT_PDF),
+            NuvaAction.MediaControl(MediaCommand.FAST_FORWARD, 30),
+            NuvaAction.MediaControl(MediaCommand.STOP),
+            NuvaAction.VolumeControl(VolumeCommand.SET, 55),
+            NuvaAction.VolumeControl(VolumeCommand.UNMUTE),
+            NuvaAction.OpenSettingScreen(SettingTarget.AIRPLANE_MODE),
+            NuvaAction.OpenSettingScreen(SettingTarget.VPN),
+            NuvaAction.OpenSettingScreen(SettingTarget.DEFAULT_APPS),
+            NuvaAction.UserFile(UserFileOperation.SHARE_MULTIPLE_FILES),
+            NuvaAction.UserFile(UserFileOperation.SHARE_MULTIPLE_PHOTOS),
+            NuvaAction.ComposeEmail("user@example.com", null, null, attachmentRequested = true, multipleAttachments = true),
             NuvaAction.OpenSettingScreen(SettingTarget.TORCH),
             NuvaAction.ReadNotifications,
             NuvaAction.SetReminder("medicine", 1_770_000_000_000L, "kal"),
@@ -61,6 +150,22 @@ class ActionJsonTest {
     }
 
     @Test
+    fun `every device status kind round trips through local validation`() {
+        DeviceStatusKind.entries.forEach { kind ->
+            val action = NuvaAction.DeviceStatusQuery(kind)
+            assertEquals(kind.wireName, action, ActionJson.decode(ActionJson.encode(action)))
+        }
+    }
+
+    @Test
+    fun `every settings target round trips through local validation`() {
+        SettingTarget.entries.forEach { target ->
+            val action = NuvaAction.OpenSettingScreen(target)
+            assertEquals(target.wireName, action, ActionJson.decode(ActionJson.encode(action)))
+        }
+    }
+
+    @Test
     fun `invalid local-only payloads are refused`() {
         val bad = CommandValidator.validateAction(
             kotlinx.serialization.json.buildJsonObject {
@@ -77,6 +182,178 @@ class ActionJsonTest {
             },
         )
         assertTrue(badTarget is CommandValidator.ValidatedAction.Invalid)
+
+        val unsafeAnswer = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "LOCAL_ANSWER")
+                put("answer", "42")
+                put("category", "../../bad")
+            },
+        )
+        assertTrue(unsafeAnswer is CommandValidator.ValidatedAction.Invalid)
+
+        val unsafeFileOperation = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "USER_FILE")
+                put("operation", "delete_everything")
+            },
+        )
+        assertTrue(unsafeFileOperation is CommandValidator.ValidatedAction.Invalid)
+
+        val renameWithoutName = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "USER_FILE")
+                put("operation", "rename_file")
+            },
+        )
+        assertTrue(renameWithoutName is CommandValidator.ValidatedAction.Invalid)
+
+        val internalAttachmentOperation = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "USER_FILE")
+                put("operation", "email_attachment")
+            },
+        )
+        assertTrue(internalAttachmentOperation is CommandValidator.ValidatedAction.Invalid)
+
+        val badEmail = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "COMPOSE_EMAIL")
+                put("recipient", "not-an-email")
+            },
+        )
+        assertTrue(badEmail is CommandValidator.ValidatedAction.Invalid)
+
+        val emptyReply = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "REPLY_NOTIFICATION")
+                put("message", "")
+            },
+        )
+        assertTrue(emptyReply is CommandValidator.ValidatedAction.Invalid)
+
+        val badForm = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "PREPARE_FORM")
+                put("kind", "loan")
+            },
+        )
+        assertTrue(badForm is CommandValidator.ValidatedAction.Invalid)
+
+        val badSchedule = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "SCHEDULE_COMPOSE")
+                put("channel", "email")
+                put("body", "")
+                put("trigger_at", 1_800_000_000_000L)
+            },
+        )
+        assertTrue(badSchedule is CommandValidator.ValidatedAction.Invalid)
+
+        val badRecurrence = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "SCHEDULE_COMPOSE")
+                put("channel", "email")
+                put("body", "hello")
+                put("trigger_at", 1_800_000_000_000L)
+                put("recurrence", "every_second")
+            },
+        )
+        assertTrue(badRecurrence is CommandValidator.ValidatedAction.Invalid)
+
+        val emptyShare = CommandValidator.validateAction(
+            buildJsonObject { put("type", "SHARE_TEXT"); put("text", "") },
+        )
+        assertTrue(emptyShare is CommandValidator.ValidatedAction.Invalid)
+
+        val badContact = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "CREATE_CONTACT_DRAFT"); put("name", "Rahim"); put("email", "bad")
+            },
+        )
+        assertTrue(badContact is CommandValidator.ValidatedAction.Invalid)
+
+        val badMultipleEmail = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "COMPOSE_EMAIL"); put("multiple_attachments", true)
+            },
+        )
+        assertTrue(badMultipleEmail is CommandValidator.ValidatedAction.Invalid)
+
+        val badHandoff = CommandValidator.validateAction(
+            buildJsonObject { put("type", "CONTACT_HANDOFF"); put("operation", "delete") },
+        )
+        assertTrue(badHandoff is CommandValidator.ValidatedAction.Invalid)
+
+        val badAppPanel = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "OPEN_APP_MANAGEMENT"); put("app", "youtube"); put("panel", "force_stop")
+            },
+        )
+        assertTrue(badAppPanel is CommandValidator.ValidatedAction.Invalid)
+
+        val emptyClipboardCopy = CommandValidator.validateAction(
+            buildJsonObject { put("type", "CLIPBOARD_ACTION"); put("operation", "copy") },
+        )
+        assertTrue(emptyClipboardCopy is CommandValidator.ValidatedAction.Invalid)
+
+        val badCalendar = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "CREATE_CALENDAR_EVENT"); put("title", "meeting")
+                put("begin_at", 2_000L); put("end_at", 1_000L)
+            },
+        )
+        assertTrue(badCalendar is CommandValidator.ValidatedAction.Invalid)
+
+        val emptySocial = CommandValidator.validateAction(
+            buildJsonObject { put("type", "COMPOSE_SOCIAL_POST"); put("platform", "facebook"); put("text", "") },
+        )
+        assertTrue(emptySocial is CommandValidator.ValidatedAction.Invalid)
+
+        val emptyMms = CommandValidator.validateAction(
+            buildJsonObject { put("type", "COMPOSE_MMS") },
+        )
+        assertTrue(emptyMms is CommandValidator.ValidatedAction.Invalid)
+
+        val emptyMap = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "MAP_NAVIGATION"); put("request_type", "directions"); put("destination", "")
+            },
+        )
+        assertTrue(emptyMap is CommandValidator.ValidatedAction.Invalid)
+
+        val seekWithoutOffset = CommandValidator.validateAction(
+            buildJsonObject { put("type", "MEDIA_CONTROL"); put("command", "fast_forward") },
+        )
+        assertTrue(seekWithoutOffset is CommandValidator.ValidatedAction.Invalid)
+
+        val setWithoutLevel = CommandValidator.validateAction(
+            buildJsonObject { put("type", "VOLUME_CONTROL"); put("command", "set") },
+        )
+        assertTrue(setWithoutLevel is CommandValidator.ValidatedAction.Invalid)
+
+        val unsafeHaDomain = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "HOME_ASSISTANT"); put("domain", "lock"); put("operation", "turn_on"); put("entity_query", "front door")
+            },
+        )
+        assertTrue(unsafeHaDomain is CommandValidator.ValidatedAction.Invalid)
+
+        val unsafeTemperature = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "HOME_ASSISTANT"); put("domain", "climate"); put("operation", "set_temperature")
+                put("entity_query", "bedroom"); put("value", 50.0)
+            },
+        )
+        assertTrue(unsafeTemperature is CommandValidator.ValidatedAction.Invalid)
+
+        val calendarEditWithoutTarget = CommandValidator.validateAction(
+            buildJsonObject {
+                put("type", "CALENDAR_PROVIDER"); put("operation", "edit_event")
+                put("range_start", 1_800_000_000_000L); put("range_end", 1_800_086_400_000L)
+            },
+        )
+        assertTrue(calendarEditWithoutTarget is CommandValidator.ValidatedAction.Invalid)
     }
 
     @Test
@@ -84,6 +361,28 @@ class ActionJsonTest {
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SET_REMINDER))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CALL_CONTACT))
         assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SEND_MESSAGE))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.COMPOSE_EMAIL))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.REPLY_NOTIFICATION))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.PREPARE_FORM))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SCHEDULE_COMPOSE))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CANCEL_SCHEDULED_DRAFT))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.SHARE_TEXT))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CREATE_CONTACT_DRAFT))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.MANAGE_NOTIFICATION))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CONTACT_HANDOFF))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.UNINSTALL_APP))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CLIPBOARD_ACTION))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CREATE_CALENDAR_EVENT))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.COMPOSE_SOCIAL_POST))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.COMPOSE_MMS))
+        assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.OPEN_VOICEMAIL))
+        assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.MAP_NAVIGATION))
+        assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.EMERGENCY_DIALER))
+        assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CLOCK_CONTROL))
+        assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.VIEW_CALENDAR))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.HOME_ASSISTANT))
+        assertEquals(NuvaRisk.MEDIUM, baselineRisk(NuvaIntent.CALENDAR_PROVIDER))
+        assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.LIST_SCHEDULED_DRAFTS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.DEVICE_STATUS))
         assertEquals(NuvaRisk.LOW, baselineRisk(NuvaIntent.CREATE_NOTE))
     }

@@ -3,6 +3,15 @@
     <string name="app_name">NUVA</string>
     <string name="accessibility_service_label">NUVA Automation</string>
     <string name="accessibility_service_description">Lets NUVA find buttons, tap, type and scroll on your behalf when you ask it to. NUVA only acts on the 15 registered actions and always asks before anything risky.</string>
+    <string name="system_assistant_label">NUVA Digital Assistant</string>
+    <string name="system_recognition_label">NUVA Voice Recognition Bridge</string>
+    <string name="quick_tile_label">Talk to NUVA</string>
+    <string name="quick_tile_subtitle">Tap to speak</string>
+    <string name="shortcut_talk_short">Talk to NUVA</string>
+    <string name="shortcut_talk_long">Open NUVA and start listening</string>
+    <string name="shortcut_talk_disabled">NUVA voice shortcut is unavailable</string>
+    <string name="settings_add_quick_tile">Add Quick Settings tile</string>
+    <string name="external_text_draft_hint">Shared text is only a draft—review it, then tap Send.</string>
 
     <string name="home_title">NUVA</string>
     <string name="home_subtitle">Your personal AI assistant</string>
@@ -67,13 +76,15 @@
     <string name="onboarding_title">Set up NUVA</string>
     <string name="onboarding_intro">Give only the permissions you want, when you want them. Everything is optional — NUVA simply tells you what needs which permission.</string>
     <string name="perm_mic_title">🎙 Microphone</string>
-    <string name="perm_mic_desc">Needed to hear your voice commands. The mic only runs while the listening indicator is visible — never in the background.</string>
+    <string name="perm_mic_desc">Needed for voice commands. Optional Hey Nuva mode can wait while its ongoing microphone notification is visible; it never records secretly. NUVA receives transcript text, not raw audio.</string>
     <string name="perm_notifications_title">🔔 Notifications</string>
     <string name="perm_notifications_desc">Shows NUVA\'s listening status and results as a notification. Optional.</string>
     <string name="perm_accessibility_title">♿ Accessibility service</string>
     <string name="perm_accessibility_desc">Lets NUVA read the screen aloud and press buttons you name (screen reading, WhatsApp send, scroll). Enabled manually in system settings — NUVA can never turn it on itself.</string>
     <string name="perm_contacts_title">👥 Contacts</string>
     <string name="perm_contacts_desc">Needed to find a number when you say “call Rahim”. Requested only when you first run a call/message command.</string>
+    <string name="perm_calendar_title">📅 Calendar read</string>
+    <string name="perm_calendar_desc">Optional. Reads a bounded agenda only when you explicitly ask. NUVA never silently writes, syncs or uploads calendar data.</string>
     <string name="perm_sms_title">✉ SMS</string>
     <string name="perm_sms_desc">Lets NUVA send an SMS after you confirm. Without it NUVA opens the SMS screen pre-filled and you press Send yourself.</string>
     <string name="perm_notif_listener_title">📩 Notification access</string>
@@ -113,7 +124,7 @@
     <!-- v1.6: privacy screen -->
     <string name="privacy_title">Where your data goes</string>
     <string name="privacy_local_title">📱 Stays on your phone</string>
-    <string name="privacy_local_body">Voice audio is never uploaded — only the text transcript is used. Command history, notes, to-dos, memories and settings live only in this phone\'s Room/DataStore.</string>
+    <string name="privacy_local_body">NUVA never stores raw voice audio or sends it to NUVA/Groq/Vercel. Android\'s selected speech-recognition provider converts audio to transcript text under that provider\'s privacy terms. Command history, notes, to-dos, memories and settings live only in this phone\'s Room/DataStore.</string>
     <string name="privacy_groq_title">🤖 Goes to Groq (only when needed)</string>
     <string name="privacy_groq_body">Only when the local parser does not understand a command is the TEXT sent (via Vercel) to Groq to pick an action. Never audio.</string>
     <string name="privacy_vercel_title">🔗 Vercel (backend)</string>
@@ -121,6 +132,6 @@
     <string name="privacy_localdb_title">💾 Local database</string>
     <string name="privacy_localdb_body">Room stores: command text, intent, status, failure reason. Credentials are never stored — OTP/PIN/password memory keys are rejected.</string>
     <string name="privacy_never_title">⛔ Never</string>
-    <string name="privacy_never_body">OTP/PIN/password/CVV/card numbers are never read, stored or typed. Banking screens are never read. Financial transaction automation is fully blocked. No hidden recording — the mic runs only in visible sessions.</string>
+    <string name="privacy_never_body">OTP/PIN/password/CVV/card numbers are never read, stored or typed. Banking screens are never read. Financial transaction automation is fully blocked. No hidden recording — active listening or optional wake mode always has a visible UI/ongoing notification.</string>
     <string name="settings_open_privacy">Privacy</string>
 </resources>

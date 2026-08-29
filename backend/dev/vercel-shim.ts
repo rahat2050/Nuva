@@ -7,7 +7,7 @@
  * CLI.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../types/vercel.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
 

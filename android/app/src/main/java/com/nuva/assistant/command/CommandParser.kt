@@ -69,6 +69,7 @@ object CommandParser {
 
     // Bangladeshi/Intl numbers, tolerant of spaces/hyphens inside ("01712-345678").
     private val PHONE_NUMBER = Regex("""(\+?88)?01[3-9](?:[\s-]?\d){8}|\+\d{8,15}""")
+    private val EMAIL_ADDRESS = Regex("""[A-Za-z0-9.!#\x24%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+""")
 
     /** "rohim-ke" → "rohim ke", "whatsapp-e" → "whatsapp e" (keeps URLs intact). */
     private val HYPHEN_SUFFIX = Regex("""-(ke|kei|keu|kar|e|te|er|r)\b""")
@@ -85,7 +86,7 @@ object CommandParser {
      */
     fun parse(rawText: String): CommandDecision? {
         val text = prepare(rawText) ?: return null
-        return parsePrepared(text)
+        return parsePreparedWithGrammar(text)
     }
 
     private fun stripWakeWord(text: String): String =
@@ -122,7 +123,10 @@ object CommandParser {
     // parses to a non-message, non-call action — so message content that
     // contains " ar " ("ami ar ashbo") can never be cut in half.
 
-    private val CONNECTORS = listOf(" ar ", " ebong ", " and ", " tarpor ", " আর ", " এবং ", " তারপর ", " then ", "; ")
+    private val CONNECTORS = listOf(
+        " ar ", " ebong ", " and then ", " and ", " tarpor ", " erpor ", " then ", " also ",
+        " আর ", " এবং ", " তারপর ", " এরপর ", " তারপরে ", "; ",
+    )
 
     /**
      * Parses a full utterance into an ordered action plan. Returns a
@@ -132,13 +136,17 @@ object CommandParser {
     fun parseCompound(rawText: String): List<CommandDecision>? {
         val text = prepare(rawText) ?: return null
 
-        // Security first — a refused utterance is refused as a whole.
-        SensitiveAppPolicy.refusalForText(text)?.let { return listOf(refused()) }
-        if (SensitiveAppPolicy.mentionsCredentials(text)) {
-            return listOf(unsupported("OTP, PIN ba password NUVA kochu kore na — egulo nije likhun."))
+        // Security first — check both original and typo/ASR-canonicalized text
+        // so "paymnt"/"pasword" cannot bypass the same fixed boundary.
+        val rewritten = NaturalCommandGrammar.rewrite(text)
+        listOf(text, rewritten).distinct().forEach { candidate ->
+            SensitiveAppPolicy.refusalForText(candidate)?.let { return listOf(refused()) }
+            if (SensitiveAppPolicy.mentionsCredentials(candidate)) {
+                return listOf(unsupported("OTP, PIN ba password NUVA kochu kore na — egulo nije likhun."))
+            }
         }
 
-        val whole = parsePrepared(text)
+        val whole = parsePreparedWithGrammar(text)
         if (whole != null && !whole.unsupported && looksLikeCleanMessage(whole)) {
             // A complete call/message command whose content may contain
             // connector words ("ami ar ashbo") — never split it.
@@ -173,13 +181,47 @@ object CommandParser {
         return ruleTable(text)
     }
 
+    /** Original first for entity/message fidelity; canonical retry on a miss. */
+    private fun parsePreparedWithGrammar(text: String): CommandDecision? {
+        val rewritten = NaturalCommandGrammar.rewrite(text)
+        if (rewritten != text) {
+            SensitiveAppPolicy.refusalForText(rewritten)?.let { return refused() }
+            if (SensitiveAppPolicy.mentionsCredentials(rewritten)) {
+                return unsupported("OTP, PIN ba password NUVA kochu kore na — egulo nije likhun.")
+            }
+        }
+        // Exact static grammar aliases are intentional and should beat a broad
+        // dynamic fallback such as treating "notification app" as an app name.
+        NaturalCommandGrammar.canonicalStatic(text)?.let { canonical ->
+            parsePrepared(canonical)?.let { return it }
+        }
+        val direct = parsePrepared(text)
+        // A successfully extracted message keeps its exact body. Otherwise a
+        // command-word rewrite should beat broad parsers such as dynamic app
+        // names or generic web questions.
+        if (direct?.action is NuvaAction.SendMessage) return direct
+        if (rewritten != text) parsePrepared(rewritten)?.let { return it }
+        return direct
+    }
+
     private fun ruleTable(text: String): CommandDecision? = parseNavigation(text)
+        ?: parseEmergency(text)
+        ?: parseHomeAssistant(text)
+        ?: parseUserPresentFile(text)
+        ?: parseProductivityHandoff(text)
+        ?: parseCommunicationCompose(text)
+        ?: parseMapNavigation(text)
+        ?: parseUniversal(text)
         ?: parseScreenReading(text)
+        ?: parseDailyUtility(text)
+        ?: parseRealtimeInfo(text)
         ?: parseDeviceStatus(text)
+        ?: parseAssistantHelp(text)
         ?: parseMediaControl(text)
         ?: parseVolumeControl(text)
         ?: parseCamera(text)
         ?: parseSettings(text)
+        ?: parseClockControl(text)
         ?: parseAlarm(text)
         ?: parseTimer(text)
         ?: parseReminder(text)
@@ -193,9 +235,65 @@ object CommandParser {
         ?: parseScrollSwipe(text)
         ?: parseCloseApp(text)
         ?: parseOpenApp(text)
+        ?: parseDailySkill(text)
+        ?: parseExtendedDailySkill(text)
+        ?: parseKnowledgeSearch(text)
+
+    private fun parseDailySkill(text: String): CommandDecision? {
+        val match = DailySkillRegistry.resolve(text) ?: return null
+        val isBangla = text.any { it.code in 0x0980..0x09FF }
+        val speech = if (isBangla) {
+            "হালনাগাদ ও sourced তথ্য ওয়েবে খুঁজছি।"
+        } else {
+            "Updated sourced information web e khujchi."
+        }
+        return ok(NuvaAction.SearchWeb(match.query), speech)
+    }
+
+    private fun parseExtendedDailySkill(text: String): CommandDecision? {
+        val match = ExtendedDailySkillRegistry.resolve(text) ?: return null
+        val speech = if (text.any { it.code in 0x0980..0x09FF }) {
+            "নির্দিষ্ট তথ্যটি sourced web result-এ খুঁজছি।"
+        } else {
+            "Specific information sourced web result e khujchi."
+        }
+        return ok(NuvaAction.SearchWeb(match.query), speech)
+    }
+
+    private fun parseDailyUtility(text: String): CommandDecision? {
+        val result = DailyUtilityParser.parse(text) ?: return null
+        return ok(NuvaAction.LocalAnswer(result.answer, result.category), result.answer)
+    }
+
+    private fun parseAssistantHelp(text: String): CommandDecision? {
+        val asksCapabilities = listOf(
+            "ki ki korte paro", "ki kaj paro", "tumi ki paro", "what can you do", "show commands",
+            "help me", "feature dekhao", "command dekhao", "কী কী করতে পারো", "কি কি করতে পারো",
+            "কী কাজ পারো", "সাহায্য করো", "ফিচার দেখাও",
+        ).any { text.contains(it) }
+        if (asksCapabilities) {
+            val answer = if (text.any { it.code in 0x0980..0x09FF }) {
+                "আমি ফোন কন্ট্রোল, কল-মেসেজ, রিমাইন্ডার, নোট-লিস্ট, উন্নত হিসাব, ৬০০টি sourced skill এবং ১২,২৫০টি audited natural command form বুঝতে পারি। Polite, ASR ও Bangla/Banglish/English variant-ও চলে। Features পেজে তালিকা আছে।"
+            } else {
+                "Ami phone control, call-message, reminder, note-list, advanced calculation, 600 ta sourced skill, ar 12,250 ta audited natural command form bujhte pari. Polite, ASR o Bangla-Banglish-English variant-o chole. Features page e list ache."
+            }
+            return ok(NuvaAction.LocalAnswer(answer, "assistant_help"), answer)
+        }
+
+        val greeting = when {
+            listOf("assalamu alaikum", "salam", "আসসালামু আলাইকুম", "সালাম").any { text == it || text.startsWith("$it ") } ->
+                if (text.any { it.code in 0x0980..0x09FF }) "ওয়ালাইকুম আসসালাম। কীভাবে সাহায্য করতে পারি?" else "Walaikum assalam. Kivabe help korte pari?"
+            listOf("thank you", "thanks", "dhonnobad", "ধন্যবাদ").any { text == it || text.startsWith("$it ") } ->
+                if (text.any { it.code in 0x0980..0x09FF }) "স্বাগতম।" else "Welcome."
+            listOf("tumi ke", "who are you", "তুমি কে").any { text.contains(it) } ->
+                if (text.any { it.code in 0x0980..0x09FF }) "আমি NUVA—আপনার নিরাপদ Android সহকারী।" else "Ami NUVA—apnar safe Android assistant."
+            else -> null
+        } ?: return null
+        return ok(NuvaAction.LocalAnswer(greeting, "small_talk"), greeting)
+    }
 
     private fun splitPlan(text: String, depth: Int): List<CommandDecision>? {
-        if (depth > 2 || text.isBlank()) return null
+        if (depth > 5 || text.isBlank()) return null
         for (connector in CONNECTORS) {
             var from = 0
             while (true) {
@@ -205,21 +303,28 @@ object CommandParser {
                 val rightRaw = text.substring(idx + connector.length).trim()
                 from = idx + connector.length
 
-                val left = leftRaw.takeIf { it.isNotBlank() }?.let { parsePrepared(it) } ?: continue
+                val left = leftRaw.takeIf { it.isNotBlank() }?.let { parsePreparedWithGrammar(it) } ?: continue
                 if (left.unsupported) continue
                 // A MESSAGE carries free text and may legally contain the
                 // connector itself ("…bole dao ami ar ashbo") — never accept
                 // it as the left side of a split. Calls carry no content, so
                 // splitting after a call is safe.
                 if (left.action is NuvaAction.SendMessage) continue
-                if (leftRaw.split(" ").size > 8) continue
+                if (leftRaw.split(" ").size > 12) continue
 
-                // The TAIL is parsed whole first — a trailing message keeps
-                // its own inner connectors ("ami ar ashbo") intact.
-                val wholeTail = parsePrepared(rightRaw)
+                // If the tail still contains connectors, recursively try a
+                // longer plan first. Message content remains safe because a
+                // SEND_MESSAGE is never accepted as a split's left side.
+                val nested = if (CONNECTORS.any { rightRaw.contains(it) }) {
+                    splitPlan(rightRaw, depth + 1)
+                } else {
+                    null
+                }
+                val wholeTail = parsePreparedWithGrammar(rightRaw)
                 val rest: List<CommandDecision> = when {
+                    !nested.isNullOrEmpty() -> nested
                     wholeTail != null -> listOf(wholeTail)
-                    else -> splitPlan(rightRaw, depth + 1).orEmpty()
+                    else -> emptyList()
                 }
                 if (rest.isEmpty()) continue
 
@@ -255,6 +360,104 @@ object CommandParser {
                 step
             }
         }
+    }
+
+    // --- 0c. Emergency/SOS user-finalized handoffs (v3.4) ------------------------------
+
+    private fun parseEmergency(t: String): CommandDecision? {
+        if (listOf("emergency info setting", "medical info setting", "emergency profile", "জরুরি তথ্য সেটিং", "মেডিকেল তথ্য সেটিং")
+                .any { t.contains(it) }
+        ) {
+            return ok(NuvaAction.OpenSettingScreen(SettingTarget.EMERGENCY_INFO), "Emergency information settings khulchi.")
+        }
+
+        val sosMarker = listOf("sos message draft", "emergency message draft", "help message share", "জরুরি মেসেজ ড্রাফট")
+            .firstOrNull { t.contains(it) }
+        if (sosMarker != null) {
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            var text = quoted ?: contentAfter(t, sosMarker)
+            text = text?.removePrefix("je ")?.removePrefix("যে ")?.trim()
+            val message = text?.takeIf { it.isNotBlank() } ?: "আমার জরুরি সাহায্য দরকার।"
+            return ok(
+                NuvaAction.ShareText(message.take(1_000)),
+                "SOS text share sheet khulbo — recipient o final Send apni korben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val asksDialer = listOf(
+            "emergency call", "emergency dialer", "999 dial", "police call", "ambulance call", "fire service call",
+            "জরুরি কল", "পুলিশ কল", "অ্যাম্বুলেন্স কল", "ফায়ার সার্ভিস কল", "ফায়ার সার্ভিস কল",
+        ).any { t.contains(it) }
+        if (!asksDialer) return null
+        val service = when {
+            t.contains("police") || t.contains("পুলিশ") -> EmergencyService.POLICE
+            t.contains("ambulance") || t.contains("অ্যাম্বুলেন্স") -> EmergencyService.AMBULANCE
+            t.contains("fire") || t.contains("ফায়ার") || t.contains("ফায়ার") -> EmergencyService.FIRE
+            else -> EmergencyService.NATIONAL
+        }
+        return ok(
+            NuvaAction.EmergencyDialer(service),
+            "Bangladesh 999 dialer khulchi — final Call apni chapun.",
+        )
+    }
+
+    // --- 0d. Home Assistant safe physical controls (v4.0) ------------------------------
+
+    private fun parseHomeAssistant(t: String): CommandDecision? {
+        val domain = when {
+            listOf("light", "lights", "lamp", "bulb", "লাইট", "বাতি").any { NuvaDateTimeParser.hasWord(t, it) } ->
+                HomeAssistantDomain.LIGHT
+            listOf("fan", "পাখা", "ফ্যান").any { NuvaDateTimeParser.hasWord(t, it) } -> HomeAssistantDomain.FAN
+            listOf("thermostat", "climate", "air conditioner", "smart ac", "থার্মোস্ট্যাট", "স্মার্ট এসি")
+                .any { t.contains(it) } || NuvaDateTimeParser.hasWord(t, "ac") || NuvaDateTimeParser.hasWord(t, "এসি") ->
+                HomeAssistantDomain.CLIMATE
+            listOf("smart switch", "home assistant switch", "স্মার্ট সুইচ").any { t.contains(it) } ->
+                HomeAssistantDomain.SWITCH
+            else -> return null
+        }
+        val temperatureMatch = Regex(
+            """(?:temperature|temp|তাপমাত্রা)\s*(\d{2}(?:\.\d)?)|(?:\b(\d{2}(?:\.\d)?)\s*(?:degree|degrees|°|ডিগ্রি))""",
+        ).find(t)
+        val temperature = temperatureMatch?.let { match ->
+            match.groupValues[1].ifBlank { match.groupValues[2] }.toDoubleOrNull()
+        }?.takeIf { domain == HomeAssistantDomain.CLIMATE }
+        val operation = when {
+            temperature != null -> HomeAssistantOperation.SET_TEMPERATURE
+            listOf("turn off", "switch off", "off koro", "bondho koro", "বন্ধ করো", "অফ করো")
+                .any { t.contains(it) } -> HomeAssistantOperation.TURN_OFF
+            listOf("toggle", "টগল").any { t.contains(it) } -> HomeAssistantOperation.TOGGLE
+            listOf("turn on", "switch on", "on koro", "chalu koro", "চালু করো", "অন করো")
+                .any { t.contains(it) } -> HomeAssistantOperation.TURN_ON
+            else -> return null
+        }
+        if (temperature != null && temperature !in 10.0..32.0) {
+            return unsupported("Home Assistant temperature 10 theke 32 degree-er moddhe bolun.")
+        }
+        var entity = t
+        listOf(
+            "home assistant", "smart", "light", "lights", "lamp", "bulb", "লাইট", "বাতি", "fan", "ফ্যান", "পাখা",
+            "thermostat", "climate", "air conditioner", "ac", "থার্মোস্ট্যাট", "এসি", "switch", "সুইচ",
+            "turn off", "switch off", "off koro", "bondho koro", "বন্ধ করো", "অফ করো",
+            "turn on", "switch on", "on koro", "chalu koro", "চালু করো", "অন করো", "toggle", "টগল",
+            "temperature", "temp", "তাপমাত্রা", "degree", "degrees", "ডিগ্রি",
+        ).sortedByDescending { it.length }.forEach { entity = entity.replace(it, " ") }
+        temperature?.let { entity = entity.replace(Regex("""\b${it.toInt()}(?:\.\d)?\b"""), " ") }
+        TAIL_VERBS.forEach { entity = swapWord(entity, it) }
+        entity = entity.replace(Regex("""\s+"""), " ").trim(' ', ',', '.', ':', '?', '!')
+        if (entity.isBlank()) {
+            entity = when (domain) {
+                HomeAssistantDomain.LIGHT -> "light"
+                HomeAssistantDomain.FAN -> "fan"
+                HomeAssistantDomain.CLIMATE -> "climate"
+                HomeAssistantDomain.SWITCH -> "switch"
+            }
+        }
+        return ok(
+            NuvaAction.HomeAssistantControl(domain, operation, entity.take(120), temperature),
+            "Home Assistant-e $entity ${operation.wireName} korbo — nishchit korun.",
+            NuvaRisk.MEDIUM,
+        )
     }
 
     // --- 1. Navigation ------------------------------------------------------------
@@ -348,31 +551,716 @@ object CommandParser {
         return null
     }
 
+    // --- 2b. User-present files & gallery (v2.2) -----------------------------------------
+
+    private fun parseUserPresentFile(t: String): CommandDecision? {
+        fun decision(operation: UserFileOperation, speech: String, newName: String? = null): CommandDecision {
+            val risk = if (operation.needsBlockingConfirmation) NuvaRisk.MEDIUM else NuvaRisk.LOW
+            return ok(NuvaAction.UserFile(operation, newName), speech, risk)
+        }
+
+        val share = listOf("share", "pathao", "send", "শেয়ার", "শেয়ার", "পাঠাও").any { t.contains(it) }
+        val select = listOf("select", "choose", "pick", "beche", "বেছে", "নির্বাচন").any { t.contains(it) }
+        val open = listOf("open", "kholo", "khulo", "খোলো", "খুলে").any { t.contains(it) }
+        val fileWord = listOf("file", "document", "ফাইল", "ডকুমেন্ট").any { t.contains(it) }
+        val multiple = listOf("multiple", "several", "onek", "sob", "all selected", "একাধিক", "অনেক", "কয়েকটি", "কয়েকটি")
+            .any { t.contains(it) }
+
+        if ((fileWord || t.contains("pdf")) && listOf("print", "প্রিন্ট").any { t.contains(it) }) {
+            return decision(UserFileOperation.PRINT_PDF, "PDF picker-er por Android print preview khulbo.")
+        }
+        if (fileWord && share && multiple) {
+            return decision(UserFileOperation.SHARE_MULTIPLE_FILES, "Multiple file picker-er por Android share sheet khulbo.")
+        }
+        if (fileWord && listOf("delete", "remove", "muchhe", "মুছে", "ডিলিট").any { t.contains(it) }) {
+            return decision(UserFileOperation.DELETE_FILE, "File picker-er por selected target abar dekhie delete confirmation nebo.")
+        }
+        if (fileWord && listOf("rename", "nam bodlao", "নাম বদল", "রিনেম").any { t.contains(it) }) {
+            val nameMarker = listOf("new name", "rename to", "nam dao", "নাম দাও", "নতুন নাম")
+                .firstOrNull { t.contains(it) }
+            val newName = nameMarker?.let { t.substringAfter(it).trim(' ', ',', '.', ':') }
+                ?.takeIf { it.isNotBlank() && it.length <= 120 && '/' !in it && '\\' !in it }
+                ?: return unsupported("File-er notun nam bolun — jemon: file rename koro new name report.pdf")
+            return decision(UserFileOperation.RENAME_FILE, "File select korar por target-aware rename confirmation nebo.", newName)
+        }
+        if (fileWord && listOf("copy", "কপি").any { t.contains(it) }) {
+            return decision(UserFileOperation.COPY_FILE, "Source file o destination folder apni select korben; tarpor copy confirm korbo.")
+        }
+        if (fileWord && listOf("move", "sorao", "সরাও", "মুভ").any { t.contains(it) }) {
+            return decision(UserFileOperation.MOVE_FILE, "Source file o destination folder apni select korben; tarpor move confirm korbo.")
+        }
+
+        if (listOf("folder select", "folder choose", "folder access", "directory select", "ফোল্ডার বেছে", "ফোল্ডার সিলেক্ট")
+                .any { t.contains(it) }
+        ) {
+            return decision(UserFileOperation.OPEN_FOLDER, "Android folder picker khulbo — folder apni select korun.")
+        }
+
+        val photo = listOf("photo", "chobi", "image", "ছবি", "ফটো").any { t.contains(it) }
+        val video = listOf("video", "ভিডিও").any { t.contains(it) }
+        val gallerySource = listOf("gallery theke", "gallery থেকে", "গ্যালারি থেকে", "photo picker", "media picker")
+            .any { t.contains(it) }
+        if (photo && share && multiple) {
+            return decision(UserFileOperation.SHARE_MULTIPLE_PHOTOS, "Multiple photo picker-er por Android share sheet khulbo.")
+        }
+        if (video && share && multiple) {
+            return decision(UserFileOperation.SHARE_MULTIPLE_VIDEOS, "Multiple video picker-er por Android share sheet khulbo.")
+        }
+        if (photo && listOf("edit", "crop", "rotate", "filter", "এডিট", "ক্রপ", "ঘোরাও").any { t.contains(it) }) {
+            return decision(UserFileOperation.EDIT_PHOTO, "Photo select korar por installed editor khulbo; final Save apni korben.")
+        }
+        if (photo && (gallerySource || share || select)) {
+            return if (share) {
+                decision(UserFileOperation.SHARE_PHOTO, "Photo picker-er por Android share sheet khulbo.")
+            } else {
+                decision(UserFileOperation.PICK_PHOTO, "Photo picker khulchi — photo apni select korun.")
+            }
+        }
+        if (video && (gallerySource || share || select)) {
+            return if (share) {
+                decision(UserFileOperation.SHARE_VIDEO, "Video picker-er por Android share sheet khulbo.")
+            } else {
+                decision(UserFileOperation.PICK_VIDEO, "Video picker khulchi — video apni select korun.")
+            }
+        }
+
+        val textFile = listOf("text file", "txt file", "লেখার ফাইল", "টেক্সট ফাইল").any { t.contains(it) }
+        val wantsRead = listOf("read", "poro", "পড়ো", "পড়ো", "pore shonao", "পড়ে শোনাও")
+            .any { t.contains(it) }
+        if (textFile && wantsRead) {
+            return decision(UserFileOperation.READ_TEXT, "Text file picker khulchi — file apni select korun.")
+        }
+
+        if (fileWord && share) {
+            return decision(UserFileOperation.SHARE_FILE, "File picker-er por Android share sheet khulbo.")
+        }
+        if (fileWord && (select || open)) {
+            return decision(UserFileOperation.OPEN_FILE, "System file picker khulchi — file apni select korun.")
+        }
+        return null
+    }
+
+    // --- 2c. Forms/productivity handoff + scheduled compose reminder (v2.4) ------------
+
+    private fun parseProductivityHandoff(t: String): CommandDecision? {
+        if (listOf("clipboard poro", "read clipboard", "clipboard e ki ache", "ক্লিপবোর্ড পড়ো", "ক্লিপবোর্ডে কী আছে")
+                .any { t.contains(it) }
+        ) {
+            return ok(NuvaAction.ClipboardAction(ClipboardOperation.READ), "Clipboard porbo — nishchit korun.", NuvaRisk.MEDIUM)
+        }
+        if (listOf("clipboard clear", "clear clipboard", "clipboard muchhe", "ক্লিপবোর্ড মুছো", "ক্লিপবোর্ড পরিষ্কার")
+                .any { t.contains(it) }
+        ) {
+            return ok(NuvaAction.ClipboardAction(ClipboardOperation.CLEAR), "Clipboard clear korbo — nishchit korun.", NuvaRisk.MEDIUM)
+        }
+        val clipboardCopyMarker = listOf(
+            "clipboard e copy koro", "copy to clipboard", "copy text", "clipboard e rakho", "ক্লিপবোর্ডে কপি", "ক্লিপবোর্ডে রাখো",
+        ).firstOrNull { t.contains(it) }
+        if (clipboardCopyMarker != null) {
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            var text = quoted ?: contentAfter(t, clipboardCopyMarker)
+            text = text?.removePrefix("je ")?.removePrefix("যে ")?.trim()
+            if (text.isNullOrBlank()) return unsupported("Clipboard-e kon text copy korbo?")
+            return ok(NuvaAction.ClipboardAction(ClipboardOperation.COPY, text.take(5_000)), "Text copy korbo — nishchit korun.", NuvaRisk.MEDIUM)
+        }
+
+        val agendaRead = listOf(
+            "agenda poro", "calendar events poro", "calendar agenda poro", "read agenda", "agenda read",
+            "এজেন্ডা পড়ো", "ক্যালেন্ডার ইভেন্ট পড়ো", "ক্যালেন্ডার পড়ো",
+        ).any { t.contains(it) }
+        val eventProviderOperation = when {
+            listOf("calendar event edit", "event edit koro", "ক্যালেন্ডার ইভেন্ট এডিট").any { t.contains(it) } ->
+                CalendarProviderOperation.EDIT_EVENT
+            listOf("calendar event kholo", "open calendar event", "event details kholo", "ক্যালেন্ডার ইভেন্ট খোলো")
+                .any { t.contains(it) } -> CalendarProviderOperation.OPEN_EVENT
+            else -> null
+        }
+        if (agendaRead || eventProviderOperation != null) {
+            val start = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+            }
+            if (listOf("parso", "porshu", "পরশু").any { NuvaDateTimeParser.hasWord(t, it) }) {
+                start.add(java.util.Calendar.DAY_OF_YEAR, 2)
+            } else if (NuvaDateTimeParser.relativeDay(t) == RelativeDay.TOMORROW) {
+                start.add(java.util.Calendar.DAY_OF_YEAR, 1)
+            }
+            val days = Regex("""(?:next|agami|আগামী)\s*(\d{1,2})\s*(?:day|days|din|দিন)""")
+                .find(t)?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(1, 31)
+                ?: if (listOf("week", "shoptaho", "সপ্তাহ").any { t.contains(it) }) 7 else 1
+            val end = (start.clone() as java.util.Calendar).apply { add(java.util.Calendar.DAY_OF_YEAR, days) }
+            val query = if (eventProviderOperation != null) {
+                val marker = listOf(" title ", " name ", " শিরোনাম ", " নাম ").firstOrNull { t.contains(it) }
+                marker?.let { t.substringAfter(it).trim(' ', ',', '.', ':').take(200) }
+                    ?.takeIf { it.isNotBlank() }
+                    ?: return unsupported("Kon calendar event khulbo/edit korbo? Title bolun.")
+            } else null
+            return ok(
+                NuvaAction.CalendarProvider(
+                    eventProviderOperation ?: CalendarProviderOperation.READ_AGENDA,
+                    start.timeInMillis,
+                    end.timeInMillis,
+                    query,
+                ),
+                if (eventProviderOperation == null) "Calendar agenda porbo — nishchit korun."
+                else "Exact event match kore Calendar app khulbo — nishchit korun.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val calendarRequested = listOf(
+            "calendar event create", "calendar event add", "meeting create", "event draft", "ক্যালেন্ডার ইভেন্ট", "মিটিং তৈরি",
+        ).any { t.contains(it) }
+        val calendarView = !calendarRequested && listOf(
+            "calendar dekhao", "show calendar", "calendar agenda", "today calendar", "tomorrow calendar",
+            "ক্যালেন্ডার দেখাও", "আজকের ক্যালেন্ডার", "আগামীকালের ক্যালেন্ডার",
+        ).any { t.contains(it) }
+        if (calendarView) {
+            val focus = java.util.Calendar.getInstance()
+            when {
+                listOf("parso", "porshu", "পরশু").any { NuvaDateTimeParser.hasWord(t, it) } ->
+                    focus.add(java.util.Calendar.DAY_OF_YEAR, 2)
+                NuvaDateTimeParser.relativeDay(t) == RelativeDay.TOMORROW ->
+                    focus.add(java.util.Calendar.DAY_OF_YEAR, 1)
+                NuvaDateTimeParser.weekday(t) != null -> {
+                    val weekday = NuvaDateTimeParser.weekday(t)
+                        ?: return unsupported("Weekday ta bujhte parini.")
+                    val wanted = when (weekday) {
+                        Weekday.MON -> java.util.Calendar.MONDAY
+                        Weekday.TUE -> java.util.Calendar.TUESDAY
+                        Weekday.WED -> java.util.Calendar.WEDNESDAY
+                        Weekday.THU -> java.util.Calendar.THURSDAY
+                        Weekday.FRI -> java.util.Calendar.FRIDAY
+                        Weekday.SAT -> java.util.Calendar.SATURDAY
+                        Weekday.SUN -> java.util.Calendar.SUNDAY
+                    }
+                    var delta = (wanted - focus.get(java.util.Calendar.DAY_OF_WEEK) + 7) % 7
+                    if (delta == 0) delta = 7
+                    focus.add(java.util.Calendar.DAY_OF_YEAR, delta)
+                }
+            }
+            return ok(NuvaAction.ViewCalendar(focus.timeInMillis), "Calendar view khulchi.")
+        }
+        if (calendarRequested) {
+            val parsedTime = NuvaDateTimeParser.parseTime(t)
+                ?: return unsupported("Calendar event-er time bolun.")
+            val begin = com.nuva.assistant.automation.ScheduledComposeScheduler.nextTrigger(t, parsedTime.hour, parsedTime.minute)
+            val durationSeconds = NuvaDateTimeParser.parseDuration(t)?.takeIf { it in 60..86_400 } ?: 3_600L
+            val titleMarker = listOf(" title ", " name ", " শিরোনাম ", " নাম ").firstOrNull { t.contains(it) }
+            val eventTitle = titleMarker?.let { marker ->
+                t.substringAfter(marker)
+                    .substringBefore(" location ").substringBefore(" description ").substringBefore(" attendee ")
+                    .substringBefore(" email ").substringBefore(" স্থান ").substringBefore(" বিবরণ ")
+                    .trim(' ', ',', '.', ':')
+            }?.takeIf { it.isNotBlank() }?.take(200)
+                ?: return unsupported("Calendar event-er title bolun.")
+            val location = listOf(" location ", " স্থান ").firstOrNull { t.contains(it) }
+                ?.let { marker -> t.substringAfter(marker).substringBefore(" description ").substringBefore(" attendee ").substringBefore(" email ").trim(' ', ',', '.', ':').take(300) }
+            val description = listOf(" description ", " বিবরণ ").firstOrNull { t.contains(it) }
+                ?.let { marker -> t.substringAfter(marker).substringBefore(" attendee ").substringBefore(" email ").trim(' ', ',', '.', ':').take(2_000) }
+            val attendee = EMAIL_ADDRESS.find(t)?.value
+            return ok(
+                NuvaAction.CreateCalendarEvent(eventTitle, begin, begin + durationSeconds * 1_000, location, description, attendee),
+                "Rich calendar event draft khulbo — final Save apni chapben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val managementPanel = when {
+            listOf("app info", "application info", "app details", "অ্যাপ ইনফো").any { t.contains(it) } ->
+                AppManagementPanel.APP_INFO
+            listOf("notification setting", "notification settings", "নোটিফিকেশন সেটিং").any { t.contains(it) } &&
+                !listOf("nuva er", "nuva-র").any { t.contains(it) } -> AppManagementPanel.NOTIFICATIONS
+            listOf("play store page", "store page", "প্লে স্টোর পেজ").any { t.contains(it) } ->
+                AppManagementPanel.PLAY_STORE
+            else -> null
+        }
+        if (managementPanel != null) {
+            var app = t
+            listOf(
+                "application info", "app details", "app info", "অ্যাপ ইনফো", "notification settings", "notification setting",
+                "নোটিফিকেশন সেটিং", "play store page", "store page", "প্লে স্টোর পেজ", "khulo", "kholo", "open", "দেখাও", "খোলো",
+            ).forEach { app = app.replace(it, " ") }
+            listOf("app", "ta", "টা", "please", "er", "এর").forEach { app = swapWord(app, it) }
+            app = app.replace(Regex("""\s+"""), " ").trim(' ', ',', '.', ':')
+            if (app.isNotBlank() && app.length <= 80) {
+                return ok(NuvaAction.OpenAppManagement(app, managementPanel), "$app er ${managementPanel.wireName} khulchi.")
+            }
+        }
+
+        val uninstallMarker = listOf("uninstall koro", "uninstall korun", "remove app", "app uninstall", "আনইনস্টল করো")
+            .firstOrNull { t.contains(it) }
+        if (uninstallMarker != null) {
+            var app = t.replace(uninstallMarker, " ")
+            listOf("app", "ta", "টা", "please").forEach { app = swapWord(app, it) }
+            TAIL_VERBS.forEach { app = swapWord(app, it) }
+            app = app.replace(Regex("""\s+"""), " ").trim(' ', ',', '.', ':')
+            if (app.isBlank() || app.length > 80) return unsupported("Kon app uninstall korbo? App-er nam bolun.")
+            if (SensitiveAppPolicy.isSensitiveAppName(app)) {
+                return unsupported("Financial app uninstall NUVA initiate korbe na — Android Settings theke manually korun.")
+            }
+            return ok(NuvaAction.UninstallApp(app), "$app uninstall prompt khulbo — nishchit korun.", NuvaRisk.MEDIUM)
+        }
+
+        val contactHandoff = when {
+            listOf("contact edit", "edit contact", "contact bodlao", "কন্টাক্ট এডিট", "কন্টাক্ট বদলাও").any { t.contains(it) } ->
+                ContactHandoffOperation.EDIT
+            listOf("contact dekhao", "contact details", "view contact", "কন্টাক্ট দেখাও").any { t.contains(it) } ->
+                ContactHandoffOperation.VIEW
+            else -> null
+        }
+        if (contactHandoff != null) {
+            return ok(
+                NuvaAction.ContactHandoff(contactHandoff),
+                "Contact picker khulbo — exact contact apni select korun.",
+                if (contactHandoff == ContactHandoffOperation.EDIT) NuvaRisk.MEDIUM else NuvaRisk.LOW,
+            )
+        }
+
+        val contactDraft = listOf(
+            "new contact add", "contact create", "contact draft", "contact save screen", "নতুন কন্টাক্ট", "কন্টাক্ট যোগ",
+        ).any { t.contains(it) }
+        if (contactDraft) {
+            val phone = PHONE_NUMBER.find(t)?.value?.let { digitsOnly(it) }
+            val email = EMAIL_ADDRESS.find(t)?.value
+            val nameMarker = listOf(" name ", " nam ", " নাম ").firstOrNull { t.contains(it) }
+            val name = nameMarker?.let { marker ->
+                var rawName = t.substringAfter(marker)
+                    .substringBefore(" number ").substringBefore(" phone ").substringBefore(" email ")
+                phone?.let { rawName = rawName.substringBefore(it) }
+                email?.let { rawName = rawName.substringBefore(it) }
+                rawName.trim(' ', ',', '.', ':')
+            }
+            if (name.isNullOrBlank()) return unsupported("Notun contact-er name bolun.")
+            return ok(
+                NuvaAction.CreateContactDraft(name.take(120), phone, email),
+                "Contact draft khulbo — review kore final Save apni chapben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val textShareMarker = listOf(
+            "text share koro", "lekha share koro", "share text", "ei lekha share", "লেখা শেয়ার", "টেক্সট শেয়ার",
+        ).firstOrNull { t.contains(it) }
+        if (textShareMarker != null) {
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            var text = quoted ?: contentAfter(t, textShareMarker)
+            text = text?.removePrefix("je ")?.removePrefix("যে ")?.trim()
+            if (text.isNullOrBlank()) return unsupported("Kon text share korbo? Lekhata bolun.")
+            return ok(NuvaAction.ShareText(text.take(5_000)), "Text share korbo — nishchit korun.", NuvaRisk.MEDIUM)
+        }
+
+        val scheduledDraftWords = listOf("scheduled draft", "scheduled email", "scheduled sms", "compose reminder", "শিডিউল ড্রাফট")
+        if (scheduledDraftWords.any { t.contains(it) } &&
+            listOf("list", "dekhao", "poro", "show", "দেখাও", "পড়ো").any { t.contains(it) }
+        ) {
+            return ok(NuvaAction.ListScheduledDrafts, "Scheduled draft list porchi.")
+        }
+        if (scheduledDraftWords.any { t.contains(it) } &&
+            listOf("cancel", "batil", "বাতিল", "remove").any { t.contains(it) }
+        ) {
+            val ordinal = Regex("""(\d+)\s*(number|no|tomo|তম)?""").find(t)
+                ?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(1, 100) ?: 1
+            return ok(
+                NuvaAction.CancelScheduledDraft(ordinal),
+                "$ordinal number scheduled draft cancel korbo — nishchit korun.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val scheduled = listOf(
+            "schedule email", "scheduled email", "email reminder", "schedule sms", "scheduled sms",
+            "message compose reminder", "ইমেইল রিমাইন্ডার", "এসএমএস রিমাইন্ডার",
+        ).any { t.contains(it) }
+        if (scheduled) {
+            val channel = if (t.contains("sms") || t.contains("এসএমএস")) ComposeChannel.SMS else ComposeChannel.EMAIL
+            val parsedTime = NuvaDateTimeParser.parseTime(t)
+                ?: return unsupported("Koto tay compose reminder dibo? Somoy ta bolun.")
+            val triggerAt = com.nuva.assistant.automation.ScheduledComposeScheduler.nextTrigger(t, parsedTime.hour, parsedTime.minute)
+            val recipient = when (channel) {
+                ComposeChannel.EMAIL -> EMAIL_ADDRESS.find(t)?.value
+                ComposeChannel.SMS -> PHONE_NUMBER.find(t)?.value?.let { digitsOnly(it) }
+            }
+            val subject = Regex("""(?:subject|বিষয়|বিষয়)\s*[:=-]?\s*(.{1,200}?)(?=\s+(?:body|message|je|যে)\s|$)""")
+                .find(t)?.groupValues?.get(1)?.trim(' ', ',', '.', ':')
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            val bodyMarker = listOf(" body ", " message ", " je ", " যে ").firstOrNull { t.contains(it) }
+            val body = quoted ?: bodyMarker?.let { t.substringAfter(it).trim(' ', ',', '.', ':') }
+            if (body.isNullOrBlank()) return unsupported("Reminder-er compose body/message ta bolun.")
+            val recurrence = when {
+                listOf("protidin", "pratidin", "daily", "every day", "প্রতিদিন", "রোজ").any { t.contains(it) } ->
+                    ComposeRecurrence.DAILY
+                listOf("weekly", "every week", "proti shoptaho", "প্রতি সপ্তাহ").any { t.contains(it) } ||
+                    NuvaDateTimeParser.weekday(t) != null -> ComposeRecurrence.WEEKLY
+                else -> ComposeRecurrence.ONCE
+            }
+            return ok(
+                NuvaAction.ScheduleCompose(channel, recipient, subject, body.take(2_000), triggerAt, recurrence),
+                "Compose reminder schedule korbo — notification tap korle draft khulbe; Send apni chapben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val formRequested = listOf(
+            "form prepare", "application prepare", "application form kholo", "booking prepare", "form draft",
+            "ফর্ম প্রস্তুত", "আবেদন ফর্ম", "বুকিং ফর্ম",
+        ).any { t.contains(it) }
+        if (!formRequested) return null
+        val kind = when {
+            t.contains("passport") || t.contains("পাসপোর্ট") -> FormKind.PASSPORT
+            t.contains("nid") || t.contains("এনআইডি") -> FormKind.NID
+            t.contains("birth") || t.contains("জন্ম") -> FormKind.BIRTH_REGISTRATION
+            t.contains("driving") || t.contains("ড্রাইভিং") -> FormKind.DRIVING_LICENSE
+            t.contains("visa") || t.contains("ভিসা") -> FormKind.VISA
+            t.contains("admission") || t.contains("ভর্তি") -> FormKind.ADMISSION
+            t.contains("job") || t.contains("চাকরি") -> FormKind.JOB
+            t.contains("doctor") || t.contains("ডাক্তার") -> FormKind.DOCTOR
+            t.contains("hotel") || t.contains("হোটেল") -> FormKind.HOTEL
+            t.contains("flight") || t.contains("ফ্লাইট") -> FormKind.FLIGHT
+            t.contains("courier") || t.contains("কুরিয়ার") -> FormKind.COURIER
+            else -> return unsupported("Kon form/booking prepare korbo? Type ta bolun.")
+        }
+        val details = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            ?: listOf(" details ", " তথ্য ").firstOrNull { t.contains(it) }
+                ?.let { t.substringAfter(it).trim(' ', ',', '.', ':').take(1_000) }
+        return ok(
+            NuvaAction.PrepareForm(kind, details),
+            "${kind.wireName} form draft locally rakhbo, tarpor official portal search khulbo — final Submit apni korben.",
+            NuvaRisk.MEDIUM,
+        )
+    }
+
+    // --- 2d. User-reviewed email + official notification reply (v2.3) ------------------
+
+    private fun parseCommunicationCompose(t: String): CommandDecision? {
+        if (listOf("voicemail khulo", "open voicemail", "voicemail dialer", "ভয়েসমেইল খোলো", "ভয়েসমেইল খোলো")
+                .any { t.contains(it) }
+        ) {
+            return ok(NuvaAction.OpenVoicemail, "Voicemail dialer khulchi — final call apni korben.")
+        }
+
+        val socialPlatform = when {
+            t.contains("facebook") -> SocialPlatform.FACEBOOK
+            t.contains("instagram") -> SocialPlatform.INSTAGRAM
+            t.contains("linkedin") -> SocialPlatform.LINKEDIN
+            t.contains("reddit") -> SocialPlatform.REDDIT
+            t.contains("threads") -> SocialPlatform.THREADS
+            t.contains("tiktok") -> SocialPlatform.TIKTOK
+            Regex("""(^|\s)(x|twitter)(\s|$)""").containsMatchIn(t) -> SocialPlatform.X
+            else -> null
+        }
+        val socialCompose = listOf("post draft", "post compose", "compose post", "post likho", "পোস্ট ড্রাফট", "পোস্ট লেখো")
+            .any { t.contains(it) }
+        if (socialPlatform != null && socialCompose) {
+            val marker = listOf(" je ", " যে ", " text ", " লেখা ").firstOrNull { t.contains(it) }
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            val text = quoted ?: marker?.let { t.substringAfter(it).trim(' ', ',', '.', ':') }
+            if (text.isNullOrBlank()) return unsupported("Social post draft-er text bolun.")
+            return ok(
+                NuvaAction.ComposeSocialPost(socialPlatform, text.take(5_000)),
+                "${socialPlatform.wireName} compose khulbo — final Post apni korben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val mmsRequested = listOf("mms compose", "mms pathao", "multimedia message", "photo message", "এমএমএস")
+            .any { t.contains(it) }
+        if (mmsRequested) {
+            val recipient = PHONE_NUMBER.find(t)?.value?.let { digitsOnly(it) }
+            val attachment = listOf("attachment", "attach", "photo", "image", "file", "ছবি", "ফাইল").any { t.contains(it) }
+            val marker = listOf(" message ", " body ", " je ", " যে ").firstOrNull { t.contains(it) }
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            var body = quoted ?: marker?.let { t.substringAfter(it).trim(' ', ',', '.', ':') }
+            body = body?.removePrefix("je ")?.removePrefix("যে ")?.trim()
+            if (body.isNullOrBlank() && !attachment) return unsupported("MMS-er body ba attachment bolun.")
+            return ok(
+                NuvaAction.ComposeMms(recipient, body?.take(2_000), attachment),
+                "MMS composer khulbo${if (attachment) "; age file beche nin" else ""} — final Send apni korben.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val mentionsNotification = t.contains("notification") || t.contains("নোটিফিকেশন")
+        if (mentionsNotification && listOf("dismiss", "clear notification", "notification muchhe", "সরাও", "মুছে দাও")
+                .any { t.contains(it) }
+        ) {
+            val ordinal = Regex("""(\d+)\s*(number|no|tomo|তম)?""").find(t)
+                ?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(1, 30) ?: 1
+            return ok(
+                NuvaAction.ManageNotification(ordinal, NotificationManageOperation.DISMISS),
+                "$ordinal number notification dismiss korbo — nishchit korun.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+        if (mentionsNotification && listOf("mark as read", "mark read", "পঠিত", "পড়া হয়েছে", "পড়া হয়েছে")
+                .any { t.contains(it) }
+        ) {
+            val ordinal = Regex("""(\d+)\s*(number|no|tomo|তম)?""").find(t)
+                ?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(1, 30) ?: 1
+            return ok(
+                NuvaAction.ManageNotification(ordinal, NotificationManageOperation.MARK_READ),
+                "$ordinal number notification app-er official Mark as read action diye mark korbo — nishchit korun.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val replyMarker = listOf(
+            "notification e reply dao", "notification reply dao", "notification reply koro",
+            "reply to notification", "নোটিফিকেশনে রিপ্লাই দাও", "নোটিফিকেশনের উত্তর দাও",
+            "রিপ্লাই দাও", "reply dao", "reply koro",
+        ).firstOrNull { t.contains(it) }
+        if (replyMarker != null && (t.contains("notification") || t.contains("নোটিফিকেশন"))) {
+            val ordinal = Regex("""(\d+)\s*(number|no|tomo|তম)""").find(t)
+                ?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(1, 30) ?: 1
+            val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+            var message = quoted ?: contentAfter(t, replyMarker)
+            message = message?.removePrefix("je ")?.removePrefix("যে ")?.trim()
+            if (message.isNullOrBlank()) return unsupported("Notification e ki reply dibo? Message ta bolun.")
+            return ok(
+                NuvaAction.ReplyNotification(ordinal, message.take(1_000)),
+                "$ordinal number notification e \"${message.take(120)}\" reply pathabo — nishchit korun.",
+                NuvaRisk.MEDIUM,
+            )
+        }
+
+        val emailMarker = listOf(
+            "email compose koro", "compose email", "email likho", "email koro", "email pathao",
+            "mail compose koro", "mail likho", "mail pathao", "ইমেইল লেখো", "ইমেইল পাঠাও", "মেইল লেখো",
+        ).firstOrNull { t.contains(it) } ?: return null
+        val recipient = EMAIL_ADDRESS.find(t)?.value
+        val subject = Regex("""(?:subject|বিষয়|বিষয়)\s*[:=-]?\s*(.{1,200}?)(?=\s+(?:body|message|je|যে)\s|$)""")
+            .find(t)?.groupValues?.get(1)?.trim(' ', ',', '.', ':')
+        val quoted = Regex("""["'“”](.+?)["'“”]""").find(t)?.groupValues?.get(1)?.trim()
+        val bodyMarker = listOf(" body ", " message ", " je ", " যে ").firstOrNull { t.contains(it) }
+        var body = quoted ?: bodyMarker?.let { marker -> t.substringAfter(marker).trim(' ', ',', '.', ':') }
+        if (body.isNullOrBlank()) {
+            body = contentAfter(t, emailMarker)?.replace(recipient.orEmpty(), " ")
+                ?.replace(Regex("""\b(subject|বিষয়|বিষয়)\b.*$"""), " ")
+                ?.replace(Regex("""\s+"""), " ")?.trim()?.ifBlank { null }
+        }
+        val attachmentWords = listOf(
+            "attachment", "attach file", "file attach", "document attach", "সংযুক্তি", "ফাইল অ্যাটাচ",
+        )
+        val attachmentRequested = attachmentWords.any { t.contains(it) }
+        val multipleAttachments = attachmentRequested && listOf(
+            "multiple", "several", "onek", "একাধিক", "অনেক", "কয়েকটি", "কয়েকটি",
+        ).any { t.contains(it) }
+        if (attachmentRequested && quoted == null && bodyMarker == null) {
+            (attachmentWords + listOf("multiple", "several", "onek", "একাধিক", "অনেক", "কয়েকটি", "কয়েকটি"))
+                .forEach { word -> body = body?.replace(word, " ") }
+            body = body?.replace(Regex("""\s+"""), " ")?.trim()?.ifBlank { null }
+        }
+        return ok(
+            NuvaAction.ComposeEmail(recipient, subject, body?.take(5_000), attachmentRequested, multipleAttachments),
+            "Email composer khulbo${recipient?.let { " — recipient $it" } ?: ""}${if (attachmentRequested) "; age attachment beche nin" else ""}; Send apni chapben.",
+            NuvaRisk.MEDIUM,
+        )
+    }
+
+    // --- 2e. Maps directions/navigation (v3.2) -----------------------------------------
+
+    private fun parseMapNavigation(t: String): CommandDecision? {
+        val street = listOf("street view", "রাস্তার ছবি", "স্ট্রিট ভিউ").any { t.contains(it) }
+        val nearby = listOf("nearby ", "near me", "kacher ", "কাছের ", "আশেপাশের ").any { t.contains(it) }
+        val navigationMarker = listOf(
+            "navigate to", "navigation to", "start navigation", "niye jao", "নেভিগেট করো", "নিয়ে যাও", "নিয়ে যাও",
+        ).firstOrNull { t.contains(it) }
+        val directionsMarker = listOf(
+            "directions to", "direction to", "route to", "rasta dekhao", "jawar rasta", "kivabe jabo", "কীভাবে যাব", "কিভাবে যাব", "রাস্তা দেখাও",
+        ).firstOrNull { t.contains(it) }
+        val requestType = when {
+            street -> MapRequestType.STREET_VIEW
+            nearby -> MapRequestType.NEARBY
+            navigationMarker != null -> MapRequestType.NAVIGATION
+            directionsMarker != null || Regex("""\bfrom\s+.+\s+to\s+.+""").containsMatchIn(t) -> MapRequestType.DIRECTIONS
+            else -> return null
+        }
+        val mode = when {
+            listOf("walking", "walk", "hete", "হেঁটে", "পায়ে", "পায়ে").any { t.contains(it) } -> TravelMode.WALKING
+            listOf("bicycle", "cycling", "cycle", "সাইকেল").any { t.contains(it) } -> TravelMode.BICYCLING
+            listOf("transit", "bus e", "train e", "public transport", "বাসে", "ট্রেনে").any { t.contains(it) } -> TravelMode.TRANSIT
+            else -> TravelMode.DRIVING
+        }
+
+        var origin: String? = null
+        var destination: String? = null
+        Regex("""\bfrom\s+(.{1,150}?)\s+to\s+(.{1,150})$""").find(t)?.let { match ->
+            origin = cleanMapPlace(match.groupValues[1])
+            destination = cleanMapPlace(match.groupValues[2])
+        }
+        if (destination == null) {
+            val marker = when (requestType) {
+                MapRequestType.NAVIGATION -> navigationMarker
+                MapRequestType.DIRECTIONS -> directionsMarker
+                MapRequestType.NEARBY -> listOf("nearby ", "kacher ", "কাছের ", "আশেপাশের ").firstOrNull { t.contains(it) }
+                MapRequestType.STREET_VIEW -> listOf("street view", "রাস্তার ছবি", "স্ট্রিট ভিউ").firstOrNull { t.contains(it) }
+            }
+            destination = marker?.let { found ->
+                val after = t.substringAfter(found).trim()
+                if (after.isNotBlank()) cleanMapPlace(after) else cleanMapPlace(t.substringBefore(found))
+            }
+        }
+        if (destination == null && navigationMarker != null && t.contains(navigationMarker)) {
+            destination = cleanMapPlace(t.substringBefore(navigationMarker))
+        }
+        val finalDestination = destination?.takeIf { it.isNotBlank() }?.take(300)
+            ?: return unsupported("Maps-e kothay jaben ba ki khujben, destination bolun.")
+        return ok(
+            NuvaAction.MapNavigation(requestType, finalDestination, origin?.take(300), mode),
+            "Maps-e $finalDestination ${requestType.wireName} khulchi.",
+        )
+    }
+
+    private fun cleanMapPlace(raw: String): String {
+        var value = raw
+        listOf(
+            "walking", "walk", "driving", "drive", "bicycle", "cycling", "transit", "public transport",
+            "hete", "হেঁটে", "পায়ে", "পায়ে", "car e", "গাড়িতে", "গাড়িতে", "dekhao", "show", "please",
+        ).forEach { value = value.replace(it, " ") }
+        TAIL_VERBS.forEach { value = swapWord(value, it) }
+        return value.replace(Regex("""\s+"""), " ").trim(' ', ',', '.', ':', '?', '!')
+    }
+
     // --- 3. Device status ---------------------------------------------------------------
 
     private fun parseDeviceStatus(t: String): CommandDecision? {
-        val battery = listOf("battery", "battary", "charge koto", "কত চার্জ", "ব্যাটারি", "চার্জ কত")
-            .any { t.contains(it) }
-        if (battery) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.BATTERY), "Battery dekhe nicchi.")
+        val battery = listOf(
+            "battery", "battary", "bettery", "charge koto", "charge koy", "চার্জ কত",
+            "কত চার্জ", "ব্যাটারি", "battery percentage", "battery percent",
+        ).any { t.contains(it) }
+        if (battery && !listOf("battery saver", "battery setting", "power saving", "ব্যাটারি সেভার").any { t.contains(it) }) {
+            return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.BATTERY), "Battery dekhe nicchi.")
+        }
+        if (listOf("uptime", "phone koto khon on", "device koto khon cholche", "কতক্ষণ ধরে ফোন চলছে", "ফোন আপটাইম")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.UPTIME), "Uptime dekhe nicchi.")
 
-        val time = listOf("কটা বাজে", "কয়টা বাজে", "somoy koto", "time koto", "koto bajche", "সময় কত", "এখন কটা")
-            .any { t.contains(it) }
-        if (time) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.TIME), "Somoy dekhe nicchi.")
+        // Speech recognition writes the same Banglish sentence many ways. In
+        // particular, users commonly say/type "akn koyta baje" rather than
+        // the canonical "ekhon koto bajche". Keep these reads local so the
+        // answer always comes from the phone's clock, not an AI guess.
+        val nowWords = listOf(
+            "ekhon", "akhon", "akon", "akn", "ekhn", "now", "current",
+            "এখন", "বর্তমান",
+        )
+        val timePhrases = listOf(
+            "koyta baje", "koita baje", "koi ta baje", "koy ta baje", "kota baje", "koto baje",
+            "koyta bajche", "koita bajche", "koto bajche", "somoy koto", "shomoy koto", "time koto",
+            "what time is it", "what's the time", "current time", "time now", "tell me the time",
+            "কটা বাজে", "কয়টা বাজে", "কয়টা বাজে", "কতটা বাজে", "সময় কত", "সময় কত",
+            "এখন কটা", "এখন কয়টা", "এখন কয়টা", "বর্তমান সময়", "বর্তমান সময়",
+        )
+        val asksTime = timePhrases.any { t.contains(it) } ||
+            (nowWords.any { NuvaDateTimeParser.hasWord(t, it) } &&
+                listOf("time", "somoy", "shomoy", "baje", "bajche", "সময়", "সময়", "বাজে")
+                    .any { t.contains(it) })
 
-        val date = listOf("aj kibar", "আজ কি বার", "আজ কী বার", "আজ কত তারিখ", "tarikh koto", "date koto", "আজকের তারিখ")
-            .any { t.contains(it) }
-        if (date) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.DATE), "Tarikh dekhe nicchi.")
+        val todayWords = listOf("aj", "aaj", "ajke", "today", "আজ", "আজকে", "আজকের")
+        val datePhrases = listOf(
+            "aj koto tarik", "aj koto tarikh", "aaj koto tarik", "ajke koto tarik", "ajke koto tarikh",
+            "aj tarikh koto", "aj tarik koto", "ajker tarik", "ajker tarikh", "aj ki tarik", "aj ki tarikh",
+            "tarikh koto", "tarik koto", "date koto", "today's date", "todays date", "date today",
+            "what is the date", "what's the date", "what day is it", "aj kibar", "aj ki bar", "ajke ki bar",
+            "আজ কি বার", "আজ কী বার", "আজকে কি বার", "আজকে কী বার", "আজ কত তারিখ", "আজকে কত তারিখ",
+            "আজ কী তারিখ", "আজ কি তারিখ", "আজকের তারিখ", "আজকের দিন", "আজ কী দিন",
+        )
+        val asksDate = datePhrases.any { t.contains(it) } ||
+            (todayWords.any { NuvaDateTimeParser.hasWord(t, it) } &&
+                listOf("tarik", "tarikh", "date", "kibar", "ki bar", "তারিখ", "কি বার", "কী বার")
+                    .any { t.contains(it) })
 
-        val network = listOf("internet ache", "internet on ache", "network kothay", "net ache",
-            "wifi e connected", "নেটওয়ার্ক", "ইন্টারনেট আছে", "নেট আছে", "network status")
-            .any { t.contains(it) }
+        if (asksTime && asksDate) {
+            return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.DATE_TIME), "Tarikh o somoy dekhe nicchi.")
+        }
+        if (asksTime) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.TIME), "Somoy dekhe nicchi.")
+        if (asksDate) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.DATE), "Tarikh dekhe nicchi.")
+
+        if (listOf("phone model", "device info", "phone info", "android version", "mobile model", "ফোনের মডেল", "অ্যান্ড্রয়েড ভার্সন")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.DEVICE_INFO), "Device info dekhe nicchi.")
+
+        if (listOf("ram koto", "ram status", "available ram", "free ram", "র‍্যাম কত", "র‍্যাম স্ট্যাটাস")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.MEMORY), "RAM status dekhe nicchi.")
+
+        if (listOf("display resolution", "screen resolution", "display size pixel", "স্ক্রিন রেজোলিউশন", "ডিসপ্লে রেজোলিউশন")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.DISPLAY), "Display info dekhe nicchi.")
+
+        if (listOf("volume koto", "audio status", "ringer mode", "sound status", "ভলিউম কত", "রিঙ্গার মোড")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.AUDIO), "Audio status dekhe nicchi.")
+
+        if (listOf("timezone", "time zone", "utc offset", "টাইমজোন", "সময় অঞ্চল", "সময় অঞ্চল")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.TIMEZONE), "Timezone dekhe nicchi.")
+
+        if (listOf("phone language ki", "current locale", "locale ki", "system language", "ফোনের ভাষা কী", "লোকেল কী")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.LOCALE), "Locale dekhe nicchi.")
+
+        if (listOf("koyta app installed", "installed app count", "app koyta ache", "কয়টা অ্যাপ আছে", "ইনস্টলড অ্যাপ কত")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.INSTALLED_APPS), "Installed app count korchi.")
+
+        if (listOf("sensor list", "phone e ki sensor", "koyta sensor", "সেন্সর লিস্ট", "কী সেন্সর আছে")
+                .any { t.contains(it) }
+        ) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.SENSORS), "Sensor info dekhe nicchi.")
+
+        val network = listOf(
+            "internet ache", "internet ase", "internet on ache", "network kothay", "net ache", "net ase",
+            "wifi e connected", "নেটওয়ার্ক", "ইন্টারনেট আছে", "নেট আছে", "network status", "connection ache",
+        ).any { t.contains(it) }
         if (network) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.NETWORK), "Network dekhe nicchi.")
 
-        val storage = listOf("storage", "koto jayga", "কত জায়গা", "স্টোরেজ", "memory koto", "space koto")
-            .any { t.contains(it) }
-        if (storage) return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.STORAGE), "Storage dekhe nicchi.")
+        val storage = listOf(
+            "storage", "koto jayga", "koto jaiga", "কত জায়গা", "কত জায়গা", "স্টোরেজ",
+            "memory koto", "space koto", "free space", "jayga khali", "jaiga khali",
+        ).any { t.contains(it) }
+        if (storage && !listOf("storage setting", "স্টোরেজ সেটিং").any { t.contains(it) }) {
+            return ok(NuvaAction.DeviceStatusQuery(DeviceStatusKind.STORAGE), "Storage dekhe nicchi.")
+        }
 
         return null
+    }
+
+    // --- 3a. Current information from the live web --------------------------------------
+
+    /**
+     * Fresh data such as weather/news/scores must never be invented by the
+     * language model. Date/time/device state are answered directly above;
+     * internet-backed topics are sent to a browser search so the result is
+     * genuinely current. This is intentionally read-only and LOW risk.
+     */
+    private fun parseRealtimeInfo(t: String): CommandDecision? {
+        val topic = listOf(
+            "weather", "abohawa", "আবহাওয়া", "আবহাওয়া", "temperature", "তাপমাত্রা", "brishti", "বৃষ্টি",
+            "latest news", "today news", "news today", "ajker news", "ajker khobor", "খবর", "সংবাদ",
+            "live score", "score koto", "current score", "cricket score", "football score", "লাইভ স্কোর", "স্কোর কত",
+            "traffic", "jam kemon", "rastar obostha", "ট্রাফিক", "যানজট", "রাস্তার অবস্থা",
+            "dollar rate", "exchange rate", "gold price", "sonar dam", "fuel price", "market price", "product price",
+            "ডলারের রেট", "সোনার দাম", "বাজার দর", "দাম কত",
+            "prayer time", "namazer shomoy", "namajer somoy", "নামাজের সময়", "নামাজের সময়",
+            "sunrise", "sunset", "সূর্যোদয়", "সূর্যাস্ত", "air quality", "aqi", "বায়ুর মান", "বায়ুর মান",
+            "bus schedule", "train schedule", "flight status", "বাসের সময়", "ট্রেনের সময়", "ফ্লাইট স্ট্যাটাস",
+        ).any { t.contains(it) }
+        if (!topic) return null
+
+        val asksCurrent = listOf(
+            "ekhon", "akhon", "akon", "akn", "ekhn", "current", "latest", "live", "today", "aj", "ajke", "ajker",
+            "koto", "kemon", "ki", "hobe", "now", "এখন", "আজ", "আজকে", "আজকের", "বর্তমান", "সর্বশেষ",
+            "লাইভ", "কত", "কেমন", "কি", "কী", "হবে",
+        ).any { if (it.all { ch -> ch.code in 32..127 }) NuvaDateTimeParser.hasWord(t, it) else t.contains(it) }
+        if (!asksCurrent) return null
+
+        val query = t.trim(' ', '.', ',', '?', '!', ':').take(300)
+        if (query.isBlank()) return null
+        val speech = if (query.any { it.code in 0x0980..0x09FF }) {
+            "সর্বশেষ তথ্য ওয়েবে খুঁজছি।"
+        } else {
+            "Latest information web e khujchi."
+        }
+        return ok(NuvaAction.SearchWeb(query), speech)
     }
 
     // --- 3b. Media transport (v1.2) -------------------------------------------------------
@@ -387,10 +1275,17 @@ object CommandParser {
             .any { t.contains(it) } && (hasMediaWord || t.contains("pause"))
         val resume = listOf("resume koro", "resume korun", "resume", "abar chalao", "আবার চালাও")
             .any { t.contains(it) } && (hasMediaWord || t.contains("resume"))
+        val stop = hasMediaWord && listOf("stop koro", "media stop", "music stop", "পুরো বন্ধ", "স্টপ করো").any { t.contains(it) }
+        val forward = hasMediaWord && listOf("fast forward", "forward", "samne nao", "এগিয়ে", "এগিয়ে", "সামনে নাও").any { t.contains(it) }
+        val rewind = hasMediaWord && listOf("rewind", "pichone nao", "পিছনে নাও", "পেছনে নাও").any { t.contains(it) }
+        val offset = NuvaDateTimeParser.parseDuration(t)?.toInt()?.coerceIn(1, 300) ?: 10
         val next = hasMediaWord && listOf("next", "porer", "পরের", "agamir").any { t.contains(it) }
         val previous = hasMediaWord && listOf("previous", "ager", "আগের", "agerta", "prev").any { t.contains(it) }
 
         return when {
+            forward -> ok(NuvaAction.MediaControl(MediaCommand.FAST_FORWARD, offset), "$offset second samne jacchi.")
+            rewind -> ok(NuvaAction.MediaControl(MediaCommand.REWIND, offset), "$offset second pichone jacchi.")
+            stop -> ok(NuvaAction.MediaControl(MediaCommand.STOP), "Media stop korchi.")
             pause -> ok(NuvaAction.MediaControl(MediaCommand.PAUSE), "Music pause korlam.")
             resume -> ok(NuvaAction.MediaControl(MediaCommand.PLAY), "Music abar chalacchi.")
             next -> ok(NuvaAction.MediaControl(MediaCommand.NEXT), "Porer ta chalacchi.")
@@ -404,7 +1299,18 @@ object CommandParser {
     private fun parseVolumeControl(t: String): CommandDecision? {
         val mentionsVolume = listOf("volume", "ভলিউম", "shobdo", "শব্দ", "sound", "সাউন্ড").any { t.contains(it) }
         if (!mentionsVolume) return null
+        val requestedLevel = Regex("""(?:volume|sound|ভলিউম)\s*(?:set|koro|করো|at|to)?\s*(\d{1,3})\s*(?:%|percent|শতাংশ)""")
+            .find(t)?.groupValues?.get(1)?.toIntOrNull()
+        if (requestedLevel != null && requestedLevel !in 0..100) {
+            return unsupported("Volume 0 theke 100 percent-er moddhe bolun.")
+        }
+        val exactLevel = requestedLevel?.takeIf { it in 0..100 }
         return when {
+            exactLevel != null -> ok(NuvaAction.VolumeControl(VolumeCommand.SET, exactLevel), "Volume $exactLevel percent korchi.")
+
+            listOf("unmute", "sound on", "awaj chalu", "শব্দ চালু", "মিউট বন্ধ").any { t.contains(it) } ->
+                ok(NuvaAction.VolumeControl(VolumeCommand.UNMUTE), "Sound unmute korchi.")
+
             listOf("mute", "নীরব", "চুপ", "bondho shobdo", "shobdo bondho", "শব্দ বন্ধ").any { t.contains(it) } ->
                 ok(NuvaAction.VolumeControl(VolumeCommand.MUTE), "Sound mute korlam.")
 
@@ -414,7 +1320,7 @@ object CommandParser {
             listOf("kom koro", "koman", "kom", "namiye", "নামাও", "কম করো", "কমাও").any { t.contains(it) } ->
                 ok(NuvaAction.VolumeControl(VolumeCommand.DOWN), "Volume kome dicchi.")
 
-            else -> null // "volume setting" etc. falls through to parseSettings
+            else -> null
         }
     }
 
@@ -469,6 +1375,28 @@ object CommandParser {
         if (listOf("bluetooth", "ব্লুটুথ").any { t.contains(it) }) {
             return ok(NuvaAction.OpenSettingScreen(SettingTarget.BLUETOOTH), "Bluetooth setting khulchi.")
         }
+        val extendedTarget = when {
+            listOf("mobile data setting", "data usage setting", "মোবাইল ডাটা সেটিং").any { t.contains(it) } -> SettingTarget.MOBILE_DATA
+            listOf("airplane mode", "flight mode", "এয়ারপ্লেন মোড", "ফ্লাইট মোড").any { t.contains(it) } -> SettingTarget.AIRPLANE_MODE
+            listOf("location setting", "gps setting", "লোকেশন সেটিং", "জিপিএস সেটিং").any { t.contains(it) } -> SettingTarget.LOCATION
+            listOf("hotspot setting", "tether setting", "হটস্পট সেটিং").any { t.contains(it) } -> SettingTarget.HOTSPOT
+            listOf("nfc setting", "এনএফসি সেটিং").any { t.contains(it) } -> SettingTarget.NFC
+            listOf("vpn setting", "ভিপিএন সেটিং").any { t.contains(it) } -> SettingTarget.VPN
+            listOf("battery saver", "power saving", "ব্যাটারি সেভার").any { t.contains(it) } -> SettingTarget.BATTERY_SAVER
+            listOf("default app", "default apps", "ডিফল্ট অ্যাপ").any { t.contains(it) } -> SettingTarget.DEFAULT_APPS
+            listOf("date time setting", "date and time setting", "তারিখ সময় সেটিং", "তারিখ সময় সেটিং").any { t.contains(it) } -> SettingTarget.DATE_TIME
+            listOf("language setting", "ভাষা সেটিং").any { t.contains(it) } -> SettingTarget.LANGUAGE
+            listOf("storage setting", "স্টোরেজ সেটিং").any { t.contains(it) } -> SettingTarget.STORAGE_SETTINGS
+            listOf("privacy setting", "প্রাইভেসি সেটিং", "গোপনীয়তা সেটিং").any { t.contains(it) } -> SettingTarget.PRIVACY
+            listOf("security setting", "সিকিউরিটি সেটিং", "নিরাপত্তা সেটিং").any { t.contains(it) } -> SettingTarget.SECURITY
+            listOf("cast setting", "screen cast", "কাস্ট সেটিং").any { t.contains(it) } -> SettingTarget.CAST
+            listOf("print setting", "printing setting", "প্রিন্ট সেটিং").any { t.contains(it) } -> SettingTarget.PRINT
+            listOf("caption setting", "subtitle setting", "ক্যাপশন সেটিং").any { t.contains(it) } -> SettingTarget.CAPTIONS
+            else -> null
+        }
+        if (extendedTarget != null) {
+            return ok(NuvaAction.OpenSettingScreen(extendedTarget), "${extendedTarget.wireName} screen khulchi — final change apni korben.")
+        }
         if (listOf("notification setting", "notification settings", "নোটিফিকেশন সেটিং")
                 .any { t.contains(it) }
         ) return ok(NuvaAction.OpenSettingScreen(SettingTarget.NOTIFICATION_SETTINGS), "Notification settings khulchi.")
@@ -487,6 +1415,29 @@ object CommandParser {
             return ok(NuvaAction.OpenSettingScreen(SettingTarget.GENERAL_SETTINGS), "Settings khulchi.")
         }
         return null
+    }
+
+    // --- 4b. Existing alarm/timer management (v3.6) ------------------------------------
+
+    private fun parseClockControl(t: String): CommandDecision? {
+        val operation = when {
+            listOf("show alarms", "alarm list", "alarms dekhao", "অ্যালার্ম লিস্ট", "অ্যালার্ম দেখাও")
+                .any { t.contains(it) } -> ClockOperation.SHOW_ALARMS
+            listOf("show timers", "timer list", "timers dekhao", "টাইমার লিস্ট", "টাইমার দেখাও")
+                .any { t.contains(it) } -> ClockOperation.SHOW_TIMERS
+            listOf("snooze alarm", "alarm snooze", "অ্যালার্ম স্নুজ").any { t.contains(it) } ->
+                ClockOperation.SNOOZE_ALARM
+            listOf("dismiss alarm", "alarm dismiss", "alarm bondho", "অ্যালার্ম ডিসমিস", "অ্যালার্ম বন্ধ")
+                .any { t.contains(it) } -> ClockOperation.DISMISS_ALARM
+            listOf("dismiss timer", "timer dismiss", "timer bondho", "টাইমার ডিসমিস", "টাইমার বন্ধ")
+                .any { t.contains(it) } -> ClockOperation.DISMISS_TIMER
+            else -> null
+        } ?: return null
+        return ok(
+            NuvaAction.ClockControl(operation),
+            "${operation.wireName} request korchi.",
+            if (operation.changesActiveClock) NuvaRisk.MEDIUM else NuvaRisk.LOW,
+        )
     }
 
     // --- 5. Alarm / timer ------------------------------------------------------------------
@@ -576,6 +1527,47 @@ object CommandParser {
     // --- 7. Notes & to-dos ----------------------------------------------------------------
 
     private fun parseNoteTodo(t: String): CommandDecision? {
+        val wantsRead = listOf("dekhao", "dekhan", "poro", "read", "show", "দেখাও", "দেখান", "পড়ো", "পড়ো")
+            .any { t.contains(it) }
+        if (wantsRead) {
+            val savedKind = when {
+                listOf("shopping list", "grocery list", "bazar list", "বাজারের তালিকা", "বাজারের লিস্ট", "শপিং লিস্ট")
+                    .any { t.contains(it) } -> SavedItemKind.SHOPPING
+                listOf("expense", "khoroch", "খরচ").any { t.contains(it) } -> SavedItemKind.EXPENSE
+                listOf("todo", "to do", "kaj list", "কাজের তালিকা", "টুডু").any { t.contains(it) } -> SavedItemKind.TODO
+                listOf("note", "নোট").any { t.contains(it) } -> SavedItemKind.NOTE
+                else -> null
+            }
+            if (savedKind != null) {
+                return ok(NuvaAction.ReadSavedItems(savedKind), "${savedKind.wireName} list porchi.")
+            }
+        }
+
+        // Shopping/grocery list reuses the local to-do store, with a visible
+        // prefix so it remains useful without adding another database/table.
+        val shoppingMarker = listOf(
+            "shopping list e", "shopping list", "grocery list e", "grocery list", "bazar list e", "bazarer list e",
+            "বাজারের তালিকায়", "বাজারের তালিকায়", "বাজারের লিস্টে", "শপিং লিস্টে",
+        ).firstOrNull { t.contains(it) }
+        if (shoppingMarker != null) {
+            val raw = contentAfter(t, shoppingMarker)
+            val content = raw?.let { cleanListContent(it) }
+            if (content.isNullOrBlank()) return unsupported("Shopping list e ki add korbo?")
+            return ok(NuvaAction.CreateTodo("Shopping: $content"), "Shopping list e add korlam.")
+        }
+
+        // Expense logging is a local note only; it never opens or automates a
+        // financial app and therefore does not cross the transaction boundary.
+        val expenseMarker = listOf(
+            "expense note", "expense log", "khoroch likhe rakho", "khoroch note koro", "খরচ লিখে রাখো", "খরচ নোট করো",
+        ).firstOrNull { t.contains(it) }
+        if (expenseMarker != null) {
+            val content = contentAfter(t, expenseMarker)?.let { cleanListContent(it) }
+                ?: t.replace(expenseMarker, " ").let { cleanListContent(it) }
+            if (content.isBlank()) return unsupported("Khoroch er poriman o karon bolun.")
+            return ok(NuvaAction.CreateNote("Expense: $content"), "Expense note kore nilam.")
+        }
+
         // To-do: "todo te add koro X" / "kaj list e X"
         val todoMarker = listOf(
             "todo te", "to do te", "todo list e", "kaj er list e", "kaj list e", "টুডু",
@@ -709,14 +1701,14 @@ object CommandParser {
             return if (sendVerb) unsupported("Kake pathabo? Contact er nam bole din.") else null
         }
 
+        val target = name ?: number ?: return unsupported("Kake pathabo? Contact er nam bole din.")
         val message = extractMessage(t)
         if (message.isNullOrBlank()) {
             return unsupported(
                 "Ki message pathabo bolen — tarpor abar bolen. " +
-                    "Jemon: ${if (name != null) "$name ke" else number!!} whatsapp e bole dao kal 9 tay class.",
+                    "Jemon: $target ke whatsapp e bole dao kal 9 tay class.",
             )
         }
-        val target = name ?: number!!
         return ok(
             NuvaAction.SendMessage(app, target, message, number),
             "$target ke ${app.wireName} e message pathabo — nishchit korun.",
@@ -821,6 +1813,40 @@ object CommandParser {
             return ok(NuvaAction.OpenUrl("https://$url"), "$url khulchi.")
         }
         return null
+    }
+
+    /**
+     * Safe catch-all for factual/how-to daily questions. Instead of returning
+     * UNSUPPORTED or letting an LLM invent an answer, NUVA opens a web search
+     * containing the user's full query. Action/phone commands have already had
+     * first refusal above, so this cannot steal executable intents.
+     */
+    private fun parseKnowledgeSearch(t: String): CommandDecision? {
+        val question = listOf(
+            "what ", "how ", "why ", "who ", "where ", "when ", "which ", "meaning of", "define ",
+            "ki ", "kivabe", "keno", "kothay", "kokhon", "kar ", "mane ki", "konti", "kon ",
+            "কী ", "কি ", "কিভাবে", "কীভাবে", "কেন", "কোথায়", "কোথায়", "কখন", "কে ", "মানে কী",
+        ).any { t.startsWith(it) || t.contains(" $it") } ||
+            listOf(
+                " ki", " keno", " kothay", " kokhon", " koto", " kemon",
+                " কী", " কি", " কেন", " কোথায়", " কোথায়", " কখন", " কত", " কেমন",
+            ).any { t.endsWith(it) }
+        val usefulTopic = listOf(
+            "recipe", "রেসিপি", "রান্না", "meaning", "মানে", "dictionary", "অভিধান", "translate", "translation",
+            "অনুবাদ", "near me", "nearby", "কাছাকাছি", "schedule", "সময়সূচি", "সময়সূচি", "routine", "রুটিন",
+            "price", "dam koto", "দাম কত", "bus", "train", "flight", "বাস", "ট্রেন", "ফ্লাইট", "doctor",
+            "hospital", "medicine", "ডাক্তার", "হাসপাতাল", "ওষুধ", "school", "college", "job", "স্কুল", "কলেজ", "চাকরি",
+            "how to", "upay ki", "উপায়", "উপায়",
+        ).any { t.contains(it) }
+        if (!question && !usefulTopic) return null
+        if (t.length !in 3..300) return null
+
+        val speech = if (t.any { it.code in 0x0980..0x09FF }) {
+            "নির্ভরযোগ্য ও হালনাগাদ তথ্য ওয়েবে খুঁজছি।"
+        } else {
+            "Reliable updated information web e khujchi."
+        }
+        return ok(NuvaAction.SearchWeb(t), speech)
     }
 
     // --- 12. Gestures ------------------------------------------------------------------------
@@ -935,6 +1961,16 @@ object CommandParser {
         TAIL_VERBS.forEach { rest = swapWord(rest, it) }
         val cleaned = rest.replace(Regex("""\s+"""), " ").trim(' ', '-', '.', ',', '!', '?')
         return cleaned.ifBlank { null }
+    }
+
+    private fun cleanListContent(raw: String): String {
+        var content = raw
+        listOf(
+            "add", "add koro", "add korun", "jog koro", "likhe rakho", "note koro",
+            "যোগ করো", "অ্যাড করো", "লিখে রাখো", "নোট করো", "দাও", "দিন",
+        ).forEach { content = content.replace(it, " ") }
+        TAIL_VERBS.forEach { content = swapWord(content, it) }
+        return content.replace(Regex("""\s+"""), " ").trim(' ', '-', '.', ',', '!', '?', ':')
     }
 
     private fun extractLabel(t: String): String? {

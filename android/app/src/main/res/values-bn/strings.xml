@@ -3,6 +3,15 @@
     <string name="app_name">নুভা</string>
     <string name="accessibility_service_label">নুভা অটোমেশন</string>
     <string name="accessibility_service_description">আপনার বলা কাজ নুভাকে করতে দিলে সে স্ক্রিনের বাটন খুঁজে চাপা, লেখা ও স্ক্রল করতে পারে। নুভা শুধু অনুমোদিত ১৫টি কাজ করে এবং ঝুঁকিপূর্ণ কাজের আগে অবশ্যই জিজ্ঞেস করে।</string>
+    <string name="system_assistant_label">নুভা ডিজিটাল অ্যাসিস্ট্যান্ট</string>
+    <string name="system_recognition_label">নুভা ভয়েস রিকগনিশন ব্রিজ</string>
+    <string name="quick_tile_label">নুভার সাথে কথা বলুন</string>
+    <string name="quick_tile_subtitle">কথা বলতে চাপুন</string>
+    <string name="shortcut_talk_short">নুভাকে বলুন</string>
+    <string name="shortcut_talk_long">নুভা খুলে কথা বলা শুরু করুন</string>
+    <string name="shortcut_talk_disabled">নুভা ভয়েস শর্টকাট এখন পাওয়া যাচ্ছে না</string>
+    <string name="settings_add_quick_tile">Quick Settings tile যোগ করুন</string>
+    <string name="external_text_draft_hint">শেয়ার করা লেখা শুধু draft—দেখে নিয়ে তারপর Send চাপুন।</string>
 
     <string name="home_title">নুভা</string>
     <string name="home_subtitle">আপনার ব্যক্তিগত এআই সহকারী</string>
@@ -67,13 +76,15 @@
     <string name="onboarding_title">নুভা সেটআপ</string>
     <string name="onboarding_intro">যে পারমিশন দরকার শুধু সেটাই, কখন দরকার তখনই চাওয়া হবে। সবই ঐচ্ছিক — না দিলে নুভা বলে দেবে কোন ফিচার কী কারণে বন্ধ থাকবে।</string>
     <string name="perm_mic_title">🎙 মাইক্রোফোন</string>
-    <string name="perm_mic_desc">আপনার ভয়েস কমান্ড শোনার জন্য। শোনার ইন্ডিকেটর দেখা যাওয়ার সময়ই কেবল মাইক চলে — কখনো লুকিয়ে রেকর্ড করে না।</string>
+    <string name="perm_mic_desc">ভয়েস কমান্ডের জন্য। ঐচ্ছিক Hey Nuva mode চললে মাইক্রোফোনের ongoing notification সবসময় দেখা যায়; লুকিয়ে রেকর্ড হয় না। নুভা raw audio নয়, শুধু transcript পায়।</string>
     <string name="perm_notifications_title">🔔 নোটিফিকেশন</string>
     <string name="perm_notifications_desc">নুভার শোনার স্ট্যাটাস ও ফলাফল নোটিফিকেশনে দেখাতে। ঐচ্ছিক।</string>
     <string name="perm_accessibility_title">♿ অ্যাক্সেসিবিলিটি সার্ভিস</string>
     <string name="perm_accessibility_desc">স্ক্রিন পড়ে শোনানো ও আপনার বলা বাটনে চাপ দেওয়ার জন্য। সিস্টেম সেটিংস থেকে নিজ হাতে চালু করতে হয় — নুভা নিজে কখনো চালু করতে পারে না।</string>
     <string name="perm_contacts_title">👥 কন্টাক্ট</string>
     <string name="perm_contacts_desc">“রহিমকে কল করো” বললে নম্বর খুঁজতে। প্রথম কল/মেসেজ কমান্ডের সময়েই কেবল চাওয়া হয়।</string>
+    <string name="perm_calendar_title">📅 ক্যালেন্ডার পড়া</string>
+    <string name="perm_calendar_desc">ঐচ্ছিক। আপনি স্পষ্টভাবে চাইলে সীমিত agenda পড়ে; নুভা লুকিয়ে event লেখে, sync বা upload করে না।</string>
     <string name="perm_sms_title">✉ এসএমএস</string>
     <string name="perm_sms_desc">আপনি নিশ্চিত করার পর এসএমএস পাঠাতে। না দিলে নুভা লেখা বসিয়ে এসএমএস স্ক্রিন খুলে দেবে, সেন্ড আপনি চাপবেন।</string>
     <string name="perm_notif_listener_title">📩 নোটিফিকেশন অ্যাক্সেস</string>
@@ -113,7 +124,7 @@
     <!-- v1.6: privacy screen -->
     <string name="privacy_title">আপনার ডেটা কোথায় যায়</string>
     <string name="privacy_local_title">📱 ফোনেই থাকে</string>
-    <string name="privacy_local_body">ভয়েস কমান্ডের অডিও কোথাও পাঠানো হয় না — শুধু লেখা (transcript) ব্যবহার হয়। কমান্ড হিস্ট্রি, নোট, টু-ডু, স্মৃতি ও সেটিংস শুধু এই ফোনের Room/DataStore-এ থাকে।</string>
+    <string name="privacy_local_body">নুভা raw voice audio জমা রাখে না এবং NUVA/Groq/Vercel-এ পাঠায় না। Android-এর নির্বাচিত speech-recognition provider তার privacy terms অনুযায়ী audio থেকে transcript বানাতে পারে। কমান্ড হিস্ট্রি, নোট, টু-ডু, স্মৃতি ও সেটিংস শুধু এই ফোনের Room/DataStore-এ থাকে।</string>
     <string name="privacy_groq_title">🤖 Groq-এ যায় (শুধু দরকার হলে)</string>
     <string name="privacy_groq_body">লোকাল পার্সার যখন কমান্ড বোঝে না, তখনই শুধু লেখাটা Vercel হয়ে Groq-কে যায় — অ্যাকশন বেছে নেওয়ার জন্য। অডিও কখনো নয়।</string>
     <string name="privacy_vercel_title">🔗 Vercel (ব্যাকএন্ড)</string>
@@ -121,6 +132,6 @@
     <string name="privacy_localdb_title">💾 লোকাল ডেটাবেজ</string>
     <string name="privacy_localdb_body">Room-এ থাকে: কমান্ড টেক্সট, intent, status, failure reason। Credentials কখনো রাখা হয় না — মেমোরি-লেয়ার OTP/PIN/password key ফেক করে দেয়।</string>
     <string name="privacy_never_title">⛔ কখনোই নয়</string>
-    <string name="privacy_never_body">OTP/PIN/পাসওয়ার্ড/CVV/কার্ড নম্বর পড়া, সেভ বা টাইপ করা হয় না। ব্যাংকিং স্ক্রিন পড়া হয় না। ফাইন্যান্সিয়াল ট্রানজেকশন অটোমেশন সম্পূর্ণ ব্লকড। লুকানো রেকর্ডিং নেই — মাইক শুধু দৃশ্যমান সেশনে চলে।</string>
+    <string name="privacy_never_body">OTP/PIN/পাসওয়ার্ড/CVV/কার্ড নম্বর পড়া, সেভ বা টাইপ করা হয় না। ব্যাংকিং স্ক্রিন পড়া হয় না। ফাইন্যান্সিয়াল ট্রানজেকশন অটোমেশন সম্পূর্ণ ব্লকড। লুকানো রেকর্ডিং নেই—active listening বা optional wake mode-এ দৃশ্যমান UI/ongoing notification থাকে।</string>
     <string name="settings_open_privacy">প্রাইভেসি</string>
 </resources>

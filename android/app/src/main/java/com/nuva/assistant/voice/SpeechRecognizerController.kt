@@ -40,7 +40,13 @@ class SpeechRecognizerController(private val context: Context) {
             return@callbackFlow
         }
 
-        val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        val recognizer = runCatching {
+            SpeechRecognizer.createSpeechRecognizer(context)
+        }.getOrElse {
+            trySend(VoiceEvent.Error("Speech recognizer start korte parini. Voice input settings check korun."))
+            close()
+            return@callbackFlow
+        }
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageTag(languageHint))
@@ -78,9 +84,18 @@ class SpeechRecognizerController(private val context: Context) {
             }
         })
 
-        recognizer.startListening(intent)
+        val started = runCatching { recognizer.startListening(intent) }.isSuccess
+        if (!started) {
+            recognizer.destroy()
+            trySend(VoiceEvent.Error("Speech recognizer start korte parini. Voice input settings check korun."))
+            close()
+            return@callbackFlow
+        }
 
-        awaitClose { recognizer.destroy() }
+        awaitClose {
+            runCatching { recognizer.cancel() }
+            recognizer.destroy()
+        }
     }
 
     companion object {

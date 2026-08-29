@@ -21,6 +21,7 @@ import { listCommands, recordCommand, updateCommandStatus } from '../../lib/repo
 import { NuvaError } from '../../lib/errors.js';
 import { COMMAND_STATUSES, RISK_LEVELS, type CommandStatus, type RiskLevel } from '../../types/action.js';
 import { isRegisteredActionType } from '../../lib/actions.js';
+import { containsCredentialTerms, containsTransactionRequest } from '../../lib/sensitive.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -48,11 +49,21 @@ export default defineHandler({
       const requested = Number.parseInt(query['limit'] ?? '50', 10);
       const limit = Number.isFinite(requested) ? Math.min(200, Math.max(1, requested)) : 50;
       const commands = await listCommands({ userId, limit }, env);
-      return ok({ ok: true, count: commands.length, commands });
+      const safeCommands = commands.filter((command) => {
+        const stored = `${command.command}\n${command.error ?? ''}\n${JSON.stringify(command.action ?? null)}`;
+        return !containsCredentialTerms(stored) && !containsTransactionRequest(stored);
+      });
+      return ok({ ok: true, count: safeCommands.length, commands: safeCommands });
     }
 
     const status = readStatus(body['status']);
     const error = typeof body['error'] === 'string' ? body['error'].slice(0, 1000) : undefined;
+    if (
+      error !== undefined &&
+      (containsCredentialTerms(error) || containsTransactionRequest(error))
+    ) {
+      throw new NuvaError('BAD_REQUEST', 'Sensitive errors are not stored');
+    }
     const commandId = body['command_id'];
 
     // Update an existing row created by /api/ai/command.
@@ -72,6 +83,13 @@ export default defineHandler({
     const command = body['command'];
     if (typeof command !== 'string' || command.trim().length === 0) {
       throw new NuvaError('BAD_REQUEST', '`command` is required when `command_id` is omitted');
+    }
+    const standalonePayload = `${command}\n${JSON.stringify(body['action'] ?? null)}`;
+    if (
+      containsCredentialTerms(standalonePayload) ||
+      containsTransactionRequest(standalonePayload)
+    ) {
+      throw new NuvaError('BAD_REQUEST', 'Sensitive commands/actions are not stored');
     }
     const intent = body['intent'];
     if (typeof intent !== 'string' || (!isRegisteredActionType(intent) && intent !== 'UNSUPPORTED')) {

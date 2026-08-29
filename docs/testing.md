@@ -6,16 +6,17 @@
 cd backend
 npm install
 npm run build     # tsc --noEmit  (the PHASE 1 "TypeScript builds" gate)
-npm test          # vitest run    (188 tests)
+npm test          # vitest run    (190 tests)
 npm run verify    # build + test
+npm audit          # dependency advisories; current expected result: 0
 npm run dev       # local server on :3000 with a manual test console at /
 ```
 
 ## 2. Current status
 
 ```
-Test Files  9 passed (9)
-     Tests  156 passed (156)
+Test Files  14 passed (14)
+     Tests  190 passed (190)
 ```
 
 | Suite                     | Tests | Covers                                                        |
@@ -24,11 +25,16 @@ Test Files  9 passed (9)
 | `actions.test.ts`         | 22    | Registry integrity, strict schemas, URL scheme blocking        |
 | `validate.test.ts`        | 16    | JSON extraction, unsupported/invalid handling, coercion        |
 | `risk.test.ts`            | 25    | Baselines, escalation, "model cannot lower risk"               |
-| `fallbackParser.test.ts`  | 13    | Offline parsing + its safety contract                          |
+| `fallbackParser.test.ts`  | 15    | Offline parsing + its safety contract                          |
 | `speech.test.ts`          | 10    | Three-language phrasing, confirmations always ask              |
 | `pipeline.test.ts`        | 17    | End-to-end with Groq mocked, degradation, prompt injection     |
 | `groq.test.ts`            | 16    | Real HTTP client vs a mock Groq: retries, model fallback, timeouts |
 | `api.test.ts`             | 16    | Handlers via the Vercel shim: methods, CORS, auth, rate limits  |
+| `devices.test.ts`         | 8     | Device registration/auth/persistence degradation               |
+| `stream.test.ts`          | 5     | SSE command stages and final result                            |
+| `ratelimit.test.ts`       | 7     | Distributed limiter and memory fallback                        |
+| `screenshots.test.ts`     | 5     | Signed-upload endpoint boundaries                              |
+| `eval.test.ts`            | 7     | Evaluation corpus and safety expectations                      |
 
 No live `GROQ_API_KEY` or Supabase project is needed: Groq is verified against a mock server that
 speaks the real API shape, so the suite runs in CI and in a fresh clone.
@@ -105,11 +111,41 @@ curl -s -X POST $BASE/api/ai/command -H 'Content-Type: application/json' \
 
 `meta.source` must be `"groq"` in production. If it says `"fallback"`, `GROQ_API_KEY` is missing.
 
-## 7. PHASE 2 manual test plan (real-device validation)
+## 7. Android preflight and focused semantic checks
 
-Run these on a real Android device/emulator once the Android SDK and production backend URL are available:
+These dependency-free checks run even when Android Gradle is unavailable:
 
-microphone permission · notification permission · overlay permission · wake-word service on/off ·
-floating popup states · speech recognition · AI response · invalid commands · network failure ·
+```bash
+cd android
+python3 tools/parser_mirror_check.py
+python3 tools/android_contract_check.py
+```
+
+With Java 17, a standalone Kotlin compiler and the public Android 35 `android.jar`:
+
+```bash
+python3 tools/focused_android_api_compile_check.py \
+  --kotlinc /path/to/kotlinc-jvm \
+  --android-jar /path/to/platforms/android-35/android.jar
+```
+
+The focused compile validates system-assistant, Calendar-provider, Home Assistant Keystore,
+system settings/torch APIs, SpeechRecognizer, TextToSpeech, encrypted session-token cipher,
+wake-state, Quick Settings tile,
+external-text and secure-endpoint policy API signatures. It does not replace:
+
+```bash
+gradle --no-daemon -p android :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+```
+
+See [`v4.4-full-code-audit.md`](v4.4-full-code-audit.md) for current results and blockers.
+
+## 8. PHASE 2 manual test plan (real-device validation)
+
+Run the full matrix in [`v4.2-apk-build-qa.md`](v4.2-apk-build-qa.md) on physical devices. At minimum:
+
+microphone permission · notification permission · overlay permission · default-assistant selection ·
+assistant gesture/power shortcut · wake-word service on/off · foreground notification · screen-off
+pause · floating popup states · speech recognition · AI response · invalid commands · network failure ·
 Accessibility disabled · UI element not found · action timeout · confirmation · app launch · typing ·
 swipe · scrolling · back · home.

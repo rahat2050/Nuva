@@ -25,7 +25,7 @@ data class CommandHistoryEntity(
 
 /**
  * A medium/high-risk decision parked until the user answers the blocking
- * confirmation dialog. Status: pending | confirmed | rejected | expired.
+ * confirmation dialog. Status: pending | confirmed | rejected | expired | blocked.
  */
 @Entity(tableName = "pending_actions", indices = [Index("status")])
 data class PendingActionEntity(
@@ -62,5 +62,19 @@ data class NoteEntity(
     val content: String,
     val kind: String,
     val done: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+/** Persistent user-created email/SMS draft reminder; never an automatic send. */
+@Entity(tableName = "scheduled_drafts", indices = [Index("status"), Index("triggerAt")])
+data class ScheduledDraftEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val channel: String,
+    val recipient: String?,
+    val subject: String?,
+    val body: String,
+    val triggerAt: Long,
+    val recurrence: String,
+    val status: String = "pending",
     val createdAt: Long = System.currentTimeMillis(),
 )

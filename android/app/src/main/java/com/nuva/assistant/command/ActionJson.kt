@@ -99,6 +99,106 @@ object ActionJson {
         is NuvaAction.DeviceStatusQuery -> buildJsonObject {
             put("type", "DEVICE_STATUS"); put("query", action.query.wireName)
         }
+        is NuvaAction.LocalAnswer -> buildJsonObject {
+            put("type", "LOCAL_ANSWER"); put("answer", action.answer); put("category", action.category)
+        }
+        is NuvaAction.ReadSavedItems -> buildJsonObject {
+            put("type", "READ_SAVED_ITEMS"); put("kind", action.kind.wireName)
+        }
+        is NuvaAction.UserFile -> buildJsonObject {
+            put("type", "USER_FILE"); put("operation", action.operation.wireName)
+            action.newName?.let { put("new_name", it) }
+        }
+        is NuvaAction.ComposeEmail -> buildJsonObject {
+            put("type", "COMPOSE_EMAIL")
+            action.recipient?.let { put("recipient", it) }
+            action.subject?.let { put("subject", it) }
+            action.body?.let { put("body", it) }
+            if (action.attachmentRequested) put("attachment_requested", true)
+            if (action.multipleAttachments) put("multiple_attachments", true)
+        }
+        is NuvaAction.ReplyNotification -> buildJsonObject {
+            put("type", "REPLY_NOTIFICATION"); put("ordinal", action.ordinal); put("message", action.message)
+        }
+        is NuvaAction.PrepareForm -> buildJsonObject {
+            put("type", "PREPARE_FORM"); put("kind", action.kind.wireName)
+            action.details?.let { put("details", it) }
+        }
+        is NuvaAction.ScheduleCompose -> buildJsonObject {
+            put("type", "SCHEDULE_COMPOSE"); put("channel", action.channel.wireName)
+            action.recipient?.let { put("recipient", it) }
+            action.subject?.let { put("subject", it) }
+            put("body", action.body); put("trigger_at", action.triggerAt); put("recurrence", action.recurrence.wireName)
+        }
+        is NuvaAction.ListScheduledDrafts -> buildJsonObject { put("type", "LIST_SCHEDULED_DRAFTS") }
+        is NuvaAction.CancelScheduledDraft -> buildJsonObject {
+            put("type", "CANCEL_SCHEDULED_DRAFT"); put("ordinal", action.ordinal)
+        }
+        is NuvaAction.ShareText -> buildJsonObject {
+            put("type", "SHARE_TEXT"); put("text", action.text)
+        }
+        is NuvaAction.CreateContactDraft -> buildJsonObject {
+            put("type", "CREATE_CONTACT_DRAFT"); put("name", action.name)
+            action.phone?.let { put("phone", it) }
+            action.email?.let { put("email", it) }
+        }
+        is NuvaAction.ManageNotification -> buildJsonObject {
+            put("type", "MANAGE_NOTIFICATION"); put("ordinal", action.ordinal); put("operation", action.operation.wireName)
+        }
+        is NuvaAction.ContactHandoff -> buildJsonObject {
+            put("type", "CONTACT_HANDOFF"); put("operation", action.operation.wireName)
+        }
+        is NuvaAction.UninstallApp -> buildJsonObject {
+            put("type", "UNINSTALL_APP"); put("app", action.app)
+        }
+        is NuvaAction.OpenAppManagement -> buildJsonObject {
+            put("type", "OPEN_APP_MANAGEMENT"); put("app", action.app); put("panel", action.panel.wireName)
+        }
+        is NuvaAction.ClipboardAction -> buildJsonObject {
+            put("type", "CLIPBOARD_ACTION"); put("operation", action.operation.wireName)
+            action.text?.let { put("text", it) }
+        }
+        is NuvaAction.CreateCalendarEvent -> buildJsonObject {
+            put("type", "CREATE_CALENDAR_EVENT"); put("title", action.title)
+            put("begin_at", action.beginAt); put("end_at", action.endAt)
+            action.location?.let { put("location", it) }
+            action.description?.let { put("description", it) }
+            action.attendeeEmail?.let { put("attendee_email", it) }
+        }
+        is NuvaAction.ComposeSocialPost -> buildJsonObject {
+            put("type", "COMPOSE_SOCIAL_POST"); put("platform", action.platform.wireName); put("text", action.text)
+        }
+        is NuvaAction.ComposeMms -> buildJsonObject {
+            put("type", "COMPOSE_MMS")
+            action.recipient?.let { put("recipient", it) }
+            action.body?.let { put("body", it) }
+            if (action.attachmentRequested) put("attachment_requested", true)
+        }
+        is NuvaAction.OpenVoicemail -> buildJsonObject { put("type", "OPEN_VOICEMAIL") }
+        is NuvaAction.MapNavigation -> buildJsonObject {
+            put("type", "MAP_NAVIGATION"); put("request_type", action.requestType.wireName)
+            put("destination", action.destination); put("travel_mode", action.travelMode.wireName)
+            action.origin?.let { put("origin", it) }
+        }
+        is NuvaAction.EmergencyDialer -> buildJsonObject {
+            put("type", "EMERGENCY_DIALER"); put("service", action.service.wireName)
+        }
+        is NuvaAction.ClockControl -> buildJsonObject {
+            put("type", "CLOCK_CONTROL"); put("operation", action.operation.wireName)
+        }
+        is NuvaAction.ViewCalendar -> buildJsonObject {
+            put("type", "VIEW_CALENDAR"); put("focus_at", action.focusAt)
+        }
+        is NuvaAction.HomeAssistantControl -> buildJsonObject {
+            put("type", "HOME_ASSISTANT"); put("domain", action.domain.wireName)
+            put("operation", action.operation.wireName); put("entity_query", action.entityQuery)
+            action.value?.let { put("value", it) }
+        }
+        is NuvaAction.CalendarProvider -> buildJsonObject {
+            put("type", "CALENDAR_PROVIDER"); put("operation", action.operation.wireName)
+            put("range_start", action.rangeStart); put("range_end", action.rangeEnd)
+            action.eventQuery?.let { put("event_query", it) }
+        }
         is NuvaAction.OpenSettingScreen -> buildJsonObject {
             put("type", "OPEN_SETTING"); put("target", action.target.wireName)
         }
@@ -112,9 +212,11 @@ object ActionJson {
         is NuvaAction.CreateTodo -> buildJsonObject { put("type", "CREATE_TODO"); put("content", action.content) }
         is NuvaAction.MediaControl -> buildJsonObject {
             put("type", "MEDIA_CONTROL"); put("command", action.command.wireName)
+            action.offsetSeconds?.let { put("offset_seconds", it) }
         }
         is NuvaAction.VolumeControl -> buildJsonObject {
             put("type", "VOLUME_CONTROL"); put("command", action.command.wireName)
+            action.levelPercent?.let { put("level_percent", it) }
         }
         is NuvaAction.CameraOpen -> buildJsonObject {
             put("type", "CAMERA"); put("mode", action.mode.wireName)

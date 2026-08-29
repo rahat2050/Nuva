@@ -58,6 +58,8 @@ Three independent layers:
    question, so the UI can never present a pending action as already done.
 3. `settings.confirmation_mode` is constrained to `always | risky_only`. There is no `never`, so
    "disable all confirmations" is not representable in the database.
+4. Android confirmation rows expire after five minutes and use an atomic `pending → confirmed`
+   compare-and-set. Rapid double taps cannot execute twice, and command-plan state is mutex-serialized.
 
 ## 4. Input validation
 
@@ -88,11 +90,68 @@ to `/api/*`).
 ## 7. Privacy (§26)
 
 Stored: command text, the derived action, risk, status, and preferences the user asks NUVA to
-remember. Not stored: audio (never uploaded in PHASE 1), contact lists, location, screen contents.
+remember. Not stored by NUVA: raw audio, contact lists, location, screen contents. The selected Android
+speech provider may process audio under its own terms, but NUVA backend receives transcript text only.
 Screen context sent with a command is used for that request only and is never persisted.
 
-`/api/memory` actively refuses credential-like keys, so a buggy or malicious client cannot turn
-NUVA's memory into a password store.
+`/api/memory` actively refuses credential-like keys **and values**, filters legacy sensitive rows on
+read, and Android repeats that policy before display/push/pull. Credential-bearing commands and
+financial-transaction requests stop before Groq, local history and Supabase persistence; structured
+model speech/actions are checked again.
+
+## Home Assistant boundary (v4.0)
+
+- Configuration accepts HTTPS origins only; URL user-info/query/fragment credentials are rejected.
+- Long-lived token is encrypted with a non-exportable Android Keystore AES-GCM key and never logged.
+- Server/AI cannot emit `HOME_ASSISTANT`; it is a local-only action.
+- Runtime allowlist is limited to light/switch/fan and bounded climate temperature.
+- Every physical action is confirmation-gated and ambiguous entity matching stops.
+- Locks, covers/garage, cameras, security systems, gas/water/medical and arbitrary services are not callable.
+
+## Calendar provider boundary (v4.1)
+
+- `READ_CALENDAR` is optional, explained and requested separately; `WRITE_CALENDAR` is absent.
+- Queries are explicit, transient and capped to 31 days/100 instances.
+- Credential-like event titles are excluded and ambiguous title matches stop.
+- Event edit opens the visible Calendar app; NUVA never silently updates/deletes events.
+
+## System assistant / wake boundary (v4.2)
+
+- Android's visible Default apps picker is the only way to select NUVA; it never replaces another
+  assistant programmatically.
+- AssistStructure and screenshot delivery are disabled for ordinary NUVA invocation.
+- Custom wake mode is opt-in, screen-on only and always carries an ongoing microphone notification.
+- No hidden/system `CAPTURE_AUDIO_HOTWORD`, boot-time microphone start or privacy-indicator bypass.
+- Wake transcripts stay local until a verified command; raw audio never reaches NUVA backend/Groq.
+- The required RecognitionService bridge rejects its own package to prevent recursive binding and
+  delegates only to an installed external provider.
+- Assistant invocation changes only the entry point; all normal validation, risk and confirmation
+  gates still run.
+
+## Quick access / external text boundary (v4.4)
+
+- Quick Settings tile installation is Android/user-owned; tile and launcher shortcut only open a
+  visible listening session.
+- `ACTION_SEND`/`ACTION_PROCESS_TEXT` accept `text/plain` only after the user selects NUVA.
+- External text is capped at 1,000 characters, credential/transaction checked and kept as an editable
+  draft; no automatic parser/backend submission occurs.
+- Consumed text extras and ClipData are cleared from the Activity Intent to prevent replay on
+  recreation.
+- No clipboard monitor, background share receiver or new dangerous permission is introduced.
+
+## Endpoint/session hardening
+
+- Custom NUVA backend and Supabase origins are normalized to HTTPS and reject URL credentials,
+  query/fragment tokens, invalid ports and parent-path traversal before any network request.
+- Invalid/legacy stored backend values fail closed to the production HTTPS origin.
+- Supabase access/refresh JWTs use AES-GCM with a separate non-exportable Android Keystore key;
+  legacy plaintext or undecryptable sessions are cleared rather than reused.
+- Changing the backend endpoint, Supabase endpoint or anon key atomically clears the previous session,
+  preventing an old JWT from being forwarded to a newly configured origin. An in-flight sign-in can
+  save its JWT only if the exact Supabase URL/anon-key snapshot is still current; stale decrypt failures
+  use compare-before-clear so they cannot erase a newer session.
+- The Settings password field is masked and cleared from Compose state immediately on submit; the
+  password is never persisted.
 
 ## 8. Known limitations (honest list)
 

@@ -34,4 +34,17 @@ class WakePhraseDetectorTest {
         assertTrue(match != null)
         assertEquals("back jao", match?.commandAfterWake)
     }
+
+    @Test
+    fun `accepts common speech engine spellings of the made up name`() {
+        assertEquals("weather bolo", WakePhraseDetector.detect("Hey Nova weather bolo")?.commandAfterWake)
+        assertEquals("open camera", WakePhraseDetector.detect("hay niva open camera")?.commandAfterWake)
+        assertTrue(WakePhraseDetector.containsWakePhrase("হেই নোভা"))
+    }
+
+    @Test
+    fun `does not wake when phrase is only mentioned later in conversation`() {
+        assertNull(WakePhraseDetector.detect("I told him to say Hey Nuva"))
+        assertNull(WakePhraseDetector.detect("আজ নুভা নামটা বলেছি"))
+    }
 }

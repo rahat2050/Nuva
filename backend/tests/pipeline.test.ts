@@ -144,17 +144,57 @@ describe('interpretCommand — confirmation (§11, §24)', () => {
     expect(response.result.requires_confirmation).toBe(true);
   });
 
-  it('escalates money movement to high risk', async () => {
+  it('blocks money movement before Groq instead of offering confirmation', async () => {
+    const response = await run('Karim ke bkash e 5000 taka pathao');
+    expect(groqChatJson).not.toHaveBeenCalled();
+    expect(response.input.text).toBe('[financial request hidden]');
+    expect(response.result.intent).toBe('UNSUPPORTED');
+    expect(response.result.action).toBeNull();
+    expect(response.result.risk).toBe('high');
+    expect(response.result.requires_confirmation).toBe(false);
+    expect(response.meta.persisted).toBe(false);
+  });
+});
+
+describe('interpretCommand — credential privacy boundary', () => {
+  it('refuses before Groq and does not echo a credential-bearing transcript', async () => {
+    const response = await run('amar OTP 4321 Rahim ke pathao');
+
+    expect(groqChatJson).not.toHaveBeenCalled();
+    expect(response.input.text).toBe('[sensitive content hidden]');
+    expect(response.input.normalized_text).toBe('[sensitive content hidden]');
+    expect(response.result.intent).toBe('UNSUPPORTED');
+    expect(response.result.risk).toBe('high');
+    expect(response.result.requires_confirmation).toBe(false);
+    expect(response.meta.persisted).toBe(false);
+  });
+
+  it('refuses a credential injected only into a structured model action', async () => {
     mockModel({
       intent: 'SEND_MESSAGE',
-      action: { type: 'SEND_MESSAGE', app: 'whatsapp', contact: 'Karim', message: 'bkash e 5000 taka pathao' },
-      risk: 'medium',
-      requires_confirmation: true,
+      action: { type: 'SEND_MESSAGE', app: 'whatsapp', contact: 'Rahim', message: 'your OTP is 4321' },
+      risk: 'low',
+      requires_confirmation: false,
     });
 
-    const response = await run('Karim ke bkash e 5000 taka pathao');
-    expect(response.result.risk).toBe('high');
-    expect(response.result.requires_confirmation).toBe(true);
+    const response = await run('Rahim ke latest update pathao');
+    expect(response.result.intent).toBe('UNSUPPORTED');
+    expect(response.result.action).toBeNull();
+    expect(response.result.requires_confirmation).toBe(false);
+  });
+
+  it('refuses a financial transaction injected only into a model action', async () => {
+    mockModel({
+      intent: 'SEND_MESSAGE',
+      action: { type: 'SEND_MESSAGE', app: 'whatsapp', contact: 'Rahim', message: 'send money now' },
+      risk: 'low',
+      requires_confirmation: false,
+    });
+
+    const response = await run('Rahim ke latest update pathao');
+    expect(response.result.intent).toBe('UNSUPPORTED');
+    expect(response.result.action).toBeNull();
+    expect(response.result.requires_confirmation).toBe(false);
   });
 });
 
@@ -174,7 +214,7 @@ describe('interpretCommand — unsupported and invalid (§8, §10, §24)', () =>
     // because the model deliberately refused.
     mockModel({ intent: 'UNSUPPORTED', action: null, risk: 'high', reason: 'money transfer requested' });
 
-    const response = await run('open youtube and send money to Rahim');
+    const response = await run('open youtube then do the unsafe thing');
     expect(response.result.intent).toBe('UNSUPPORTED');
     expect(response.result.action).toBeNull();
     expect(response.meta.source).toBe('groq');
@@ -262,5 +302,28 @@ describe('interpretCommand — screen context is untrusted data', () => {
     expect(params.user).toContain('UNTRUSTED DATA');
     expect(params.user).toContain('<<<SCREEN');
     expect(params.user).toContain('com.whatsapp');
+  });
+
+  it('omits credential and financial screen context before Groq', async () => {
+    mockModel({ intent: 'GO_HOME', action: { type: 'GO_HOME' } });
+
+    await interpretCommand({
+      request: {
+        text: 'home e jao',
+        context: {
+          foreground_app: 'com.bkash.walletapp',
+          screen_summary: 'OTP 4321',
+        },
+      },
+      identity,
+      logger,
+      requestId: 'req-sensitive-ctx',
+      env,
+    });
+
+    const [params] = groqChatJson.mock.calls[0] as [{ user: string }];
+    expect(params.user).not.toContain('com.bkash.walletapp');
+    expect(params.user).not.toContain('4321');
+    expect(params.user).not.toContain('<<<SCREEN');
   });
 });

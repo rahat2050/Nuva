@@ -133,6 +133,23 @@ const RULES: Rule[] = [
     },
   },
   {
+    // Live information must come from a live source, never from model memory.
+    // The Android client handles phone date/time itself; external topics open
+    // a current web result even when the user naturally asks instead of saying
+    // the literal word "search".
+    name: 'OPEN_URL_LIVE_INFO',
+    run: (text) => {
+      const topic =
+        /(weather|abohawa|আবহাওয়া|আবহাওয়া|temperature|তাপমাত্রা|brishti|বৃষ্টি|latest news|today news|news today|ajker news|ajker khobor|খবর|সংবাদ|live score|current score|cricket score|football score|লাইভ স্কোর|স্কোর কত|traffic|jam kemon|rastar obostha|ট্রাফিক|যানজট|রাস্তার অবস্থা|dollar rate|exchange rate|gold price|sonar dam|fuel price|ডলারের রেট|সোনার দাম)/.test(text);
+      const current =
+        /\b(ekhon|akhon|akon|akn|ekhn|current|latest|live|today|aj|ajke|ajker|koto|kemon|ki|hobe|now)\b/.test(text) ||
+        /(এখন|আজ|আজকে|আজকের|বর্তমান|সর্বশেষ|লাইভ|কত|কেমন|কি|কী|হবে)/.test(text);
+      if (!topic || !current) return null;
+      const query = text.replace(/[.,?!।]+$/g, '').trim();
+      return query ? { type: 'OPEN_URL', url: `https://www.google.com/search?q=${encodeURIComponent(query)}` } : null;
+    },
+  },
+  {
     name: 'OPEN_URL_SEARCH',
     run: (text) => {
       if (!/(search|সার্চ|খোঁজ|khojo|khoj)/.test(text)) return null;
@@ -142,6 +159,22 @@ const RULES: Rule[] = [
           ? `https://www.google.com/search?q=${encodeURIComponent(query)}`
           : 'https://www.google.com';
       return { type: 'OPEN_URL', url };
+    },
+  },
+  {
+    // Factual/how-to daily questions are safer as a web result than as a
+    // hallucinated model answer. Android's local parser has already handled
+    // calculations and phone state before requests normally reach this layer.
+    name: 'OPEN_URL_KNOWLEDGE',
+    run: (text) => {
+      const question =
+        /^(what|how|why|who|where|when|which|ki|kivabe|keno|kothay|kokhon|কী|কি|কিভাবে|কীভাবে|কেন|কোথায়|কখন)\b/.test(text) ||
+        /\b(ki|keno|kothay|kokhon|koto|kemon|কী|কি|কেন|কোথায়|কখন|কত|কেমন)[?.।]*$/.test(text);
+      const usefulTopic =
+        /(recipe|রেসিপি|রান্না|meaning|মানে|dictionary|অভিধান|translate|translation|অনুবাদ|near me|nearby|কাছাকাছি|schedule|সময়সূচি|routine|price|দাম কত|bus|train|flight|বাস|ট্রেন|ফ্লাইট|doctor|hospital|medicine|ডাক্তার|হাসপাতাল|ওষুধ|school|college|job|স্কুল|কলেজ|চাকরি|how to|parcel tracking|courier track|passport application|nid info|birth registration|speed test|fact check|scam check|qibla direction|public holiday|cybercrime report|গাছের যত্ন|required documents|ki kagoj lagbe|eligibility|official fees|opening hours|contact number|customer reviews|appointment information|available today|beginner guide|tutorial|worked examples|practice exercises|cheat sheet|buying guide|user manual|repair|troubleshooting|ব্যবহারের নিয়ম|মেরামত)/.test(text);
+      if ((!question && !usefulTopic) || text.length < 3) return null;
+      const query = text.replace(/[.,?!।]+$/g, '').trim();
+      return { type: 'OPEN_URL', url: `https://www.google.com/search?q=${encodeURIComponent(query)}` };
     },
   },
   {

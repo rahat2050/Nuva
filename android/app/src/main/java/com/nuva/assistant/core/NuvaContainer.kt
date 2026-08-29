@@ -4,6 +4,8 @@ import android.content.Context
 import com.nuva.assistant.ai.AIRepository
 import com.nuva.assistant.command.CommandExecutor
 import com.nuva.assistant.database.AppDatabase
+import com.nuva.assistant.homeassistant.HomeAssistantClient
+import com.nuva.assistant.homeassistant.HomeAssistantConfigStore
 import com.nuva.assistant.memory.MemoryManager
 import com.nuva.assistant.memory.UserPreferences
 import com.nuva.assistant.supabase.SupabaseRepository
@@ -25,11 +27,13 @@ object NuvaContainer {
 
     val memory: MemoryManager by lazy { MemoryManager(database) { supabaseRepository } }
 
+    val homeAssistantConfig: HomeAssistantConfigStore by lazy { HomeAssistantConfigStore(appContext) }
+    val homeAssistantClient: HomeAssistantClient by lazy { HomeAssistantClient(homeAssistantConfig) }
+
     val supabaseRepository: SupabaseRepository by lazy {
         SupabaseRepository(
-            baseUrlProvider = { preferences.baseUrlBlocking() },
-            supabaseUrlProvider = { preferences.supabaseUrlBlocking() },
-            anonKeyProvider = { preferences.supabaseAnonKeyBlocking() },
+            baseUrlProvider = { preferences.currentBaseUrl() },
+            supabaseConnectionProvider = { preferences.currentSupabaseConnection() },
         ).also { repo ->
             repo.tokenProvider = { preferences.accessToken() }
         }
@@ -37,7 +41,7 @@ object NuvaContainer {
 
     val aiRepository: AIRepository by lazy {
         AIRepository(
-            baseUrlProvider = { preferences.baseUrlBlocking() },
+            baseUrlProvider = { preferences.currentBaseUrl() },
             tokenProvider = { preferences.accessToken() },
             deviceIdProvider = { DeviceId.get(appContext) },
         )

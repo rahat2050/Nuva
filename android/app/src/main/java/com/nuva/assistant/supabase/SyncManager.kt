@@ -3,6 +3,7 @@ package com.nuva.assistant.supabase
 import android.os.Build
 import com.nuva.assistant.ai.AIRepository
 import com.nuva.assistant.memory.MemoryManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -20,10 +21,10 @@ class SyncManager(
     data class SyncReport(val pushedMemories: Int, val pulledMemories: Int, val deviceRegistered: Boolean)
 
     suspend fun syncAll(): SyncReport = withContext(Dispatchers.IO) {
-        val pushed = runCatching { memoryManager.pushUnsynced() }.getOrDefault(0)
-        val pulled = runCatching { memoryManager.pull() }.getOrDefault(0)
+        val pushed = runCatchingCancellable { memoryManager.pushUnsynced() }.getOrDefault(0)
+        val pulled = runCatchingCancellable { memoryManager.pull() }.getOrDefault(0)
 
-        val registered = runCatching {
+        val registered = runCatchingCancellable {
             supabaseRepository.registerDevice(
                 deviceName = "${Build.MANUFACTURER ?: "Android"} ${Build.MODEL ?: ""}".trim().ifEmpty { "Android device" },
                 androidVersion = Build.VERSION.RELEASE,
@@ -35,6 +36,14 @@ class SyncManager(
 
     /** Best-effort health probe for the settings screen. */
     suspend fun healthOk(): Boolean = withContext(Dispatchers.IO) {
-        runCatching { aiRepository.api.health().ok }.getOrDefault(false)
+        runCatchingCancellable { aiRepository.healthOk() }.getOrDefault(false)
+    }
+
+    private inline fun <T> runCatchingCancellable(block: () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (error: Throwable) {
+        Result.failure(error)
     }
 }

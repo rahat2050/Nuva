@@ -12,6 +12,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.graphics.ColorUtils
 import com.nuva.assistant.core.permissions.NuvaPermissions
 import kotlin.math.roundToInt
 
@@ -168,7 +169,7 @@ class FloatingAssistantOverlay(private val context: Context) {
             runCatching {
                 val params = existing.layoutParams as? WindowManager.LayoutParams
                 if (params != null) {
-                    params.width = widthDp.dp
+                    params.width = minOf(widthDp.dp, context.resources.displayMetrics.widthPixels - 24.dp)
                     windowManager.updateViewLayout(existing, params)
                 }
             }
@@ -180,17 +181,20 @@ class FloatingAssistantOverlay(private val context: Context) {
             setPadding(12.dp, 10.dp, 10.dp, 10.dp)
             elevation = 12.dp.toFloat()
         }
+        val panelWidth = minOf(widthDp.dp, context.resources.displayMetrics.widthPixels - 24.dp)
         val params = WindowManager.LayoutParams(
-            widthDp.dp,
+            panelWidth,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             android.graphics.PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.END
-            x = 16.dp
-            y = 88.dp
+            // Bottom voice plate mirrors the system-assistant mental model and
+            // stays reachable without obscuring the current app's main content.
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            x = 0
+            y = 28.dp
         }
         windowManager.addView(container, params)
         root = container
@@ -213,9 +217,16 @@ class FloatingAssistantOverlay(private val context: Context) {
         textSize = 12f
         setAllCaps(false)
         setTextColor(if (primary) Color.WHITE else 0xFFE8EAED.toInt())
-        background = GradientDrawable().apply {
+        background = GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            if (primary) {
+                intArrayOf(0xFF8B7CFF.toInt(), 0xFF2FC9C3.toInt())
+            } else {
+                intArrayOf(0xFF4B5568.toInt(), 0xFF252C3B.toInt())
+            },
+        ).apply {
             cornerRadius = 18.dp.toFloat()
-            setColor(if (primary) 0xFF3B82F6.toInt() else 0xFF374151.toInt())
+            setStroke(1.dp, 0x44FFFFFF)
         }
         setPadding(12.dp, 0, 12.dp, 0)
         setOnClickListener { onClick() }
@@ -234,20 +245,27 @@ class FloatingAssistantOverlay(private val context: Context) {
         }
     }
 
-    private fun backgroundFor(state: PopupState): GradientDrawable = GradientDrawable().apply {
-        cornerRadius = 22.dp.toFloat()
-        setStroke(1.dp, 0x33FFFFFF)
-        setColor(
-            when (state) {
-                PopupState.LISTENING -> 0xEE0F766E.toInt()
-                PopupState.PROCESSING -> 0xEE1D4ED8.toInt()
-                PopupState.EXECUTING -> 0xEE7C3AED.toInt()
-                PopupState.CONFIRMATION_REQUIRED -> 0xEEF97316.toInt()
-                PopupState.SUCCESS -> 0xEE15803D.toInt()
-                PopupState.ERROR -> 0xEEB91C1C.toInt()
-                PopupState.IDLE -> 0xEE111827.toInt()
-            },
-        )
+    private fun backgroundFor(state: PopupState): GradientDrawable {
+        val base = when (state) {
+            PopupState.LISTENING -> 0xFF0F8F88.toInt()
+            PopupState.PROCESSING -> 0xFF365EDB.toInt()
+            PopupState.EXECUTING -> 0xFF7657DE.toInt()
+            PopupState.CONFIRMATION_REQUIRED -> 0xFFE87B22.toInt()
+            PopupState.SUCCESS -> 0xFF168A4A.toInt()
+            PopupState.ERROR -> 0xFFC4314F.toInt()
+            PopupState.IDLE -> 0xFF182038.toInt()
+        }
+        return GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            intArrayOf(
+                ColorUtils.blendARGB(base, Color.WHITE, 0.20f),
+                base,
+                ColorUtils.blendARGB(base, Color.BLACK, 0.28f),
+            ),
+        ).apply {
+            cornerRadius = 24.dp.toFloat()
+            setStroke(1.dp, 0x55FFFFFF)
+        }
     }
 
     private fun iconFor(state: PopupState): String = when (state) {

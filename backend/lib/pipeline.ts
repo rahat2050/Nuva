@@ -8,6 +8,7 @@
  * the Android app in PHRASE 2. This module never executes anything.
  */
 import { assessRisk } from './risk.js';
+import { isSensitiveApp } from './apps.js';
 import { buildUserMessage, SYSTEM_PROMPT } from './prompt.js';
 import { groqChatJson } from './groq.js';
 import { parseFallback } from './fallbackParser.js';
@@ -17,6 +18,7 @@ import { confirmationPrompt, notUnderstoodSpeech, speechForAction, unsupportedSp
 import { recordCommand, recordConversation } from './repository.js';
 import { groqConfigured, type NuvaEnv } from './env.js';
 import { NuvaError } from './errors.js';
+import { containsCredentialTerms, containsTransactionRequest } from './sensitive.js';
 import type { Logger } from './logger.js';
 import type { Identity } from './auth.js';
 import type { ParsedAction } from './actions.js';
@@ -41,6 +43,54 @@ interface Interpretation {
 function resolveLanguage(hint: CommandRequest['language'], detected: Language): Language {
   if (hint && hint !== 'auto' && (LANGUAGES as readonly string[]).includes(hint)) return hint;
   return detected;
+}
+
+function credentialRefusal(language: Language): string {
+  if (language === 'bn') return 'OTP, PIN, পাসওয়ার্ড, কার্ড/CVV বা অন্য গোপন তথ্য NUVA গ্রহণ করে না।';
+  if (language === 'en') return 'NUVA does not handle OTPs, PINs, passwords, card/CVV data, or other secrets.';
+  return 'NUVA OTP, PIN, password, card/CVV ba onno secret handle kore na.';
+}
+
+function transactionRefusal(language: Language): string {
+  if (language === 'bn') return 'এই আর্থিক লেনদেন NUVA নিজে করবে না; আপনি চাইলে নিরাপদভাবে নিজে করতে পারেন।';
+  if (language === 'en') return 'NUVA will not perform this financial transaction; you can complete it yourself.';
+  return 'Ei financial transaction NUVA korbe na; apni chaile nije securely korte paren.';
+}
+
+function blockedPreflightResponse(options: {
+  requestId: string;
+  language: Language;
+  wakeWordDetected: boolean;
+  startedAt: number;
+  inputMarker: string;
+  speech: string;
+  reason: string;
+}): CommandResponse {
+  return {
+    ok: true,
+    request_id: options.requestId,
+    input: {
+      text: options.inputMarker,
+      normalized_text: options.inputMarker,
+      language: options.language,
+      wake_word_detected: options.wakeWordDetected,
+    },
+    result: {
+      intent: 'UNSUPPORTED',
+      action: null,
+      risk: 'high',
+      requires_confirmation: false,
+      speech: options.speech,
+      reasons: [options.reason],
+    },
+    meta: {
+      source: 'fallback',
+      model: null,
+      latency_ms: Date.now() - options.startedAt,
+      command_id: null,
+      persisted: false,
+    },
+  };
 }
 
 /**
@@ -83,10 +133,16 @@ async function interpret(
     );
   }
 
+  const contextContainsCredentials = request.context
+    ? containsCredentialTerms(JSON.stringify(request.context))
+    : false;
+  const contextIsFinancial = isSensitiveApp(request.context?.foreground_app ?? '');
+  const safeContext = contextContainsCredentials || contextIsFinancial ? undefined : request.context;
+
   let completion;
   try {
     completion = await groqChatJson(
-      { system: SYSTEM_PROMPT, user: buildUserMessage(normalizedText, language, request.context) },
+      { system: SYSTEM_PROMPT, user: buildUserMessage(normalizedText, language, safeContext) },
       logger,
       env,
     );
@@ -138,6 +194,31 @@ function buildDecision(
     return { decision, status: 'unsupported', action: null };
   }
 
+  // Re-check model-produced fields independently from the user transcript. A
+  // model/backend regression must not inject a secret into TYPE_TEXT/message.
+  if (containsCredentialTerms(JSON.stringify(outcome))) {
+    const decision: ActionDecision = {
+      intent: 'UNSUPPORTED',
+      action: null,
+      risk: 'high',
+      requires_confirmation: false,
+      speech: credentialRefusal(language),
+      reasons: ['blocked: credential-bearing structured action'],
+    };
+    return { decision, status: 'unsupported', action: null };
+  }
+  if (containsTransactionRequest(JSON.stringify(outcome))) {
+    const decision: ActionDecision = {
+      intent: 'UNSUPPORTED',
+      action: null,
+      risk: 'high',
+      requires_confirmation: false,
+      speech: transactionRefusal(language),
+      reasons: ['blocked: financial transaction structured action'],
+    };
+    return { decision, status: 'unsupported', action: null };
+  }
+
   const assessment = assessRisk(outcome.action, {
     commandText,
     ...(outcome.modelRisk ? { modelRisk: outcome.modelRisk } : {}),
@@ -179,6 +260,43 @@ export async function interpretCommand(options: InterpretOptions): Promise<Comma
   // 1. TEXT NORMALIZATION
   const normalized = normalizeCommand(request.text);
   const language = resolveLanguage(request.language, normalized.language);
+
+  // Stop before Groq and persistence. Returning the original secret-bearing
+  // transcript in `input` would unnecessarily retain it in another object, so
+  // even the echo is replaced with a fixed marker.
+  if (containsCredentialTerms(normalized.text)) {
+    logger.warn('credential-bearing command refused before interpretation', {
+      language,
+      chars: normalized.text.length,
+      has_user: identity.userId !== null,
+    });
+    return blockedPreflightResponse({
+      requestId,
+      language,
+      wakeWordDetected: normalized.wakeWordDetected,
+      startedAt,
+      inputMarker: '[sensitive content hidden]',
+      speech: credentialRefusal(language),
+      reason: 'blocked: credential handling',
+    });
+  }
+
+  if (containsTransactionRequest(normalized.text)) {
+    logger.warn('financial transaction refused before interpretation', {
+      language,
+      chars: normalized.text.length,
+      has_user: identity.userId !== null,
+    });
+    return blockedPreflightResponse({
+      requestId,
+      language,
+      wakeWordDetected: normalized.wakeWordDetected,
+      startedAt,
+      inputMarker: '[financial request hidden]',
+      speech: transactionRefusal(language),
+      reason: 'blocked: financial transaction automation',
+    });
+  }
 
   logger.info('command received', {
     language,

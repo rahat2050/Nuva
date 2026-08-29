@@ -8,7 +8,7 @@ risk-classified action** out. It never executes anything on a device.
 ```bash
 npm install
 npm run build     # tsc --noEmit (strict)
-npm test          # vitest run — 188 tests
+npm test          # vitest run — 190 tests
 npm run verify    # build + test
 npm run dev       # local server on :3000, manual test console at /
 npm run eval      # model evaluation harness (needs GROQ_API_KEY)
@@ -78,7 +78,7 @@ backend/
 | ----------------------- | -------------------------------------------------------------- |
 | `zod`                   | Runtime validation of untrusted model output — core to safety.  |
 | `@supabase/supabase-js` | Auth + database.                                               |
-| `@vercel/node` (dev)    | Request/response types.                                        |
+| `types/vercel.ts` (local) | Minimal structural request/response types; no Vercel runtime dependency. |
 | `typescript`, `vitest`, `tsx` (dev) | Build, test, local run.                            |
 
 Groq is called with **native `fetch`** — no SDK — so timeouts, retries and model fallback are fully
@@ -87,7 +87,7 @@ under our control with no extra supply-chain surface.
 ## Deployment
 
 Vercel project with **Root Directory = `backend`** (or repo root — the root `vercel.json`
-handles that too). Node 22.x is pinned via `engines` in `package.json` (the `functions.runtime` field must stay unset — Vercel resolves @vercel/node automatically and rejects version strings like `nodejs22.x`). `vercel.json` pins
+handles that too). Node 22.x is pinned via `engines` in `package.json` (the `functions.runtime` field must stay unset — Vercel resolves the Node runtime automatically and rejects version strings like `nodejs22.x`). `vercel.json` pins
 **Build Command = `npm run build`**, **Install Command = `npm install --include=dev`** and
 **Output Directory = `public`**; the committed `public/index.html` is a small landing page so
 API-only deployments do not fail Vercel's output folder check. Functions are detected from

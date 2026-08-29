@@ -55,8 +55,8 @@ com.nuva.assistant/
 ## Build & run
 
 1. Open the **`android/`** folder in Android Studio (Koala or newer, AGP 8.7.3 / Gradle 8.9).
-   The wrapper JAR is not committed — Android Studio regenerates it on first sync, or run
-   `gradle wrapper --gradle-version 8.9` once if you prefer the CLI.
+   The official Gradle 8.9 wrapper JAR is committed and checksum-audited, so a fresh clone can
+   bootstrap with `./gradlew` without requiring a system Gradle installation.
 2. `./gradlew :app:assembleDebug` (or the Run ▶ button).
 3. Unit tests (pure JVM, no emulator): `./gradlew :app:testDebugUnitTest`
 
@@ -64,21 +64,34 @@ com.nuva.assistant/
 ./gradlew lint           # Android lint
 ./gradlew test           # unit tests
 ./gradlew assembleDebug  # debug APK
+
+# Dependency-free preflight (also works when Gradle is unavailable)
+python3 tools/parser_mirror_check.py
+python3 tools/android_contract_check.py
 ```
+
+For constrained environments with a standalone Kotlin compiler + Android 35 API jar, run
+`tools/focused_android_api_compile_check.py`; see
+[`../docs/v4.2-apk-build-qa.md`](../docs/v4.2-apk-build-qa.md). This focused check supplements—it does
+not replace—the Gradle build, lint or physical-device matrix.
 
 ## First-run setup on a device
 
 1. **Backend URL** — defaults to `https://nuvaa.vercel.app/` (verified with `/api/health?deep=1`).
-   For local backend testing on an emulator use `http://10.0.2.2:3000/`. Tap Save — it checks `/api/health`.
+   Custom backend and Supabase origins are HTTPS-only because commands/JWTs must never cross cleartext.
+   For local development, use a trusted HTTPS tunnel rather than `http://10.0.2.2`. Tap Save to check `/api/health`.
 2. **Microphone + notification** — grant when prompted. A visible foreground notification is shown
    whenever NUVA is listening or waiting for the wake phrase.
-3. **Floating popup** — Settings → System assistant mode → enable **Display over other apps** when
-   Android asks. The overlay is shown only after activation and auto-dismisses after results.
-4. **Accessibility** — Settings → Accessibility → NUVA Automation → On. This is required for
+3. **Default assistant** — Settings → Hey NUVA & default assistant → **Choose NUVA as default**,
+   then select NUVA in Android's visible Digital assistant app picker.
+4. **Floating popup** — enable **Display over other apps** when Android asks. It is used as the
+   fallback when an OEM does not route the official assistant surface.
+5. **Accessibility** — Settings → Accessibility → NUVA Automation → On. This is required for
    tap/type/swipe/scroll/read-screen; app open, alarms, timers, dialer and browser work without it.
-5. Toggle **Wake word “Hey Nuva”** in NUVA Settings. Leave the app, use another app, say “Hey Nuva”,
-   then speak the command in the floating popup.
-6. Optional: Supabase URL + anon key + sign-in to enable cloud memory/history sync.
+6. Toggle **Wake word “Hey Nuva”**. Confirm `waiting for wake`, leave the app, keep the screen on and
+   say “Hey Nuva”. `Restart listener` and `Test voice` diagnose stale OEM recognizers.
+7. Optional quick entry: tap **Add Quick Settings tile**, or long-press the app icon for **Talk to NUVA**.
+8. Optional: Supabase URL + anon key + sign-in to enable cloud memory/history sync.
 
 ## The safety model (client half)
 
@@ -89,18 +102,22 @@ com.nuva.assistant/
   confirmation dialog** (there is no setting that disables it).
 - Offline, a small deterministic parser handles `GO_HOME`, `GO_BACK`, simple `OPEN_APP`, and
   minute-based `SET_TIMER` — everything else honestly says it needs the server.
-- No secret ever ships in the APK: the app holds only the backend URL and the public Supabase
-  anon key.
+- No secret ever ships in the APK: the app holds only HTTPS endpoint configuration and the public
+  Supabase anon key; optional user session JWTs are AES-GCM encrypted with Android Keystore.
 - Pending actions are persisted and re-validated on decode, so nothing stale can execute.
 
-## Wake word status
+## Wake word and default-assistant status
 
-`WakeWordService` now provides the Android-compliant fallback for “Hey Nuva”: an explicit Settings
-toggle starts a visible foreground microphone service, checks wake-loop transcripts locally, then
-shows a small overlay popup for the actual command. NUVA does **not** send idle/wake-loop audio or
-transcripts to the backend/Groq. The fallback uses Android's `SpeechRecognizer`, so the device's
-recognizer policy still applies; for strict offline hotwording, a future DSP/on-device keyword engine
-can replace it without changing the command engine.
+v4.2 adds Android's official `VoiceInteractionService`/session/recognizer contract, so the user can
+select NUVA as the default digital assistant and invoke it with the device's configured assistant
+gesture or power shortcut. `WakeWordService` remains an opt-in foreground fallback for the custom
+“Hey Nuva” phrase: its microphone notification is always visible, it runs only while the screen is
+interactive and it promotes verified wakes to the official NUVA surface when available.
+
+Idle/wake transcripts are checked locally and never sent to NUVA backend/Groq. Raw audio is not
+stored or sent to NUVA backend; the selected Android speech provider may process it under that
+provider's terms. A normal APK cannot use Google's/OEM's screen-off DSP model or hidden
+`CAPTURE_AUDIO_HOTWORD` path. See [`../docs/hey-nuva-system-assistant.md`](../docs/hey-nuva-system-assistant.md).
 
 ## Test matrix (§2.19 essentials)
 
@@ -122,9 +139,10 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
 
 * **On-device parser v2** — Bangla/Banglish/English with Bangla numerals; runs BEFORE the
   network AI (privacy, speed, offline) and as a rescue path when the server says unsupported.
-* **8 LOCAL-ONLY intents** (`NuvaIntent.localOnly`): recents, web search, device status,
-  settings/torch, notification summary, reminder, note, to-do. `NuvaIntent.fromWire()` refuses
-  them, so **no server response can ever trigger one** — the AI registry stays frozen at 15.
+* **LOCAL-ONLY intents** (`NuvaIntent.localOnly`): recents, web search, device status,
+  settings/torch, notification summary, reminder, note/to-do/list reads, media/device control and
+  deterministic calculated answers. `NuvaIntent.fromWire()` refuses them, so **no server response
+  can ever trigger one** — the executable AI registry stays frozen at 15.
 * **Three-level financial policy** (`core/security/SensitiveAppPolicy`, v1.2):
   LEVEL 1 — wallet/bank apps can be launched by voice and navigated (scroll);
   LEVEL 2 — OTP/PIN/password/card data is never read, stored or typed (password
@@ -141,6 +159,56 @@ Highlights (see `../docs/roadmap-v1.1.md` for the full audit + plan):
   notes & to-dos.
 * **Messaging tiers**: WhatsApp + SMS send after confirmation; Telegram/Messenger/
   Signal/Viber/IMO open with the message pre-filled (user taps Send).
+* **v1.8–v2.0 daily utility packs**: 1,000+ offline calculation/conversion command forms,
+  advanced study/travel/health/budget formulas, shopping/expense list read-back, 100 broad sourced
+  skills, and exactly 500 precise entity×task skills for local services, public services, learning
+  and product help.
+* **v2.1 natural command grammar**: 50 families × 5 aliases × 7 prefixes × 7 suffixes =
+  **12,250 audited forms**, conservative dynamic-command rewrites, typo-aware security checks and
+  up to six validated multi-step segments.
+* **v2.2 user-present files/media**: Storage Access Framework picker for selected file open/share,
+  bounded text read and folder grant; selected photo/video view/share via Android picker and share
+  sheet. No broad storage permission or guessed path.
+* **v2.3 user-reviewed communication**: validated email draft compose (`ACTION_SENDTO`, user taps
+  Send) and confirmed notification replies only through an app-provided free-form RemoteInput action.
+* **v2.4 forms/productivity**: one picker-selected email attachment, local-only form/booking drafts
+  with sourced portal handoff, and one-shot email/SMS compose reminders that open drafts on tap.
+* **v2.5 target-aware files**: selected-file rename/delete and source+destination copy/move with a
+  second target-aware confirmation; selected-photo `ACTION_EDIT` handoff with user-controlled Save.
+* **v2.6 persistent drafts**: Room-backed once/daily/weekly email/SMS compose reminders, pending-list
+  and confirmed cancellation commands, plus BOOT_COMPLETED/app-update restoration.
+* **v2.7 safe handoffs**: confirmed generic text share, Contacts-app insert drafts, and single safe
+  notification dismiss/exact allowlisted Mark-as-read actions; no bulk or guessed action.
+* **v2.8 multi/system handoffs**: max-10 file/photo/video sharing and email attachments, exact contact
+  picker view/edit, and Android-confirmed uninstall for dynamically resolved non-financial apps.
+* **v2.9 settings/app management**: 16 additional official settings screens/panels plus dynamically
+  resolved App Info, app-notification and Play Store pages; no secure setting bypass.
+* **v3.0 explicit productivity**: confirmation-gated bounded clipboard copy/read/clear with no
+  monitoring, and rich Calendar insert drafts with user-controlled final Save.
+* **v3.1 visible communication**: text-only social compose handoffs, MMS/message compose with one
+  picker attachment, and voicemail dialer; final Post/Send/call always user-controlled.
+* **v3.2 maps/navigation**: dynamic origin/destination, route modes, nearby search and coordinate
+  Street View through visible native/web map handoffs; NUVA reads no device location.
+* **v3.3 diagnostics**: local device/Android/RAM/uptime/display/audio/timezone/locale/app-count/sensor
+  answers with no IMEI/serial/Android-ID/MAC/location or additional permission.
+* **v3.4 emergency handoffs**: Bangladesh 999 dialer, confirmed SOS share draft and emergency-info
+  settings; no automatic call/message or location collection.
+* **v3.5 media/audio**: official MediaSession stop and bounded seek, plus exact 0–100 media volume
+  and mute/unmute through AudioManager; OEM safe-volume rules remain authoritative.
+* **v3.6 clock management**: official AlarmClock list/snooze/dismiss requests with blocking
+  confirmation for active changes and honest Clock-app fallback on unsupported OEMs.
+* **v3.7 print/calendar**: one picker-selected PDF streamed to Android print preview and Calendar
+  date/agenda views without READ_CALENDAR; final print/save remains user-controlled.
+* **v4.0 Home Assistant**: HTTPS-only config, Android-Keystore-encrypted token, exact entity matching
+  and confirmed light/switch/fan/climate allowlist; locks/security/high-consequence domains excluded.
+* **v4.1 Calendar provider**: optional bounded agenda reads and exact title-matched event view/edit
+  handoff; credential events excluded, ambiguity stops, no WRITE_CALENDAR/direct delete.
+* **v4.2 system assistant**: complete default-assistant registration, gesture/power invocation,
+  visible custom wake fallback, recognizer-discovery/race/timeout fixes and live diagnostics.
+* **v4.3 accessible 3D UI**: aurora backdrop, raised glass surfaces, tactile command orb, floating
+  labeled navigation and bottom assistant voice plate without infinite decorative animation.
+* **v4.4 quick access**: user-added Quick Settings tile, launcher Talk shortcut and Share/Process Text
+  target; imported text stays a bounded editable draft and never auto-submits.
 * **UX**: typed command fallback (offered automatically when recognition fails), rich Bangla
   confirmation dialogs (target/content/app/risk), history failure reasons + retry, permission
   onboarding in Bangla, supported/unsupported feature screen.
