@@ -104,7 +104,9 @@ class NuvaNotificationListener : NotificationListenerService() {
         if (SensitiveAppPolicy.isSensitivePackage(sbn.packageName)) return null
         val extras = sbn.notification?.extras ?: return null
         val title = extras.getCharSequence("android.title")?.toString()
+            ?.let(SensitiveAppPolicy::safeTextForDisplay)
         val text = extras.getCharSequence("android.text")?.toString()
+            ?.let(SensitiveAppPolicy::safeTextForDisplay)
         if (title.isNullOrBlank() && text.isNullOrBlank()) return null
         val token = mediaToken(extras)
         val actions = sbn.notification?.actions
@@ -130,6 +132,7 @@ class NuvaNotificationListener : NotificationListenerService() {
     private fun findMarkReadHandle(actions: Array<android.app.Notification.Action>?): SemanticActionHandle? {
         return actions.orEmpty().firstNotNullOfOrNull { action ->
             val title = action.title?.toString().orEmpty()
+            if (SensitiveAppPolicy.mentionsCredentials(title)) return@firstNotNullOfOrNull null
             val allowed = isAllowedMarkReadTitle(title)
             if (allowed && action.remoteInputs.isNullOrEmpty()) {
                 action.actionIntent?.let { SemanticActionHandle(title, it) }
@@ -141,10 +144,12 @@ class NuvaNotificationListener : NotificationListenerService() {
 
     private fun findReplyHandle(actions: Array<android.app.Notification.Action>?): ReplyHandle? {
         val candidates = actions.orEmpty().mapNotNull { action ->
+            val title = action.title?.toString().orEmpty()
+            if (SensitiveAppPolicy.mentionsCredentials(title)) return@mapNotNull null
             val inputs = action.remoteInputs.orEmpty().filter { it.allowFreeFormInput }.toTypedArray()
             val pending = action.actionIntent
             if (inputs.isEmpty() || pending == null) null
-            else ReplyHandle(action.title?.toString().orEmpty(), pending, inputs)
+            else ReplyHandle(title, pending, inputs)
         }
         val preferred = preferredReplyIndex(candidates.map { it.title }) ?: return null
         return candidates[preferred]
@@ -265,7 +270,7 @@ class NuvaNotificationListener : NotificationListenerService() {
             } catch (error: PendingIntent.CanceledException) {
                 ReplyResult.Failed("Reply action expire hoye geche.")
             } catch (error: Exception) {
-                ReplyResult.Failed(error.message ?: "RemoteInput failed")
+                ReplyResult.Failed("RemoteInput failed")
             }
         }
 
@@ -292,7 +297,7 @@ class NuvaNotificationListener : NotificationListenerService() {
             } catch (error: PendingIntent.CanceledException) {
                 ManageResult.Failed("Notification action expire hoye geche.")
             } catch (error: Exception) {
-                ManageResult.Failed(error.message ?: "notification action failed")
+                ManageResult.Failed("notification action failed")
             }
         }
 

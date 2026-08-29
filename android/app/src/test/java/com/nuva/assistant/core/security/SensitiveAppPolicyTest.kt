@@ -1,6 +1,7 @@
 package com.nuva.assistant.core.security
 
 import com.nuva.assistant.command.MessagingApp
+import com.nuva.assistant.command.NuvaAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -94,8 +95,40 @@ class SensitiveAppPolicyTest {
         )
         val redacted = SensitiveAppPolicy.redactCodes("verification code 987654")
         assertFalse(redacted.contains("987654"))
+        assertEquals(
+            "Sensitive content hidden",
+            SensitiveAppPolicy.safeTextForDisplay("Password: hunter2"),
+        )
+        assertFalse(SensitiveAppPolicy.safeTextForDisplay("OTP 1234").contains("1234"))
         // Normal numbers survive when there is no credential context.
         assertTrue(SensitiveAppPolicy.redactCodes("battery 73 percent").contains("73"))
+    }
+
+    @Test
+    fun `structured actions cannot inject credentials or transactions`() {
+        val credential = NuvaAction.SendMessage(
+            app = MessagingApp.WHATSAPP,
+            contact = "Rahim",
+            message = "amar OTP 4321",
+            phoneNumber = "+8801712345678",
+        )
+        val transaction = NuvaAction.TypeText("please send money now", target = null, submit = false)
+        val safe = NuvaAction.SendMessage(
+            app = MessagingApp.SMS,
+            contact = "Rahim",
+            message = "ami 10 minute pore ashchi",
+            phoneNumber = "+8801712345678",
+        )
+
+        assertEquals(
+            SensitiveAppPolicy.CREDENTIAL_REFUSAL_REASON,
+            SensitiveAppPolicy.refusalForAction(credential)?.reason,
+        )
+        assertEquals(
+            SensitiveAppPolicy.TRANSACTION_REFUSAL_REASON,
+            SensitiveAppPolicy.refusalForAction(transaction)?.reason,
+        )
+        assertNull(SensitiveAppPolicy.refusalForAction(safe))
     }
 
     @Test
@@ -104,5 +137,6 @@ class SensitiveAppPolicyTest {
         // runtime accessibility guard is what blocks in-app taps/typing.
         assertNull(SensitiveAppPolicy.refusalForText("bkash kholo"))
         assertNull(SensitiveAppPolicy.refusalForText("nagad open koro"))
+        assertNull(SensitiveAppPolicy.refusalForAction(NuvaAction.OpenApp("bKash", "com.bkash.walletapp")))
     }
 }

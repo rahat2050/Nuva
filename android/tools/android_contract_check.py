@@ -251,9 +251,18 @@ def main() -> None:
     require("AndroidTokenCipher" in preferences_source, "Supabase session tokens are not Keystore encrypted")
     home_config_source = (MAIN / "java/com/nuva/assistant/homeassistant/HomeAssistantConfigStore.kt").read_text()
     require("previousUrl != normalized" in home_config_source, "Home Assistant token can be reused across endpoint changes")
+    require("SecureEndpointPolicy.normalizeRequired" in home_config_source, "Home Assistant endpoint uses weaker URL validation")
+    require("@Synchronized" in home_config_source, "Home Assistant URL/token snapshots can race")
+    require("showHomeAssistantRemoveConfirmation" in settings_source, "Home Assistant config removal lacks confirmation")
     require('SESSION_PREFIX = "enc-v1:"' in preferences_source, "encrypted session format marker missing")
     require("clearSession()" in preferences_source, "invalid legacy sessions are not cleared")
-    require(preferences_source.count("if (endpointChanged)") >= 2, "endpoint changes can retain an old JWT")
+    require(
+        "if (previous != normalized)" in preferences_source and "if (previous != next)" in preferences_source,
+        "endpoint changes can retain an old JWT",
+    )
+    require("runBlocking" not in preferences_source, "UserPreferences exposes thread-blocking DataStore access")
+    require("clearSessionIfUnchanged" in preferences_source, "stale token failure can clear a newer session")
+    require("expectedConnection" in preferences_source, "in-flight sign-in can cross a Supabase config change")
     require(settings_source.count("visualTransformation = PasswordVisualTransformation()") >= 2, "password/token field masking regressed")
     require('password = ""' in settings_source, "submitted password is not cleared from UI state")
     application_source = (MAIN / "java/com/nuva/assistant/NuvaApplication.kt").read_text()
@@ -270,10 +279,43 @@ def main() -> None:
         "financial notification extras are touched before the package denylist",
     )
     require(".take(MAX_STORED)" in notification_source, "initial notification refresh is not bounded")
+    require("safeTextForDisplay" in notification_source, "credential notification is stored before redaction")
+    file_workflow_source = (MAIN / "java/com/nuva/assistant/automation/UserPresentFileWorkflow.kt").read_text()
+    require("mentionsCredentials(text)" in file_workflow_source, "selected text file can display credentials")
     calendar_source = (MAIN / "java/com/nuva/assistant/automation/CalendarProviderController.kt").read_text()
     require("safeLocationForDisplay(event.location)" in calendar_source, "calendar location bypasses credential/code redaction")
     settings_opener_source = (MAIN / "java/com/nuva/assistant/automation/SettingsOpener.kt").read_text()
     require("torchCallbackRegistered" in settings_opener_source, "torch callback is registered repeatedly and leaked")
+
+    # v4.4.2 concurrency/privacy hardening.
+    wake_source = (MAIN / "java/com/nuva/assistant/service/WakeWordService.kt").read_text()
+    require("Blocking()" not in wake_source, "wake service blocks its main-thread coroutine on DataStore")
+    require("setWakeWordEnabled(true)" not in wake_source, "service intent can silently re-enable microphone opt-in")
+    require("autoDismissMs = null" in wake_source, "wake terminal can race follow-up and wake recognizers")
+    executor_source = (MAIN / "java/com/nuva/assistant/command/CommandExecutor.kt").read_text()
+    dao_source = (MAIN / "java/com/nuva/assistant/database/dao/Daos.kt").read_text()
+    require("commandMutex.withLock" in executor_source, "command/confirmation state can interleave")
+    require("claimPending" in dao_source and "status = 'pending'" in dao_source, "confirmation is not one-shot")
+    require("PendingActionPolicy.isFresh" in executor_source, "stale confirmation can execute")
+    require("refusalForAction" in executor_source, "structured action sensitivity is not revalidated")
+    action_parser_source = (MAIN / "java/com/nuva/assistant/ai/ActionParser.kt").read_text()
+    require("SensitiveAppPolicy.refusalForAction" in action_parser_source, "model action secret can reach the UI")
+    require("safeTranscript" in wake_source and "safeTranscript" in voice_controller_source, "voice transcript can expose a credential")
+    scheduler_source = (MAIN / "java/com/nuva/assistant/automation/ScheduledComposeScheduler.kt").read_text()
+    require("mutationMutex.withLock" in scheduler_source, "scheduled-draft restore can race cancel/fire")
+    require("updatePendingAction" in executor_source, "contact selection is not atomically persisted")
+    require(
+        executor_source.index("SensitiveAppPolicy.mentionsCredentials(text)")
+        < executor_source.index("history.insert("),
+        "credential utterance can reach local history",
+    )
+    memory_manager_source = (MAIN / "java/com/nuva/assistant/memory/MemoryManager.kt").read_text()
+    require(".getOrDefault(false)" in memory_manager_source, "failed memory sync can be marked successful")
+    require("mentionsCredentials(row.value)" in memory_manager_source, "legacy credential memory can leave the device")
+    ai_source = (MAIN / "java/com/nuva/assistant/ai/AIRepository.kt").read_text()
+    require("runBlocking" not in ai_source, "network auth blocks a worker thread on DataStore")
+    require("source.readUtf8LineStrict(MAX_SSE_LINE_BYTES)" in ai_source, "SSE stages are buffered or unbounded")
+    require("Thread {" not in ai_source, "SSE uses an unmanaged raw thread")
 
     # v4.4 user-present entry points must never turn external text into an automatic command.
     main_activity_source = (MAIN / "java/com/nuva/assistant/MainActivity.kt").read_text()

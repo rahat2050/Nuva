@@ -23,13 +23,19 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Persistent local draft reminders. A reminder opens a composer; it never sends. */
 object ScheduledComposeScheduler {
+
+    /** Serializes DB/alarm mutations so boot restore cannot revive a cancelled draft. */
+    private val mutationMutex = Mutex()
 
     sealed interface Result {
         data class Scheduled(val id: Long, val triggerAt: Long) : Result
@@ -45,7 +51,10 @@ object ScheduledComposeScheduler {
 
     data class RestoreReport(val scheduled: Int, val delivered: Int, val failed: Int)
 
-    suspend fun schedule(context: Context, action: NuvaAction.ScheduleCompose): Result {
+    suspend fun schedule(context: Context, action: NuvaAction.ScheduleCompose): Result =
+        mutationMutex.withLock { scheduleLocked(context, action) }
+
+    private suspend fun scheduleLocked(context: Context, action: NuvaAction.ScheduleCompose): Result {
         if (!NuvaPermissions.hasNotifications(context)) return Result.NotificationPermissionMissing
         validateAction(action)?.let { return Result.Failed(it) }
         val dao = NuvaContainer.database.scheduledDraftDao()
@@ -61,9 +70,11 @@ object ScheduledComposeScheduler {
         return try {
             scheduleAlarm(context, row.copy(id = id))
             Result.Scheduled(id, action.triggerAt)
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (error: Exception) {
             dao.updateStatus(id, "failed")
-            Result.Failed(error.message ?: "alarm scheduling failed")
+            Result.Failed("alarm scheduling failed")
         }
     }
 
@@ -81,19 +92,27 @@ object ScheduledComposeScheduler {
         return "Scheduled drafts: $spoken$more." to screen
     }
 
-    suspend fun cancelByOrdinal(context: Context, ordinal: Int): CancelResult {
+    suspend fun cancelByOrdinal(context: Context, ordinal: Int): CancelResult =
+        mutationMutex.withLock { cancelByOrdinalLocked(context, ordinal) }
+
+    private suspend fun cancelByOrdinalLocked(context: Context, ordinal: Int): CancelResult {
         val dao = NuvaContainer.database.scheduledDraftDao()
         val row = dao.pendingOnce().getOrNull(ordinal.coerceIn(1, 100) - 1) ?: return CancelResult.Missing
         return try {
             cancelAlarm(context, row.id)
             dao.updateStatus(row.id, "cancelled")
             CancelResult.Cancelled(row.id)
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (error: Exception) {
-            CancelResult.Failed(error.message ?: "cancel failed")
+            CancelResult.Failed("cancel failed")
         }
     }
 
-    suspend fun restorePending(context: Context): RestoreReport {
+    suspend fun restorePending(context: Context): RestoreReport =
+        mutationMutex.withLock { restorePendingLocked(context) }
+
+    private suspend fun restorePendingLocked(context: Context): RestoreReport {
         if (!NuvaPermissions.hasNotifications(context)) return RestoreReport(0, 0, 0)
         var scheduled = 0
         var delivered = 0
@@ -102,12 +121,14 @@ object ScheduledComposeScheduler {
         for (row in NuvaContainer.database.scheduledDraftDao().pendingOnce()) {
             try {
                 if (row.triggerAt <= now) {
-                    handleAlarm(context, row.id)
+                    handleAlarmLocked(context, row.id)
                     delivered++
                 } else {
                     scheduleAlarm(context, row)
                     scheduled++
                 }
+            } catch (cancel: CancellationException) {
+                throw cancel
             } catch (_: Exception) {
                 failed++
             }
@@ -115,7 +136,10 @@ object ScheduledComposeScheduler {
         return RestoreReport(scheduled, delivered, failed)
     }
 
-    suspend fun handleAlarm(context: Context, id: Long) {
+    suspend fun handleAlarm(context: Context, id: Long) =
+        mutationMutex.withLock { handleAlarmLocked(context, id) }
+
+    private suspend fun handleAlarmLocked(context: Context, id: Long) {
         if (!NuvaPermissions.hasNotifications(context)) return
         val dao = NuvaContainer.database.scheduledDraftDao()
         val row = dao.get(id) ?: return

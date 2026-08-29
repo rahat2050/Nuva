@@ -1,10 +1,12 @@
 package com.nuva.assistant.memory
 
 import com.nuva.assistant.core.security.SecurityPolicy
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import com.nuva.assistant.database.AppDatabase
 import com.nuva.assistant.database.dao.LocalMemoryDao
 import com.nuva.assistant.database.dao.put
 import com.nuva.assistant.supabase.SupabaseRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -22,10 +24,15 @@ class MemoryManager(
     val all: Flow<List<com.nuva.assistant.database.entities.LocalMemoryEntity>> = dao.all()
 
     suspend fun remember(key: String, value: String): Result<Unit> {
-        if (!SecurityPolicy.isMemoryKeyAllowed(key)) {
-            return Result.failure(IllegalArgumentException("NUVA does not store credentials in memory"))
+        val cleanValue = value.trim()
+        if (
+            !SecurityPolicy.isMemoryKeyAllowed(key) ||
+            cleanValue.isEmpty() ||
+            SensitiveAppPolicy.mentionsCredentials(cleanValue)
+        ) {
+            return Result.failure(IllegalArgumentException("NUVA stores non-sensitive, non-empty preferences only"))
         }
-        dao.put(key.trim().lowercase(), value.trim().take(4000))
+        dao.put(key.trim().lowercase(), cleanValue.take(4000))
         return Result.success(Unit)
     }
 
@@ -38,7 +45,7 @@ class MemoryManager(
         if (!SecurityPolicy.isMemoryKeyAllowed(key)) return false
         val existing = dao.get(key.trim().lowercase()) ?: return false
         dao.delete(key.trim().lowercase())
-        runCatching { supabaseProvider().forgetMemory(existing.key) }
+        runCatchingCancellable { supabaseProvider().forgetMemory(existing.key) }
         return true
     }
 
@@ -47,7 +54,12 @@ class MemoryManager(
         val unsynced = dao.unsynced()
         var pushed = 0
         for (row in unsynced) {
-            val ok = runCatching { supabaseProvider().saveMemory(row.key, row.value) }.isSuccess
+            if (!SecurityPolicy.isMemoryKeyAllowed(row.key) || SensitiveAppPolicy.mentionsCredentials(row.value)) {
+                continue
+            }
+            val ok = runCatchingCancellable {
+                supabaseProvider().saveMemory(row.key, row.value)
+            }.getOrDefault(false)
             if (ok) {
                 dao.markSynced(row.key, System.currentTimeMillis())
                 pushed += 1
@@ -58,14 +70,22 @@ class MemoryManager(
 
     /** Pull the server mirror into local storage (last-write-wins by updated_at). */
     suspend fun pull(): Int {
-        val remote = runCatching { supabaseProvider().listMemory() }.getOrNull() ?: return 0
+        val remote = runCatchingCancellable { supabaseProvider().listMemory() }.getOrNull() ?: return 0
         var pulled = 0
         for (row in remote) {
-            if (!SecurityPolicy.isMemoryKeyAllowed(row.key)) continue
+            if (!SecurityPolicy.isMemoryKeyAllowed(row.key) || SensitiveAppPolicy.mentionsCredentials(row.value)) continue
             dao.put(row.key, row.value)
             dao.markSynced(row.key, System.currentTimeMillis())
             pulled += 1
         }
         return pulled
+    }
+
+    private inline fun <T> runCatchingCancellable(block: () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (error: Throwable) {
+        Result.failure(error)
     }
 }

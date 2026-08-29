@@ -1,6 +1,8 @@
 package com.nuva.assistant.core.security
 
+import com.nuva.assistant.command.ClipboardOperation
 import com.nuva.assistant.command.MessagingApp
+import com.nuva.assistant.command.NuvaAction
 
 /**
  * FINANCIAL & SENSITIVE-DATA POLICY — three levels (v1.2 product spec).
@@ -83,6 +85,7 @@ object SensitiveAppPolicy {
     private val CREDENTIAL_PATTERNS = listOf(
         "otp", "one time password", "pin number", "password", "passcode", "cvv", "cvc",
         "card number", "credit card", "debit card", "biometric", "2fa code", "seed phrase",
+        "access token", "refresh token", "bearer token", "api key", "private key", "recovery code",
         "ওটিপি", "পিন নম্বর", "পিন নাম্বার", "পাসওয়ার্ড", "কার্ড নম্বার", "সিভিভি",
         "verification code", "one-time",
     )
@@ -135,6 +138,20 @@ object SensitiveAppPolicy {
         }
 
     /**
+     * Safe transient UI form. Numeric OTP/PIN-like values are redacted; other
+     * credential-bearing text is replaced entirely rather than risking an
+     * alphanumeric password/token disclosure.
+     */
+    fun safeTextForDisplay(text: String): String {
+        val redacted = redactCodes(text)
+        return if (mentionsCredentials(text) && redacted == text) {
+            "Sensitive content hidden"
+        } else {
+            redacted
+        }
+    }
+
+    /**
      * LEVEL 3 refusal — exact product wording. No confirmation dialog is ever
      * shown for transactions: automation is simply refused, and the user is
      * reminded they can do it manually themselves.
@@ -143,6 +160,11 @@ object SensitiveAppPolicy {
         "এই financial transaction NUVA নিজে করতে পারবে না। আপনি চাইলে নিজে manually করতে পারবেন।"
 
     val TRANSACTION_REFUSAL_REASON: String = "blocked: financial transaction automation (level 3)"
+
+    val CREDENTIAL_REFUSAL: String =
+        "OTP, PIN, password, card/CVV বা অন্য authentication secret NUVA handle করবে না।"
+
+    val CREDENTIAL_REFUSAL_REASON: String = "blocked: credential handling (level 2)"
 
     /** LEVEL 2 screen-automation refusal (spoken when reading is blocked). */
     val SCREEN_READ_GUARD_SPEECH: String =
@@ -157,9 +179,59 @@ object SensitiveAppPolicy {
 
     /** Refusal for the raw command text (checked before any parsing). */
     fun refusalForText(text: String): Refusal? =
-        if (isTransactionRequest(text)) Refusal(TRANSACTION_REFUSAL_REASON) else null
+        if (isTransactionRequest(text)) {
+            Refusal(TRANSACTION_REFUSAL_REASON, TRANSACTION_REFUSAL)
+        } else {
+            null
+        }
 
-    data class Refusal(val reason: String)
+    /**
+     * Defense in depth for the structured action returned by a backend or
+     * restored from Room. Only fields that can be stored, sent, spoken or typed
+     * are inspected; opening a financial app remains explicitly allowed.
+     */
+    fun refusalForAction(action: NuvaAction): Refusal? {
+        val payload = actionSensitivePayload(action) ?: return null
+        if (mentionsCredentials(payload)) {
+            return Refusal(CREDENTIAL_REFUSAL_REASON, CREDENTIAL_REFUSAL)
+        }
+        if (isTransactionRequest(payload)) {
+            return Refusal(TRANSACTION_REFUSAL_REASON, TRANSACTION_REFUSAL)
+        }
+        return null
+    }
+
+    private fun actionSensitivePayload(action: NuvaAction): String? = when (action) {
+        is NuvaAction.TypeText -> action.text
+        is NuvaAction.SendMessage -> action.message
+        is NuvaAction.ReplyNotification -> action.message
+        is NuvaAction.ComposeEmail -> listOfNotNull(action.subject, action.body).joinToString(" ")
+        is NuvaAction.ComposeSocialPost -> action.text
+        is NuvaAction.ComposeMms -> action.body
+        is NuvaAction.ShareText -> action.text
+        is NuvaAction.ClipboardAction ->
+            action.text.takeIf { action.operation == ClipboardOperation.COPY }
+        is NuvaAction.PrepareForm -> action.details
+        is NuvaAction.ScheduleCompose -> listOfNotNull(action.subject, action.body).joinToString(" ")
+        is NuvaAction.CreateCalendarEvent ->
+            listOfNotNull(action.title, action.location, action.description).joinToString(" ")
+        is NuvaAction.SetReminder -> action.title
+        is NuvaAction.CreateNote -> action.content
+        is NuvaAction.CreateTodo -> action.content
+        is NuvaAction.SearchWeb -> action.query
+        is NuvaAction.PlayMedia -> action.query
+        is NuvaAction.OpenUrl -> action.url
+        is NuvaAction.LocalAnswer -> action.answer
+        is NuvaAction.Press -> action.label
+        is NuvaAction.Tap -> listOfNotNull(
+            action.target?.text,
+            action.target?.contentDescription,
+            action.target?.resourceId,
+        ).joinToString(" ").ifBlank { null }
+        else -> null
+    }
+
+    data class Refusal(val reason: String, val speech: String)
 
     /**
      * Messaging apps NUVA can automate per tier:

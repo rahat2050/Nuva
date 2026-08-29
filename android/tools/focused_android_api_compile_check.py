@@ -145,7 +145,10 @@ sealed class NuvaAction {
             args.kotlinc,
             args.android_jar,
             root,
-            [SOURCE / "homeassistant/HomeAssistantConfigStore.kt"],
+            [
+                SOURCE / "core/security/SecureEndpointPolicy.kt",
+                SOURCE / "homeassistant/HomeAssistantConfigStore.kt",
+            ],
         )
 
         setting_target_stub = write(
@@ -204,6 +207,14 @@ enum class SettingTarget {
             ],
         )
 
+        compile_group(
+            "pending-action-policy",
+            args.kotlinc,
+            args.android_jar,
+            root,
+            [SOURCE / "command/PendingActionPolicy.kt"],
+        )
+
         quick_entry_stub = write(
             root / "stubs-quick/com/nuva/assistant/QuickEntry.kt",
             """package com.nuva.assistant
@@ -226,26 +237,21 @@ object R {
             ],
         )
 
-        messaging_stub = write(
-            root / "stubs-handoff/com/nuva/assistant/command/MessagingApp.kt",
-            """package com.nuva.assistant.command
-enum class MessagingApp { WHATSAPP, SMS, TELEGRAM }
-""",
-        )
         compile_group(
             "external-text-policy",
             args.kotlinc,
             args.android_jar,
             root,
             [
-                messaging_stub,
+                SOURCE / "command/Intent.kt",
+                SOURCE / "command/Action.kt",
                 SOURCE / "core/security/SensitiveAppPolicy.kt",
                 SOURCE / "core/security/SecureEndpointPolicy.kt",
                 SOURCE / "automation/ExternalTextHandoffPolicy.kt",
             ],
         )
 
-    print("PASS: 10 focused Kotlin/API compile groups")
+    print("PASS: 11 focused Kotlin/API compile groups")
     print("NOTE: full Gradle compile, resource linking, lint and device QA are still required")
 
 

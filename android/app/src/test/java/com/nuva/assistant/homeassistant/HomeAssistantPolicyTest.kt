@@ -14,6 +14,8 @@ class HomeAssistantPolicyTest {
         assertNull(HomeAssistantConfigStore.normalizeAndValidateUrl("http://192.168.1.2:8123"))
         assertNull(HomeAssistantConfigStore.normalizeAndValidateUrl("https://user:pass@home.example.com"))
         assertNull(HomeAssistantConfigStore.normalizeAndValidateUrl("https://home.example.com?token=secret"))
+        assertNull(HomeAssistantConfigStore.normalizeAndValidateUrl("https://home.example.com:70000"))
+        assertNull(HomeAssistantConfigStore.normalizeAndValidateUrl("https://home.example.com/base/../admin"))
     }
 
     @Test

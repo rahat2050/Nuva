@@ -25,7 +25,7 @@ data class CommandHistoryEntity(
 
 /**
  * A medium/high-risk decision parked until the user answers the blocking
- * confirmation dialog. Status: pending | confirmed | rejected | expired.
+ * confirmation dialog. Status: pending | confirmed | rejected | expired | blocked.
  */
 @Entity(tableName = "pending_actions", indices = [Index("status")])
 data class PendingActionEntity(

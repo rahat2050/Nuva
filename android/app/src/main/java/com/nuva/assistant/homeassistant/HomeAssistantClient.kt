@@ -3,8 +3,13 @@ package com.nuva.assistant.homeassistant
 import com.nuva.assistant.command.HomeAssistantDomain
 import com.nuva.assistant.command.HomeAssistantOperation
 import com.nuva.assistant.command.NuvaAction
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -63,7 +68,7 @@ class HomeAssistantClient(private val configStore: HomeAssistantConfigStore) {
         }
     }
 
-    private fun fetchEntities(config: HomeAssistantConfigStore.Config, domain: HomeAssistantDomain): Any {
+    private suspend fun fetchEntities(config: HomeAssistantConfigStore.Config, domain: HomeAssistantDomain): Any {
         return try {
             val response = execute(config, "api/states", method = "GET", body = null)
             if (!response.first) return Result.Failed(response.second)
@@ -72,30 +77,42 @@ class HomeAssistantClient(private val configStore: HomeAssistantConfigStore) {
                 val id = obj["entity_id"]?.jsonPrimitive?.content ?: return@mapNotNull null
                 if (!id.startsWith("${domain.wireName}.")) return@mapNotNull null
                 val attributes = obj["attributes"]?.jsonObject
+                val friendlyName = attributes?.get("friendly_name")?.jsonPrimitive?.content
+                    ?: id.substringAfter('.')
+                if (
+                    SensitiveAppPolicy.mentionsCredentials(id) ||
+                    SensitiveAppPolicy.mentionsCredentials(friendlyName)
+                ) {
+                    return@mapNotNull null
+                }
                 Entity(
                     entityId = id,
-                    friendlyName = attributes?.get("friendly_name")?.jsonPrimitive?.content ?: id.substringAfter('.'),
+                    friendlyName = friendlyName,
                     state = obj["state"]?.jsonPrimitive?.content.orEmpty(),
                 )
             }
             EntityList(entities)
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (error: Exception) {
-            Result.Failed(error.message ?: "Home Assistant states failed")
+            Result.Failed("Home Assistant states request failed")
         }
     }
 
-    private inline fun request(
+    private suspend inline fun request(
         config: HomeAssistantConfigStore.Config,
         path: String,
         crossinline success: (String) -> Result,
     ): Result = try {
         val response = execute(config, path, method = "GET", body = null)
         if (response.first) success(response.second) else Result.Failed(response.second)
+    } catch (cancel: CancellationException) {
+        throw cancel
     } catch (error: Exception) {
-        Result.Failed(error.message ?: "Home Assistant request failed")
+        Result.Failed("Home Assistant request failed")
     }
 
-    private inline fun post(
+    private suspend inline fun post(
         config: HomeAssistantConfigStore.Config,
         path: String,
         body: String,
@@ -103,16 +120,18 @@ class HomeAssistantClient(private val configStore: HomeAssistantConfigStore) {
     ): Result = try {
         val response = execute(config, path, method = "POST", body = body)
         if (response.first) success() else Result.Failed(response.second)
+    } catch (cancel: CancellationException) {
+        throw cancel
     } catch (error: Exception) {
-        Result.Failed(error.message ?: "Home Assistant request failed")
+        Result.Failed("Home Assistant request failed")
     }
 
-    private fun execute(
+    private suspend fun execute(
         config: HomeAssistantConfigStore.Config,
         path: String,
         method: String,
         body: String?,
-    ): Pair<Boolean, String> {
+    ): Pair<Boolean, String> = suspendCancellableCoroutine { continuation ->
         val builder = Request.Builder()
             .url("${config.baseUrl.trimEnd('/')}/${path.trimStart('/')}")
             .header("Authorization", "Bearer ${config.token}")
@@ -122,10 +141,17 @@ class HomeAssistantClient(private val configStore: HomeAssistantConfigStore) {
         } else {
             builder.get()
         }
-        http.newCall(builder.build()).execute().use { response ->
-            val responseBody = response.body?.string().orEmpty()
-            return if (response.isSuccessful) true to responseBody
-            else false to "Home Assistant HTTP ${response.code}: ${responseBody.take(200)}"
+        val call = http.newCall(builder.build())
+        continuation.invokeOnCancellation { call.cancel() }
+        try {
+            val result = call.execute().use { response ->
+                val responseBody = response.body?.string().orEmpty()
+                if (response.isSuccessful) true to responseBody
+                else false to "Home Assistant HTTP ${response.code}"
+            }
+            if (continuation.isActive) continuation.resume(result)
+        } catch (error: Exception) {
+            if (continuation.isActive) continuation.resumeWithException(error)
         }
     }
 

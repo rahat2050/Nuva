@@ -8,6 +8,7 @@ import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import com.nuva.assistant.command.NuvaAction
 import com.nuva.assistant.command.UserFileOperation
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -169,13 +170,14 @@ object UserPresentFileWorkflow {
                     }
                     else -> error("operation does not accept multiple selections")
                 }
-            }.getOrElse { error -> fail("Multiple selection handle korte parini. ${error.message.orEmpty()}".trim()) }
+            }.getOrElse { fail("Multiple selection handle korte parini.") }
         }
     }
 
     private suspend fun handleSource(context: Context, request: Request, uri: Uri): String = runCatching {
         persistGrant(context, uri, request.operation.needsWriteGrant)
-        val name = displayName(context, uri).ifBlank { "selected item" }
+        val rawName = displayName(context, uri).ifBlank { "selected item" }
+        val name = if (SensitiveAppPolicy.mentionsCredentials(rawName)) "selected item" else rawName
         when (request.operation) {
             UserFileOperation.OPEN_FILE -> {
                 openUri(context, uri)
@@ -187,7 +189,10 @@ object UserPresentFileWorkflow {
             }
             UserFileOperation.READ_TEXT -> {
                 val text = readBoundedText(context, uri)
-                complete("$name theke text porechi.", text)
+                if (SensitiveAppPolicy.mentionsCredentials(text)) {
+                    error("Selected file-e credential-like text ache; NUVA eta display/porbe na")
+                }
+                complete("$name theke text porechi.", SensitiveAppPolicy.redactCodes(text))
             }
             UserFileOperation.OPEN_FOLDER -> complete("$name folder access user grant korechen.")
             UserFileOperation.PICK_PHOTO -> {
@@ -243,7 +248,7 @@ object UserPresentFileWorkflow {
                 complete("Photo editor khulechi — edit kore final Save apni korben.")
             }
         }
-    }.getOrElse { error -> fail("Selected file/media handle korte parini. ${error.message.orEmpty()}".trim()) }
+    }.getOrElse { fail("Selected file/media handle korte parini.") }
 
     private fun handleDestination(
         context: Context,
@@ -254,7 +259,7 @@ object UserPresentFileWorkflow {
         val awaiting = State.AwaitingMutation(active.request, active.source, active.sourceName, tree)
         _state.value = awaiting
         "${active.sourceName} er destination select hoyeche — final ${active.request.operation.wireName} confirm korun."
-    }.getOrElse { error -> fail("Destination folder use korte parini. ${error.message.orEmpty()}".trim()) }
+    }.getOrElse { fail("Destination folder use korte parini.") }
 
     suspend fun confirmMutation(context: Context): String {
         val awaiting = beginMutation() ?: return "Kono file change pending nei."
@@ -267,7 +272,7 @@ object UserPresentFileWorkflow {
                     UserFileOperation.MOVE_FILE -> copyOrMove(context, awaiting, move = true)
                     else -> error("operation is not a confirmed mutation")
                 }
-            }.getOrElse { error -> fail("File operation fail koreche. ${error.message.orEmpty()}".trim()) }
+            }.getOrElse { fail("File operation fail koreche.") }
         }
     }
 

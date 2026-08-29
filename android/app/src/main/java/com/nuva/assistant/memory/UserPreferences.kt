@@ -10,10 +10,12 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.nuva.assistant.core.constants.AppConstants
 import com.nuva.assistant.core.security.AndroidTokenCipher
 import com.nuva.assistant.core.security.SecureEndpointPolicy
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "nuva_settings")
 
@@ -61,21 +63,28 @@ class UserPreferences(private val context: Context) {
     }
     val supabaseAnonKey: Flow<String> =
         context.dataStore.data.map { it[Keys.SUPABASE_ANON_KEY] ?: AppConstants.DEFAULT_SUPABASE_ANON_KEY }
-    val signedIn: Flow<Boolean> = context.dataStore.data.map {
-        it[Keys.ACCESS_TOKEN]?.startsWith(SESSION_PREFIX) == true
-    }
+    val signedIn: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        val stored = prefs[Keys.ACCESS_TOKEN]
+        if (stored == null || !stored.startsWith(SESSION_PREFIX)) {
+            false
+        } else {
+            runCatching {
+                sessionCipher.decrypt(stored.removePrefix(SESSION_PREFIX)).isNotBlank()
+            }.getOrDefault(false)
+        }
+    }.flowOn(Dispatchers.IO)
 
-    // --- Blocking accessors (call from IO dispatchers only) --------------------
+    // --- Suspend snapshots -----------------------------------------------------
 
-    fun baseUrlBlocking(): String = runBlocking { baseUrl.first() }
-    fun supabaseUrlBlocking(): String = runBlocking { supabaseUrl.first() }
-    fun supabaseAnonKeyBlocking(): String = runBlocking { supabaseAnonKey.first() }
-    fun languageBlocking(): String = runBlocking { language.first() }
-    fun confirmationAlwaysBlocking(): Boolean = runBlocking { confirmationAlways.first() }
-    fun directCallBlocking(): Boolean = runBlocking { directCall.first() }
-    fun voiceEnabledBlocking(): Boolean = runBlocking { voiceEnabled.first() }
-    fun wakeWordEnabledBlocking(): Boolean = runBlocking { wakeWordEnabled.first() }
-    fun onboardingDoneBlocking(): Boolean = runBlocking { onboardingDone.first() }
+    /** Read the current backend endpoint without ever blocking the caller thread. */
+    suspend fun currentBaseUrl(): String = baseUrl.first()
+
+    /**
+     * URL and anon key are read from one DataStore snapshot so a concurrent
+     * Settings save cannot produce a mixed old/new Supabase configuration.
+     */
+    suspend fun currentSupabaseConnection(): SupabaseConnection =
+        supabaseConnection(context.dataStore.data.first())
 
     // --- Writes ----------------------------------------------------------------
 
@@ -84,12 +93,15 @@ class UserPreferences(private val context: Context) {
             url,
             defaultWhenBlank = AppConstants.DEFAULT_BASE_URL,
         ) ?: return false
-        val endpointChanged = baseUrl.first() != normalized
-        context.dataStore.edit {
-            it[Keys.BASE_URL] = normalized
-            if (endpointChanged) {
-                it.remove(Keys.ACCESS_TOKEN)
-                it.remove(Keys.REFRESH_TOKEN)
+        context.dataStore.edit { prefs ->
+            val previous = SecureEndpointPolicy.normalizeRequired(
+                prefs[Keys.BASE_URL].orEmpty(),
+                defaultWhenBlank = AppConstants.DEFAULT_BASE_URL,
+            ) ?: AppConstants.DEFAULT_BASE_URL
+            prefs[Keys.BASE_URL] = normalized
+            if (previous != normalized) {
+                prefs.remove(Keys.ACCESS_TOKEN)
+                prefs.remove(Keys.REFRESH_TOKEN)
             }
         }
         return true
@@ -98,13 +110,14 @@ class UserPreferences(private val context: Context) {
     suspend fun setSupabase(url: String, anonKey: String): Boolean {
         val normalized = SecureEndpointPolicy.normalizeOptional(url) ?: return false
         val cleanKey = anonKey.trim()
-        val endpointChanged = supabaseUrl.first() != normalized || supabaseAnonKey.first() != cleanKey
-        context.dataStore.edit {
-            it[Keys.SUPABASE_URL] = normalized
-            it[Keys.SUPABASE_ANON_KEY] = cleanKey
-            if (endpointChanged) {
-                it.remove(Keys.ACCESS_TOKEN)
-                it.remove(Keys.REFRESH_TOKEN)
+        context.dataStore.edit { prefs ->
+            val previous = supabaseConnection(prefs)
+            val next = SupabaseConnection(normalized, cleanKey)
+            prefs[Keys.SUPABASE_URL] = normalized
+            prefs[Keys.SUPABASE_ANON_KEY] = cleanKey
+            if (previous != next) {
+                prefs.remove(Keys.ACCESS_TOKEN)
+                prefs.remove(Keys.REFRESH_TOKEN)
             }
         }
         return true
@@ -128,16 +141,29 @@ class UserPreferences(private val context: Context) {
 
     // --- Auth session (Supabase JWT for the backend) ---------------------------
 
-    suspend fun saveSession(accessToken: String, refreshToken: String?) {
+    /**
+     * Saves a session only if it still belongs to the Supabase configuration
+     * that initiated sign-in. This closes the race where Settings changed the
+     * endpoint while an old password-grant request was still in flight.
+     */
+    suspend fun saveSession(
+        accessToken: String,
+        refreshToken: String?,
+        expectedConnection: SupabaseConnection,
+    ): Boolean = withContext(Dispatchers.IO) {
         require(accessToken.isNotBlank()) { "access token cannot be blank" }
         val encryptedAccess = SESSION_PREFIX + sessionCipher.encrypt(accessToken)
         val encryptedRefresh = refreshToken?.takeIf { it.isNotBlank() }
             ?.let { SESSION_PREFIX + sessionCipher.encrypt(it) }
-        context.dataStore.edit {
-            it[Keys.ACCESS_TOKEN] = encryptedAccess
-            if (encryptedRefresh == null) it.remove(Keys.REFRESH_TOKEN)
-            else it[Keys.REFRESH_TOKEN] = encryptedRefresh
+        var saved = false
+        context.dataStore.edit { prefs ->
+            if (supabaseConnection(prefs) != expectedConnection) return@edit
+            prefs[Keys.ACCESS_TOKEN] = encryptedAccess
+            if (encryptedRefresh == null) prefs.remove(Keys.REFRESH_TOKEN)
+            else prefs[Keys.REFRESH_TOKEN] = encryptedRefresh
+            saved = true
         }
+        saved
     }
 
     suspend fun clearSession() {
@@ -147,26 +173,58 @@ class UserPreferences(private val context: Context) {
         }
     }
 
-    suspend fun accessToken(): String? = readSessionToken(Keys.ACCESS_TOKEN)
+    suspend fun accessToken(): String? = withContext(Dispatchers.IO) {
+        readSessionToken(Keys.ACCESS_TOKEN)
+    }
 
-    suspend fun refreshToken(): String? = readSessionToken(Keys.REFRESH_TOKEN)
+    suspend fun refreshToken(): String? = withContext(Dispatchers.IO) {
+        readSessionToken(Keys.REFRESH_TOKEN)
+    }
 
     private suspend fun readSessionToken(key: Preferences.Key<String>): String? {
         val stored = context.dataStore.data.first()[key] ?: return null
         if (!stored.startsWith(SESSION_PREFIX)) {
-            // Refuse legacy/plaintext token storage. The user signs in again and
-            // receives a Keystore-encrypted session instead.
-            clearSession()
+            // Refuse legacy/plaintext token storage. The compare-before-clear
+            // prevents this stale read from deleting a newly saved session.
+            clearSessionIfUnchanged(key, stored)
             return null
         }
-        return runCatching { sessionCipher.decrypt(stored.removePrefix(SESSION_PREFIX)) }
-            .getOrElse {
-                clearSession()
-                null
-            }
+        val decrypted = try {
+            sessionCipher.decrypt(stored.removePrefix(SESSION_PREFIX))
+        } catch (_: Exception) {
+            clearSessionIfUnchanged(key, stored)
+            return null
+        }
+        if (decrypted.isBlank()) {
+            clearSessionIfUnchanged(key, stored)
+            return null
+        }
+        return decrypted
     }
 
-    fun accessTokenBlocking(): String? = runBlocking { accessToken() }
+    private suspend fun clearSessionIfUnchanged(
+        key: Preferences.Key<String>,
+        expectedStoredValue: String,
+    ) {
+        context.dataStore.edit { prefs ->
+            if (prefs[key] != expectedStoredValue) return@edit
+            prefs.remove(Keys.ACCESS_TOKEN)
+            prefs.remove(Keys.REFRESH_TOKEN)
+        }
+    }
+
+    data class SupabaseConnection(
+        val baseUrl: String,
+        val anonKey: String,
+    )
+
+    private fun supabaseConnection(prefs: Preferences): SupabaseConnection =
+        SupabaseConnection(
+            baseUrl = SecureEndpointPolicy.normalizeOptional(
+                prefs[Keys.SUPABASE_URL] ?: AppConstants.DEFAULT_SUPABASE_URL,
+            ) ?: "",
+            anonKey = prefs[Keys.SUPABASE_ANON_KEY] ?: AppConstants.DEFAULT_SUPABASE_ANON_KEY,
+        )
 
     companion object {
         private const val SESSION_PREFIX = "enc-v1:"

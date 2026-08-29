@@ -14,6 +14,7 @@ import android.os.PowerManager
 import com.nuva.assistant.command.CommandExecutor
 import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.core.permissions.NuvaPermissions
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import com.nuva.assistant.systemassistant.NuvaVoiceInteractionService
 import com.nuva.assistant.ui.floating.FloatingAssistantOverlay
 import com.nuva.assistant.voice.SpeechRecognizerController
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -78,6 +80,15 @@ class WakeWordService : Service() {
         when (intent?.action ?: ACTION_START) {
             ACTION_STOP -> {
                 updateRuntimeState(RuntimeState.STOPPED, "Stopped by user")
+                // Stop microphone/command work synchronously; persistence may
+                // await DataStore, but the user's Stop tap must take effect now.
+                wakeJob?.cancel()
+                wakeJob = null
+                commandJob?.cancel()
+                commandJob = null
+                recognizer = null
+                overlay.dismiss()
+                tts.stop()
                 scope.launch {
                     NuvaContainer.preferences.setWakeWordEnabled(false)
                     stopSelf()
@@ -87,21 +98,23 @@ class WakeWordService : Service() {
 
             ACTION_TRIGGER -> {
                 if (!startForegroundVisible()) return START_NOT_STICKY
-                val keepWakeMode = NuvaContainer.preferences.wakeWordEnabledBlocking()
-                activateAssistant(initialCommand = null, fromWake = false)
-                return if (keepWakeMode) START_STICKY else START_NOT_STICKY
+                // DataStore is asynchronous; never block Service.onStartCommand
+                // (the main thread) while opening the visible voice surface.
+                scope.launch {
+                    activateAssistant(initialCommand = null, fromWake = false)
+                }
+                return START_NOT_STICKY
             }
 
             else -> {
                 if (!startForegroundVisible()) return START_NOT_STICKY
-                if (!NuvaContainer.preferences.wakeWordEnabledBlocking()) {
-                    // Persist opt-in before the loop reads it. The old ordering
-                    // could race and immediately exit on a first-time enable.
-                    scope.launch {
-                        NuvaContainer.preferences.setWakeWordEnabled(true)
-                        startWakeLoop()
+                scope.launch {
+                    if (!NuvaContainer.preferences.wakeWordEnabled.first()) {
+                        // A service intent (including Android's sticky restart)
+                        // is never permission to opt the user in again.
+                        stopSelf()
+                        return@launch
                     }
-                } else {
                     startWakeLoop()
                 }
                 return START_STICKY
@@ -131,7 +144,7 @@ class WakeWordService : Service() {
         wakeJob = scope.launch {
             if (!checkWakePermissions()) return@launch
 
-            while (isActive && NuvaContainer.preferences.wakeWordEnabledBlocking()) {
+            while (isActive && NuvaContainer.preferences.wakeWordEnabled.first()) {
                 if (!isScreenInteractive()) {
                     updateRuntimeState(RuntimeState.PAUSED_SCREEN_OFF, "Paused while screen is off")
                     delay(SCREEN_OFF_RETRY_MS)
@@ -258,7 +271,7 @@ class WakeWordService : Service() {
         }
 
         recognizer = SpeechRecognizerController(this)
-        val language = NuvaContainer.preferences.languageBlocking()
+        val language = NuvaContainer.preferences.language.first()
         try {
             // v1.6: stuck-listening recovery — a silent recognizer death ends
             // the session and re-arms wake listening instead of hanging.
@@ -267,7 +280,11 @@ class WakeWordService : Service() {
                 when (event) {
                     SpeechRecognizerController.VoiceEvent.ListeningStarted -> Unit
                     is SpeechRecognizerController.VoiceEvent.Partial ->
-                        overlay.showStatus(FloatingAssistantOverlay.PopupState.LISTENING, "Listening…", event.text)
+                        overlay.showStatus(
+                            FloatingAssistantOverlay.PopupState.LISTENING,
+                            "Listening…",
+                            safeTranscript(event.text),
+                        )
 
                     is SpeechRecognizerController.VoiceEvent.Final ->
                         processCommand(event.text)
@@ -302,7 +319,7 @@ class WakeWordService : Service() {
         }
 
         updateRuntimeState(RuntimeState.PROCESSING, "Processing verified voice command")
-        overlay.showStatus(FloatingAssistantOverlay.PopupState.PROCESSING, "Processing…", cleanText)
+        overlay.showStatus(FloatingAssistantOverlay.PopupState.PROCESSING, "Processing…", safeTranscript(cleanText))
         when (val step = NuvaContainer.commandExecutor.process(cleanText)) {
             is CommandExecutor.Step.AwaitingConfirmation -> showConfirmation(step)
             is CommandExecutor.Step.AwaitingContactChoice -> showTerminal(
@@ -364,14 +381,16 @@ class WakeWordService : Service() {
             if (success) FloatingAssistantOverlay.PopupState.SUCCESS else FloatingAssistantOverlay.PopupState.ERROR,
             if (success) "Done" else "Problem",
             detail?.takeIf { it.isNotBlank() } ?: speech,
-            autoDismissMs = 4_000,
-        ) {
-            rearmIfEnabled()
-        }
+            // One tracked coroutine below owns both dismissal and re-arming.
+            // The old independent auto-dismiss callback could start the wake
+            // recognizer 100 ms before a follow-up recognizer, racing two mics.
+            autoDismissMs = null,
+            onDismiss = { stopCurrentCommandAndRearm() },
+        )
         speakIfEnabled(speech)
-        commandJob = null
-        scope.launch {
-            delay(4_100)
+        commandJob = scope.launch {
+            delay(4_000)
+            overlay.dismiss()
             // Conversational follow-up: keep the session briefly open after a
             // SUCCESS so "Rohim-er chat kholo" → "ওকে বলো …" works without a
             // new wake word. Failures always return to wake listening.
@@ -379,6 +398,7 @@ class WakeWordService : Service() {
                 overlay.showStatus(FloatingAssistantOverlay.PopupState.LISTENING, "NUVA", "আর কিছু? শুনছি…")
                 listenForCommandOnce()
             } else {
+                commandJob = null
                 rearmIfEnabled()
             }
         }
@@ -392,22 +412,33 @@ class WakeWordService : Service() {
     }
 
     private fun rearmIfEnabled() {
-        if (NuvaContainer.preferences.wakeWordEnabledBlocking()) startWakeLoop() else stopSelf()
+        scope.launch {
+            if (NuvaContainer.preferences.wakeWordEnabled.first()) startWakeLoop() else stopSelf()
+        }
     }
 
     private fun speakIfEnabled(text: String) {
         if (text.isBlank()) return
-        if (!NuvaContainer.preferences.voiceEnabledBlocking()) return
-        val language = NuvaContainer.preferences.languageBlocking()
-        tts.speak(text, if (language == "auto") "banglish" else language)
+        scope.launch {
+            if (!NuvaContainer.preferences.voiceEnabled.first()) return@launch
+            val language = NuvaContainer.preferences.language.first()
+            tts.speak(text, if (language == "auto") "banglish" else language)
+        }
     }
+
+    private fun safeTranscript(text: String): String =
+        if (SensitiveAppPolicy.mentionsCredentials(text)) {
+            "Sensitive content hidden"
+        } else {
+            SensitiveAppPolicy.redactCodes(text)
+        }
 
     private fun isScreenInteractive(): Boolean {
         val power = getSystemService(Context.POWER_SERVICE) as PowerManager
         return power.isInteractive
     }
 
-    private fun wakeRecognizerLanguage(): String = when (NuvaContainer.preferences.languageBlocking()) {
+    private suspend fun wakeRecognizerLanguage(): String = when (NuvaContainer.preferences.language.first()) {
         "bn" -> "bn" // support users who say “হে নুভা”
         else -> "en" // target phrase is “Hey Nuva”
     }

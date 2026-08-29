@@ -11,12 +11,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -47,6 +49,7 @@ import com.nuva.assistant.systemassistant.SystemAssistantController
 import com.nuva.assistant.ui.theme.NuvaDivider
 import com.nuva.assistant.ui.theme.NuvaGlassPanel
 import com.nuva.assistant.ui.theme.NuvaScreenHeader
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -65,8 +68,15 @@ class SettingsViewModel : ViewModel() {
     var message = mutableStateOf<String?>(null)
         private set
 
-    var homeAssistantConfigured = mutableStateOf(NuvaContainer.homeAssistantConfig.isConfigured())
+    var homeAssistantConfigured = mutableStateOf(false)
         private set
+
+    init {
+        // isConfigured decrypts the Keystore token; keep that work off the UI thread.
+        viewModelScope.launch(Dispatchers.IO) {
+            homeAssistantConfigured.value = NuvaContainer.homeAssistantConfig.isConfigured()
+        }
+    }
 
     private val ttsManagerDelegate = lazy { com.nuva.assistant.voice.TTSManager(NuvaContainer.appContext) }
     private val ttsManager by ttsManagerDelegate
@@ -96,7 +106,7 @@ class SettingsViewModel : ViewModel() {
             message.value = "Checking backend…"
             val healthy = NuvaContainer.syncManager.healthOk()
             message.value = if (healthy) {
-                "Backend reachable ✓ (${preferences.baseUrlBlocking()})"
+                "Backend reachable ✓ (${preferences.currentBaseUrl()})"
             } else {
                 "Backend reachable hoy na — URL thik ache kina dekhun"
             }
@@ -159,11 +169,22 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             when (val result = NuvaContainer.supabaseRepository.signIn(email, password)) {
                 is com.nuva.assistant.supabase.SupabaseRepository.SignInResult.Success -> {
-                    message.value = runCatching {
-                        preferences.saveSession(result.session.accessToken, result.session.refreshToken)
-                        "Signed in as ${result.session.user?.email ?: "user"}"
-                    }.getOrElse {
-                        preferences.clearSession()
+                    message.value = try {
+                        val saved = preferences.saveSession(
+                            result.session.accessToken,
+                            result.session.refreshToken,
+                            expectedConnection = result.connection,
+                        )
+                        if (saved) {
+                            "Signed in as ${result.session.user?.email ?: "user"}"
+                        } else {
+                            "Supabase config sign-in চলাকালে বদলেছে; পুরোনো session save করা হয়নি। আবার sign in করুন।"
+                        }
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (_: Exception) {
+                        // DataStore edits are atomic. Do not clear a different,
+                        // already-valid session merely because this save failed.
                         "Sign-in session securely save করা যায়নি; আবার চেষ্টা করুন।"
                     }
                 }
@@ -262,6 +283,7 @@ fun SettingsScreen(
     var password by remember { mutableStateOf("") }
     var homeAssistantUrl by remember { mutableStateOf(NuvaContainer.homeAssistantConfig.savedBaseUrl()) }
     var homeAssistantToken by remember { mutableStateOf("") }
+    var showHomeAssistantRemoveConfirmation by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val overlayGranted = remember(permissionRefresh) { NuvaPermissions.canDrawOverlays(context) }
@@ -414,7 +436,7 @@ fun SettingsScreen(
             ) { Text("Save encrypted") }
             OutlinedButton(onClick = { viewModel.testHomeAssistant() }, enabled = homeAssistantConfigured) { Text("Test") }
             if (homeAssistantConfigured) {
-                TextButton(onClick = { viewModel.clearHomeAssistant() }) { Text("Remove") }
+                TextButton(onClick = { showHomeAssistantRemoveConfirmation = true }) { Text("Remove") }
             }
         }
 
@@ -597,6 +619,28 @@ fun SettingsScreen(
             "Risk-medium/high actions always ask first. There is no way to disable that.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    if (showHomeAssistantRemoveConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showHomeAssistantRemoveConfirmation = false },
+            title = { Text("Remove Home Assistant config?") },
+            text = { Text("Saved HTTPS endpoint এবং encrypted token এই ফোন থেকে মুছে যাবে।") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showHomeAssistantRemoveConfirmation = false
+                        viewModel.clearHomeAssistant()
+                        homeAssistantToken = ""
+                    },
+                ) { Text("Remove config") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showHomeAssistantRemoveConfirmation = false }) {
+                    Text(stringResource(R.string.confirm_no))
+                }
+            },
         )
     }
 }

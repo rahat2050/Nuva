@@ -13,6 +13,7 @@ class HistoryStatusTest {
         assertEquals("SUCCESS", HistoryStatus.display("completed"))
         assertEquals("FAILED", HistoryStatus.display("failed"))
         assertEquals("CANCELLED", HistoryStatus.display("rejected"))
+        assertEquals("CANCELLED", HistoryStatus.display("expired"))
         assertEquals("UNSUPPORTED", HistoryStatus.display("unsupported"))
         assertEquals("BLOCKED", HistoryStatus.display("blocked"))
         assertEquals("CONFIRMATION_REQUIRED", HistoryStatus.display("pending_confirmation"))

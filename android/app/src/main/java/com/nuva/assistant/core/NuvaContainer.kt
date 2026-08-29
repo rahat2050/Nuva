@@ -32,9 +32,8 @@ object NuvaContainer {
 
     val supabaseRepository: SupabaseRepository by lazy {
         SupabaseRepository(
-            baseUrlProvider = { preferences.baseUrlBlocking() },
-            supabaseUrlProvider = { preferences.supabaseUrlBlocking() },
-            anonKeyProvider = { preferences.supabaseAnonKeyBlocking() },
+            baseUrlProvider = { preferences.currentBaseUrl() },
+            supabaseConnectionProvider = { preferences.currentSupabaseConnection() },
         ).also { repo ->
             repo.tokenProvider = { preferences.accessToken() }
         }
@@ -42,7 +41,7 @@ object NuvaContainer {
 
     val aiRepository: AIRepository by lazy {
         AIRepository(
-            baseUrlProvider = { preferences.baseUrlBlocking() },
+            baseUrlProvider = { preferences.currentBaseUrl() },
             tokenProvider = { preferences.accessToken() },
             deviceIdProvider = { DeviceId.get(appContext) },
         )

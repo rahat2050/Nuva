@@ -1,6 +1,6 @@
 # NUVA Privacy
 
-Last updated: v4.4 (2026-08-28). The app contains **no analytics, no trackers,
+Last updated: v4.4.2 (2026-08-29). The app contains **no analytics, no trackers,
 no ad SDKs**.
 
 ## What stays on your phone
@@ -9,7 +9,9 @@ no ad SDKs**.
   Android's user-selected `SpeechRecognizer` provider converts audio to text under that provider's
   own privacy terms; only the resulting transcript enters NUVA's command pipeline. Idle wake-loop
   transcripts are matched locally and are not sent to NUVA's backend.
-* Command history, notes, to-dos, memories, settings — local Room/DataStore only.
+* Command history, notes, to-dos, memories and settings use local Room/DataStore as their source of
+  truth. Optional signed-in sync can copy allowed command/memory records to Supabase; credential-bearing
+  utterances/values stop before local history, Groq and sync, and legacy sensitive rows are hidden.
 * Scheduled email/SMS **draft reminders** (recipient, subject/body, trigger and recurrence) — local Room only;
   AlarmManager carries only the local row id. They are never uploaded or automatically sent.
 * Clipboard access happens only on an explicit foreground copy/read/clear command; NUVA stores no
@@ -43,8 +45,8 @@ no ad SDKs**.
 
 | Data | Destination | When |
 |------|-------------|------|
-| Command text | Vercel backend → Groq (AI) | ONLY when the on-device parser cannot understand it |
-| Command record (text, intent, status) | Supabase | ONLY if you signed in (optional memory sync) |
+| Command text | Vercel backend → Groq (AI) | ONLY when the on-device parser cannot understand it and no credential/financial-transaction marker is present |
+| Command record (text, intent, status) | Supabase | ONLY if signed in; credential-bearing commands are never persisted |
 | Device id header | Vercel | with AI requests (rate limiting) |
 
 The Groq key lives only on the server; the APK holds just the backend URL and

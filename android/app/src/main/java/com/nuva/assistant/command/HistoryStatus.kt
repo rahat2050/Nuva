@@ -21,7 +21,7 @@ object HistoryStatus {
     fun display(internal: String): String = when (internal) {
         "completed" -> "SUCCESS"
         "failed" -> "FAILED"
-        "rejected", "cancelled" -> "CANCELLED"
+        "rejected", "cancelled", "expired" -> "CANCELLED"
         "unsupported" -> "UNSUPPORTED"
         "blocked" -> "BLOCKED"
         "pending_confirmation" -> "CONFIRMATION_REQUIRED"

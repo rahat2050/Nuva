@@ -50,6 +50,7 @@ import com.nuva.assistant.automation.UserPresentFileWorkflow
 import com.nuva.assistant.command.CommandDecision
 import com.nuva.assistant.core.NuvaContainer
 import com.nuva.assistant.core.permissions.NuvaPermissions
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import com.nuva.assistant.ui.ConfirmationSummary
 import com.nuva.assistant.ui.theme.NuvaGlassPanel
 import com.nuva.assistant.ui.theme.NuvaPrimaryAction
@@ -59,6 +60,7 @@ import com.nuva.assistant.ui.theme.NuvaVoiceOrb
 import com.nuva.assistant.voice.VoiceController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /**
@@ -74,6 +76,13 @@ class HomeViewModel : ViewModel() {
     val recent = NuvaContainer.database
         .commandHistoryDao()
         .recent(20)
+        .map { rows ->
+            rows.filterNot { row ->
+                SensitiveAppPolicy.mentionsCredentials(row.text) ||
+                    SensitiveAppPolicy.mentionsCredentials(row.error.orEmpty()) ||
+                    SensitiveAppPolicy.refusalForText(row.text) != null
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val pending = MutableStateFlow<Pair<Long, CommandDecision>?>(null)
@@ -90,13 +99,20 @@ class HomeViewModel : ViewModel() {
 
     fun onStateChanged(newState: VoiceController.State) {
         when (newState) {
-            is VoiceController.State.AwaitingConfirmation ->
+            is VoiceController.State.AwaitingConfirmation -> {
+                contactChoice.value = null
                 pending.value = newState.pendingId to newState.decision
+            }
 
-            is VoiceController.State.AwaitingContactChoice ->
+            is VoiceController.State.AwaitingContactChoice -> {
+                pending.value = null
                 contactChoice.value = newState.pendingId to newState.matches
+            }
 
-            else -> Unit
+            else -> {
+                pending.value = null
+                contactChoice.value = null
+            }
         }
     }
 

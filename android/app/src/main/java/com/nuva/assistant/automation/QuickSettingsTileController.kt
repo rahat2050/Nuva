@@ -45,7 +45,7 @@ object QuickSettingsTileController {
                 )
             }
         }.onFailure { error ->
-            callback(Result.Failed(error.message ?: "Could not request Quick Settings tile"))
+            callback(Result.Failed("Could not request Quick Settings tile"))
         }
     }
 

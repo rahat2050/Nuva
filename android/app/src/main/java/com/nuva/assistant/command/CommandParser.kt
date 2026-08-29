@@ -723,7 +723,9 @@ object CommandParser {
                 NuvaDateTimeParser.relativeDay(t) == RelativeDay.TOMORROW ->
                     focus.add(java.util.Calendar.DAY_OF_YEAR, 1)
                 NuvaDateTimeParser.weekday(t) != null -> {
-                    val wanted = when (NuvaDateTimeParser.weekday(t)!!) {
+                    val weekday = NuvaDateTimeParser.weekday(t)
+                        ?: return unsupported("Weekday ta bujhte parini.")
+                    val wanted = when (weekday) {
                         Weekday.MON -> java.util.Calendar.MONDAY
                         Weekday.TUE -> java.util.Calendar.TUESDAY
                         Weekday.WED -> java.util.Calendar.WEDNESDAY
@@ -1699,14 +1701,14 @@ object CommandParser {
             return if (sendVerb) unsupported("Kake pathabo? Contact er nam bole din.") else null
         }
 
+        val target = name ?: number ?: return unsupported("Kake pathabo? Contact er nam bole din.")
         val message = extractMessage(t)
         if (message.isNullOrBlank()) {
             return unsupported(
                 "Ki message pathabo bolen — tarpor abar bolen. " +
-                    "Jemon: ${if (name != null) "$name ke" else number!!} whatsapp e bole dao kal 9 tay class.",
+                    "Jemon: $target ke whatsapp e bole dao kal 9 tay class.",
             )
         }
-        val target = name ?: number!!
         return ok(
             NuvaAction.SendMessage(app, target, message, number),
             "$target ke ${app.wireName} e message pathabo — nishchit korun.",

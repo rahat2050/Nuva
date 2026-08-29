@@ -81,7 +81,7 @@ object PdfPrintHandoff {
                 } ?: error("PDF input unavailable")
                 callback.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
             } catch (error: Exception) {
-                callback.onWriteFailed(error.message ?: "PDF write failed")
+                callback.onWriteFailed("PDF write failed")
             }
         }
     }

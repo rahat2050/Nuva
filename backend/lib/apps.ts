@@ -74,7 +74,16 @@ export function packageHintFor(name: string): string | null {
 }
 
 export function isSensitiveApp(name: string): boolean {
-  return resolveApp(name)?.sensitive === true;
+  const normalized = name.trim().toLowerCase();
+  if (resolveApp(normalized)?.sensitive === true) return true;
+  if (
+    KNOWN_APPS.some(
+      (app) => app.sensitive === true && app.packageName?.toLowerCase() === normalized,
+    )
+  ) {
+    return true;
+  }
+  return /(bkash|nagad|dbbl|\.bank|banking|payment|wallet|paypal|stripe)/i.test(normalized);
 }
 
 /** Finds the first known app mentioned anywhere in a phrase. */

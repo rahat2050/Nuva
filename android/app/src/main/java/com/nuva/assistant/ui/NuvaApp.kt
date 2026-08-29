@@ -76,8 +76,8 @@ fun NuvaApp(
     // Settings ("setup" route) so permissions can be granted/re-checked any time.
     val onboardingDone by NuvaContainer.preferences.onboardingDone
         .collectAsState(initial = null as Boolean?)
-    if (onboardingDone == null) return
-    val startDestination = if (onboardingDone!!) "home" else "onboarding"
+    val onboardingComplete = onboardingDone ?: return
+    val startDestination = if (onboardingComplete) "home" else "onboarding"
     val fileWorkflow by UserPresentFileWorkflow.state.collectAsState()
     val contactWorkflow by UserPresentContactWorkflow.state.collectAsState()
     LaunchedEffect(fileWorkflow, contactWorkflow, onboardingDone, assistantInvocation?.id) {

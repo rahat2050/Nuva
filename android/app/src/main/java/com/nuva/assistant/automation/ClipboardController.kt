@@ -51,7 +51,7 @@ object ClipboardController {
                 }
             }
         } catch (error: Exception) {
-            Result.Failed(error.message ?: "clipboard operation failed")
+            Result.Failed("clipboard operation failed")
         }
     }
 }

@@ -42,7 +42,7 @@ object CalendarProviderController {
                 -> openMatched(context, action, events)
             }
         } catch (error: Exception) {
-            Result.Failed(error.message ?: "Calendar query failed")
+            Result.Failed("Calendar query failed")
         }
     }
 

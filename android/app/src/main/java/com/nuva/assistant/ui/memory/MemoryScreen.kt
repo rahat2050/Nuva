@@ -31,12 +31,15 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nuva.assistant.R
 import com.nuva.assistant.core.NuvaContainer
+import com.nuva.assistant.core.security.SecurityPolicy
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import com.nuva.assistant.ui.theme.NuvaGlassPanel
 import com.nuva.assistant.ui.theme.NuvaPrimaryAction
 import com.nuva.assistant.ui.theme.NuvaScreenHeader
 import com.nuva.assistant.ui.theme.NuvaStatusChip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -48,15 +51,23 @@ class MemoryViewModel : ViewModel() {
 
     val memories = NuvaContainer.memory
         .all
+        .map { rows ->
+            rows.filter { row ->
+                SecurityPolicy.isMemoryKeyAllowed(row.key) &&
+                    !SensitiveAppPolicy.mentionsCredentials(row.value)
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Voice-captured notes & to-dos (v1.1) — local only. */
     val notes = NuvaContainer.database.noteDao()
         .byKind("note")
+        .map { rows -> rows.filterNot { SensitiveAppPolicy.mentionsCredentials(it.content) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val todos = NuvaContainer.database.noteDao()
         .byKind("todo")
+        .map { rows -> rows.filterNot { SensitiveAppPolicy.mentionsCredentials(it.content) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     var message = mutableStateOf<String?>(null)
@@ -143,7 +154,13 @@ fun MemoryScreen(viewModel: MemoryViewModel = viewModel()) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         NuvaPrimaryAction(
-                            onClick = { if (key.isNotBlank() && value.isNotBlank()) viewModel.save(key, value) },
+                            onClick = {
+                                if (key.isNotBlank() && value.isNotBlank()) {
+                                    val submittedValue = value
+                                    value = ""
+                                    viewModel.save(key, submittedValue)
+                                }
+                            },
                             enabled = key.isNotBlank() && value.isNotBlank(),
                         ) { Text("Save", color = Color.White) }
                         TextButton(onClick = { viewModel.syncNow() }) { Text("Sync now") }

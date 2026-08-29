@@ -4,6 +4,7 @@ import com.nuva.assistant.command.CommandDecision
 import com.nuva.assistant.command.CommandValidator
 import com.nuva.assistant.command.NuvaIntent
 import com.nuva.assistant.command.NuvaRisk
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 
 /**
  * Turns the raw server response into a locally re-validated [CommandDecision].
@@ -23,6 +24,26 @@ object ActionParser {
                 source = response.meta?.source ?: "unknown",
                 commandId = response.meta?.commandId,
                 modelRisk = NuvaRisk.LOW,
+            )
+        }
+
+        val modelText = (listOfNotNull(result.speech) + result.reasons).joinToString(" ")
+        if (SensitiveAppPolicy.mentionsCredentials(modelText)) {
+            return unsupported(
+                speech = SensitiveAppPolicy.CREDENTIAL_REFUSAL,
+                reasons = listOf(SensitiveAppPolicy.CREDENTIAL_REFUSAL_REASON),
+                source = response.meta?.source ?: "groq",
+                commandId = response.meta?.commandId,
+                modelRisk = NuvaRisk.HIGH,
+            )
+        }
+        SensitiveAppPolicy.refusalForText(modelText)?.let { refusal ->
+            return unsupported(
+                speech = refusal.speech,
+                reasons = listOf(refusal.reason),
+                source = response.meta?.source ?: "groq",
+                commandId = response.meta?.commandId,
+                modelRisk = NuvaRisk.HIGH,
             )
         }
 
@@ -69,6 +90,15 @@ object ActionParser {
             )
 
             is CommandValidator.ValidatedAction.Valid -> {
+                SensitiveAppPolicy.refusalForAction(validated.action)?.let { refusal ->
+                    return unsupported(
+                        speech = refusal.speech,
+                        reasons = listOf(refusal.reason),
+                        source = response.meta?.source ?: "groq",
+                        commandId = response.meta?.commandId,
+                        modelRisk = NuvaRisk.HIGH,
+                    )
+                }
                 val modelRisk = NuvaRisk.fromWire(result.risk)
                 val risk = CommandValidator.recomputeRisk(validated.action, "", modelRisk)
                 CommandDecision(

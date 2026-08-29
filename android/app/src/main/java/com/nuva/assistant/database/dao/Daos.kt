@@ -56,9 +56,17 @@ interface PendingActionDao {
     @Query("UPDATE pending_actions SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String)
 
-    /** Re-parks a pending action after e.g. a contact choice resolves a number. */
-    @Query("UPDATE pending_actions SET actionJson = :actionJson WHERE id = :id")
-    suspend fun updateAction(id: Long, actionJson: String)
+    /** Atomic one-shot claim: only the first confirm can execute an action. */
+    @Query("UPDATE pending_actions SET status = 'confirmed' WHERE id = :id AND status = 'pending'")
+    suspend fun claimPending(id: Long): Int
+
+    /** Reject/expire/block only an action that nobody has already claimed. */
+    @Query("UPDATE pending_actions SET status = :status WHERE id = :id AND status = 'pending'")
+    suspend fun transitionPending(id: Long, status: String): Int
+
+    /** Contact selection cannot rewrite an already handled action. */
+    @Query("UPDATE pending_actions SET actionJson = :actionJson WHERE id = :id AND status = 'pending'")
+    suspend fun updatePendingAction(id: Long, actionJson: String): Int
 
     @Query("SELECT * FROM pending_actions WHERE status = 'pending' ORDER BY createdAt DESC")
     fun pending(): Flow<List<PendingActionEntity>>

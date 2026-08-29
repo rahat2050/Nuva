@@ -58,6 +58,8 @@ Three independent layers:
    question, so the UI can never present a pending action as already done.
 3. `settings.confirmation_mode` is constrained to `always | risky_only`. There is no `never`, so
    "disable all confirmations" is not representable in the database.
+4. Android confirmation rows expire after five minutes and use an atomic `pending → confirmed`
+   compare-and-set. Rapid double taps cannot execute twice, and command-plan state is mutex-serialized.
 
 ## 4. Input validation
 
@@ -92,8 +94,10 @@ remember. Not stored by NUVA: raw audio, contact lists, location, screen content
 speech provider may process audio under its own terms, but NUVA backend receives transcript text only.
 Screen context sent with a command is used for that request only and is never persisted.
 
-`/api/memory` actively refuses credential-like keys, so a buggy or malicious client cannot turn
-NUVA's memory into a password store.
+`/api/memory` actively refuses credential-like keys **and values**, filters legacy sensitive rows on
+read, and Android repeats that policy before display/push/pull. Credential-bearing commands and
+financial-transaction requests stop before Groq, local history and Supabase persistence; structured
+model speech/actions are checked again.
 
 ## Home Assistant boundary (v4.0)
 
@@ -143,7 +147,9 @@ NUVA's memory into a password store.
 - Supabase access/refresh JWTs use AES-GCM with a separate non-exportable Android Keystore key;
   legacy plaintext or undecryptable sessions are cleared rather than reused.
 - Changing the backend endpoint, Supabase endpoint or anon key atomically clears the previous session,
-  preventing an old JWT from being forwarded to a newly configured origin.
+  preventing an old JWT from being forwarded to a newly configured origin. An in-flight sign-in can
+  save its JWT only if the exact Supabase URL/anon-key snapshot is still current; stale decrypt failures
+  use compare-before-clear so they cannot erase a newer session.
 - The Settings password field is masked and cleared from Compose state immediately on submit; the
   password is never persisted.
 

@@ -18,10 +18,19 @@ import { defineHandler, ok } from '../../lib/http.js';
 import { requireUser, resolveIdentity } from '../../lib/auth.js';
 import { deleteMemory, listMemories, upsertMemory } from '../../lib/repository.js';
 import { NuvaError } from '../../lib/errors.js';
+import { containsCredentialTerms } from '../../lib/sensitive.js';
 
 const KEY_PATTERN = /^[a-z0-9][a-z0-9_.-]{0,119}$/;
 const MAX_VALUE_CHARS = 4000;
 const FORBIDDEN_KEY = /(password|passwd|secret|token|api[_-]?key|otp|pin|cvv|credit[_-]?card|private[_-]?key|seed[_-]?phrase)/i;
+
+/** Exported for deterministic policy tests; values are never logged. */
+export function isSafeMemoryValue(value: unknown): value is string {
+  return typeof value === 'string' &&
+    value.trim().length > 0 &&
+    value.length <= MAX_VALUE_CHARS &&
+    !containsCredentialTerms(value);
+}
 
 function readKey(value: unknown): string {
   if (typeof value !== 'string') {
@@ -54,7 +63,9 @@ export default defineHandler({
         { userId, ...(rawKey !== undefined ? { key: readKey(rawKey) } : {}) },
         env,
       );
-      return ok({ ok: true, count: memories.length, memories });
+      // Fail closed for legacy rows written before value validation existed.
+      const safeMemories = memories.filter((memory) => isSafeMemoryValue(memory.value));
+      return ok({ ok: true, count: safeMemories.length, memories: safeMemories });
     }
 
     if (method === 'DELETE') {
@@ -74,6 +85,9 @@ export default defineHandler({
     }
     if (value.length > MAX_VALUE_CHARS) {
       throw new NuvaError('PAYLOAD_TOO_LARGE', `\`value\` must be at most ${MAX_VALUE_CHARS} characters`);
+    }
+    if (!isSafeMemoryValue(value)) {
+      throw new NuvaError('BAD_REQUEST', 'NUVA does not store credentials in memory values');
     }
 
     const memory = await upsertMemory({ userId, key, value }, env);

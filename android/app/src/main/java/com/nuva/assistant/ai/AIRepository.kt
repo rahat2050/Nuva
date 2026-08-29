@@ -3,11 +3,15 @@ package com.nuva.assistant.ai
 import com.nuva.assistant.command.CommandDecision
 import com.nuva.assistant.core.constants.AppConstants
 import com.nuva.assistant.core.security.SecureEndpointPolicy
+import com.nuva.assistant.core.security.SensitiveAppPolicy
+import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -26,7 +30,7 @@ import java.util.concurrent.TimeUnit
  * in (see SupabaseRepository).
  */
 class AIRepository(
-    private val baseUrlProvider: () -> String,
+    private val baseUrlProvider: suspend () -> String,
     private val tokenProvider: suspend () -> String?,
     private val deviceIdProvider: () -> String?,
 ) {
@@ -46,39 +50,50 @@ class AIRepository(
             val builder = original.newBuilder()
                 .header("X-Nuva-Client", "android/$APP_VERSION")
             deviceIdProvider()?.let { builder.header("X-Nuva-Device-Id", it) }
-            chain.proceed(builder.build())
-        }
-        .addInterceptor { chain ->
-            val token = runCatching { kotlinx.coroutines.runBlocking { tokenProvider() } }.getOrNull()
-            val request = if (token.isNullOrBlank()) {
-                chain.request()
-            } else {
-                chain.request().newBuilder().header("Authorization", "Bearer $token").build()
+            val response = chain.proceed(builder.build())
+            val declaredLength = response.body?.contentLength() ?: -1L
+            if (declaredLength > MAX_HTTP_RESPONSE_BYTES) {
+                response.close()
+                throw IOException("HTTP response exceeds limit")
             }
-            chain.proceed(request)
+            response
         }
         .build()
 
-    private fun retrofit(): Retrofit = Retrofit.Builder()
-        .baseUrl(baseUrlProvider().normalizeBaseUrl())
+    private fun retrofit(baseUrl: String): Retrofit = Retrofit.Builder()
+        .baseUrl(baseUrl)
         .client(httpClient)
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()
 
-    // Cached per URL so Settings can change the backend without a restart.
-    @Volatile private var cachedUrl: String? = null
-    @Volatile private var cachedApi: NuvaApi? = null
+    // One coherent volatile entry avoids URL/API mismatches under concurrent calls.
+    @Volatile private var cachedApi: CachedApi? = null
 
-    val api: NuvaApi
-        get() {
-            val url = baseUrlProvider().normalizeBaseUrl()
-            val current = cachedApi
-            if (current !== null && cachedUrl == url) return current
-            val built = retrofit().create(NuvaApi::class.java)
-            cachedUrl = url
-            cachedApi = built
-            return built
+    private suspend fun api(): NuvaApi {
+        val url = baseUrlProvider().normalizeBaseUrl()
+        cachedApi?.takeIf { it.url == url }?.let { return it.api }
+        return synchronized(this) {
+            cachedApi?.takeIf { it.url == url }?.api
+                ?: retrofit(url).create(NuvaApi::class.java).also { built ->
+                    cachedApi = CachedApi(url, built)
+                }
         }
+    }
+
+    private suspend fun authorizationHeader(): String? {
+        val token = try {
+            tokenProvider()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            null
+        }
+        return token?.takeIf { it.isNotBlank() }?.let { "Bearer $it" }
+    }
+
+    suspend fun healthOk(): Boolean = api().health().ok
+
+    private data class CachedApi(val url: String, val api: NuvaApi)
 
     // --- Plain interpretation -------------------------------------------------
 
@@ -90,11 +105,11 @@ class AIRepository(
                 deviceId = deviceIdProvider(),
             ),
         )
-        val response = api.interpret(request)
+        val response = api().interpret(request, authorizationHeader())
         if (!response.ok) {
             throw ApiCallException(
-                code = response.error?.code ?: "AI_INVALID_OUTPUT",
-                speech = response.error?.speech ?: "Bujhte parini.",
+                code = safeErrorCode(response.error?.code),
+                speech = safeServerSpeech(response.error?.speech, "Bujhte parini."),
             )
         }
         return ActionParser.parse(response)
@@ -125,75 +140,121 @@ class AIRepository(
             ),
         )
 
-        val request = Request.Builder()
+        val requestBuilder = Request.Builder()
             .url(baseUrlProvider().normalizeBaseUrl() + "api/ai/command/stream")
             .post(requestJson.toRequestBody("application/json".toMediaType()))
             .header("Accept", "text/event-stream")
-            .build()
+        authorizationHeader()?.let { requestBuilder.header("Authorization", it) }
+        val call = httpClient.newCall(requestBuilder.build())
 
-        val call = httpClient.newCall(request)
-        val worker = Thread {
+        val worker = launch(Dispatchers.IO) {
             try {
-                val response = call.execute()
-                if (!response.isSuccessful) {
-                    val body = response.body?.string().orEmpty()
-                    val errorSpeech = runCatching { json.decodeFromString(ApiErrorEnvelope.serializer(), body) }
-                        .getOrNull()?.error?.speech
-                    trySend(StreamEvent.Failure("HTTP_${response.code}", errorSpeech ?: "Server e pouchate parini."))
-                    close()
-                    return@Thread
-                }
-                // Parse the SSE body line by line (event:/data: pairs).
-                val bodyText = response.body?.string().orEmpty()
-                var currentEvent = "message"
-                for (line in bodyText.lineSequence()) {
-                    when {
-                        line.startsWith("event:") -> currentEvent = line.removePrefix("event:").trim()
-                        line.startsWith("data:") -> {
-                            val payload = line.removePrefix("data:").trim()
-                            when (currentEvent) {
-                                "stage" -> runCatching {
-                                    json.decodeFromString(StageEventDto.serializer(), payload)
-                                }.getOrNull()?.let { stage ->
-                                    trySend(StreamEvent.Stage(stage.stage, stage.source))
-                                }
+                call.execute().use { response ->
+                    if (!response.isSuccessful) {
+                        // Never buffer or surface arbitrary custom-endpoint error bodies.
+                        trySend(StreamEvent.Failure("HTTP_${response.code}", "Server e pouchate parini."))
+                        close()
+                        return@launch
+                    }
 
-                                "result" -> {
-                                    val dto = runCatching {
-                                        json.decodeFromString(CommandResponseDto.serializer(), payload)
-                                    }.getOrNull()
-                                    if (dto != null) {
-                                        trySend(StreamEvent.Result(ActionParser.parse(dto)))
-                                    } else {
-                                        trySend(StreamEvent.Failure("AI_INVALID_OUTPUT", "Bujhte parini."))
-                                    }
-                                }
+                    val source = response.body?.source()
+                    if (source == null) {
+                        trySend(StreamEvent.Failure("EMPTY_RESPONSE", "Server theke kono response paini."))
+                        close()
+                        return@launch
+                    }
 
-                                "error" -> runCatching {
-                                    json.decodeFromString(ApiErrorEnvelope.serializer(), payload)
-                                }.getOrNull()?.let { envelope ->
-                                    trySend(
-                                        StreamEvent.Failure(
-                                            envelope.error?.code ?: "INTERNAL",
-                                            envelope.error?.speech ?: "Somossa hoyeche.",
-                                        ),
-                                    )
+                    // Consume the socket incrementally. ResponseBody.string()
+                    // buffers until EOF and used to delay every "instant" stage
+                    // event until the entire SSE response had already finished.
+                    var currentEvent = "message"
+                    val dataLines = mutableListOf<String>()
+                    var dataChars = 0
+
+                    fun emitCurrentEvent() {
+                        if (dataLines.isEmpty()) return
+                        val payload = dataLines.joinToString("\n")
+                        when (currentEvent) {
+                            "stage" -> runCatching {
+                                json.decodeFromString(StageEventDto.serializer(), payload)
+                            }.getOrNull()?.let { stage ->
+                                trySend(StreamEvent.Stage(stage.stage, stage.source))
+                            }
+
+                            "result" -> {
+                                val dto = runCatching {
+                                    json.decodeFromString(CommandResponseDto.serializer(), payload)
+                                }.getOrNull()
+                                if (dto != null) {
+                                    trySend(StreamEvent.Result(ActionParser.parse(dto)))
+                                } else {
+                                    trySend(StreamEvent.Failure("AI_INVALID_OUTPUT", "Bujhte parini."))
                                 }
+                            }
+
+                            "error" -> runCatching {
+                                json.decodeFromString(ApiErrorEnvelope.serializer(), payload)
+                            }.getOrNull()?.let { envelope ->
+                                trySend(
+                                    StreamEvent.Failure(
+                                        safeErrorCode(envelope.error?.code),
+                                        safeServerSpeech(envelope.error?.speech, "Somossa hoyeche."),
+                                    ),
+                                )
+                            }
+                        }
+                        currentEvent = "message"
+                        dataLines.clear()
+                        dataChars = 0
+                    }
+
+                    while (!source.exhausted()) {
+                        val line = source.readUtf8LineStrict(MAX_SSE_LINE_BYTES)
+                        when {
+                            line.isEmpty() -> emitCurrentEvent()
+                            line.startsWith(":") -> Unit // SSE keep-alive/comment
+                            line.startsWith("event:") -> currentEvent = line.removePrefix("event:").trim()
+                            line.startsWith("data:") -> {
+                                val data = line.removePrefix("data:").trimStart()
+                                dataChars += data.length
+                                if (dataChars > MAX_SSE_EVENT_CHARS || dataLines.size >= MAX_SSE_DATA_LINES) {
+                                    throw IOException("SSE event exceeds limit")
+                                }
+                                dataLines += data
                             }
                         }
                     }
+                    emitCurrentEvent()
+                    close()
+                }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (io: IOException) {
+                if (!call.isCanceled()) {
+                    trySend(StreamEvent.Failure("NETWORK", "Internet e pouchate parchi na."))
                 }
                 close()
-            } catch (err: Exception) {
+            } catch (_: Exception) {
                 trySend(StreamEvent.Failure("NETWORK", "Internet e pouchate parchi na."))
-                close(err)
+                close()
             }
         }
-        worker.isDaemon = true
-        worker.start()
 
-        awaitClose { call.cancel() }
+        awaitClose {
+            call.cancel()
+            worker.cancel()
+        }
     }.flowOn(Dispatchers.IO)
+
+    private fun safeErrorCode(raw: String?): String =
+        raw?.takeIf { it.matches(Regex("^[A-Z0-9_]{1,64}$")) } ?: "INTERNAL"
+
+    private fun safeServerSpeech(raw: String?, fallback: String): String =
+        raw?.takeIf { speech ->
+            speech.length in 1..500 &&
+                !SensitiveAppPolicy.mentionsCredentials(speech) &&
+                SensitiveAppPolicy.refusalForText(speech) == null
+        } ?: fallback
 
     // --- Errors ----------------------------------------------------------------
 
@@ -206,8 +267,12 @@ class AIRepository(
     private data class StageEventDto(val stage: String = "", val source: String? = null)
 
     companion object {
-        const val APP_VERSION = "4.4.1"
+        const val APP_VERSION = "4.4.2"
         const val DEFAULT_BASE_URL = AppConstants.DEFAULT_BASE_URL
+        private const val MAX_HTTP_RESPONSE_BYTES = 2L * 1024L * 1024L
+        private const val MAX_SSE_LINE_BYTES = 64L * 1024L
+        private const val MAX_SSE_EVENT_CHARS = 64 * 1024
+        private const val MAX_SSE_DATA_LINES = 64
 
         /** Missing schemes become HTTPS; insecure/malformed stored values fail closed to production. */
         fun String.normalizeBaseUrl(): String =

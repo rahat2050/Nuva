@@ -19,12 +19,17 @@ import com.nuva.assistant.database.dao.PendingActionDao
 import com.nuva.assistant.database.dao.NoteDao
 import com.nuva.assistant.database.dao.insert
 import com.nuva.assistant.database.entities.NoteEntity
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import com.nuva.assistant.memory.UserPreferences
 import com.nuva.assistant.service.NuvaNotificationListener
 import com.nuva.assistant.supabase.SupabaseRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * THE COMMAND ENGINE — the only class that turns a validated decision into
@@ -89,13 +94,33 @@ class CommandExecutor(
      */
     private val planQueue = ArrayDeque<CommandDecision>()
     private var planTotalSteps: Int = 0
+    private var planPendingId: Long? = null
+
+    /**
+     * Command processing and confirmation mutate one shared plan/session. They
+     * must never interleave across the app, wake overlay and assistant service.
+     */
+    private val commandMutex = Mutex()
 
     /**
      * Full pipeline for one utterance (voice or typed). Never throws — every
      * failure becomes a [Step.Failed] with a user-sayable reason.
      */
-    suspend fun process(text: String): Step {
+    suspend fun process(text: String): Step = commandMutex.withLock {
+        processLocked(text)
+    }
+
+    private suspend fun processLocked(text: String): Step {
         if (text.isBlank()) return Step.Failed("Kichu bolejni. Ar ektu jore bolen.")
+        clearActivePlan()
+        // Secrets and transaction requests stop before AI, contacts and local
+        // history. A refusal must not itself persist the sensitive utterance.
+        if (SensitiveAppPolicy.mentionsCredentials(text)) {
+            return Step.Failed(SensitiveAppPolicy.CREDENTIAL_REFUSAL)
+        }
+        SensitiveAppPolicy.refusalForText(text)?.let { refusal ->
+            return Step.Failed(refusal.speech)
+        }
         _busy.value = true
         try {
             // Multi-step plan? ("WhatsApp kholo ar Rohim-ke message dau …")
@@ -113,6 +138,8 @@ class CommandExecutor(
                 "পুরো command-টা বুঝিনি — আপনি কি বলতে চাচ্ছেন অন্য কিছু? একটু অন্যভাবে বলুন বা লিখে দিন।",
             )
             return handleDecision(text, decision)
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (err: AIRepository.ApiCallException) {
             return Step.Failed(
                 "ইন্টারনেট লাগবে এই command-এর জন্য। লোকাল কাজ (app open, torch, alarm, timer, volume, battery) অফলাইনেই চলে।",
@@ -129,6 +156,12 @@ class CommandExecutor(
      * needs confirmation PAUSES the plan (its own dialog); after the user
      * confirms, [confirm] resumes the queue. A failed step aborts the rest.
      */
+    private fun clearActivePlan() {
+        planQueue.clear()
+        planTotalSteps = 0
+        planPendingId = null
+    }
+
     private suspend fun drainPlan(step: Step): Step {
         var current = step
         var index = planTotalSteps - planQueue.size
@@ -143,8 +176,9 @@ class CommandExecutor(
                 handleDecision(label, next)
             }
         }
-        if (planQueue.isEmpty() && current is Step.Done && planTotalSteps > 1) {
-            planTotalSteps = 0
+        when {
+            current is Step.Failed -> clearActivePlan()
+            planQueue.isEmpty() && current is Step.Done -> clearActivePlan()
         }
         return current
     }
@@ -161,7 +195,7 @@ class CommandExecutor(
         // Local parser explicitly asked for more info (or refused) — respect it.
         if (local != null && local.source == "offline-security") return local
 
-        val language = preferences.languageBlocking()
+        val language = preferences.language.first()
         return try {
             val remote = aiRepository.interpret(text, language)
             if (remote.unsupported) {
@@ -171,6 +205,8 @@ class CommandExecutor(
             } else {
                 remote
             }
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (err: Exception) {
             local ?: throw err
         }
@@ -193,6 +229,16 @@ class CommandExecutor(
         }
 
         var action = applyContext(text, decision.action)
+
+        // Re-check the structured action itself. A compromised/misconfigured
+        // backend must not inject credential or transaction text that was not
+        // present in the user's original command.
+        SensitiveAppPolicy.refusalForAction(action)?.let { refusal ->
+            history.updateStatusAndError(localId, "blocked", refusal.reason)
+            reportRemote(decision, "blocked", refusal.reason)
+            clearActivePlan()
+            return Step.Failed(refusal.speech)
+        }
 
         // Contact resolution for calls/messages/chats BEFORE anything is
         // confirmed, so the confirmation dialog always shows a real number.
@@ -322,14 +368,17 @@ class CommandExecutor(
                 ContactStep.Resolved(r.match.phone, r.match.displayName)
 
             is ContactResolver.Resolution.Ambiguous -> {
+                val unresolvedAction = decision.action
+                    ?: return ContactStep.Fail("Action ta ar valid nei.", "missing contact action")
                 val pendingId = pendingActions.insert(
                     localCommandId = localId,
                     commandText = text,
-                    actionJson = ActionJson.encode(decision.action!!),
+                    actionJson = ActionJson.encode(unresolvedAction),
                     risk = decision.risk.name.lowercase(),
                     serverCommandId = decision.commandId,
                 )
                 history.updateStatus(localId, "pending_choice")
+                if (planQueue.isNotEmpty()) planPendingId = pendingId
                 ContactStep.Choice(Step.AwaitingContactChoice(pendingId, decision, r.matches))
             }
         }
@@ -343,7 +392,7 @@ class CommandExecutor(
     ): Step {
         val mustConfirm = com.nuva.assistant.core.security.SecurityPolicy.mustConfirm(
             decision.risk,
-            preferences.confirmationAlwaysBlocking(),
+            preferences.confirmationAlways.first(),
         ) || decision.requiresConfirmation
 
         return if (mustConfirm) {
@@ -355,6 +404,7 @@ class CommandExecutor(
                 serverCommandId = decision.commandId,
             )
             history.updateStatus(localId, "pending_confirmation")
+            if (planQueue.isNotEmpty()) planPendingId = pendingId
             Step.AwaitingConfirmation(pendingId, decision)
         } else {
             executeDecision(decision, action, localId)
@@ -362,77 +412,145 @@ class CommandExecutor(
     }
 
     /** The user picked one of several matching contacts → park it and confirm. */
-    suspend fun chooseContact(pendingId: Long, match: ContactResolver.ContactMatch): Step {
+    suspend fun chooseContact(pendingId: Long, match: ContactResolver.ContactMatch): Step =
+        commandMutex.withLock { chooseContactLocked(pendingId, match) }
+
+    private suspend fun chooseContactLocked(
+        pendingId: Long,
+        match: ContactResolver.ContactMatch,
+    ): Step {
         val pending = pendingActions.get(pendingId) ?: return Step.Failed("Action ar pending nei.")
-        val action = ActionJson.decode(pending.actionJson) ?: return Step.Failed("Action ta ar valid nei.")
+        if (pending.status != "pending") return Step.Failed("Action ta already handle hoye geche.")
+        if (!PendingActionPolicy.isFresh(pending.createdAt)) return expirePending(pending)
+        val action = ActionJson.decode(pending.actionJson)
+            ?: return blockPending(pending, "pending action failed validation")
         val updated: NuvaAction = when (action) {
             is NuvaAction.CallContact -> action.copy(contact = match.displayName, phoneNumber = match.phone)
             is NuvaAction.SendMessage -> action.copy(contact = match.displayName, phoneNumber = match.phone)
-            else -> action
+            is NuvaAction.OpenChat -> action.copy(contact = match.displayName, phoneNumber = match.phone)
+            else -> return blockPending(pending, "pending action does not support contact choice")
         }
-        // Park the RESOLVED action — confirm() decodes from the DB row.
-        pendingActions.updateAction(pendingId, ActionJson.encode(updated))
-        pendingActions.updateStatus(pendingId, "pending")
+        // Round-trip the selected contact through the same validator before it
+        // is persisted. The old OpenChat path silently ignored the selection.
+        val validated = ActionJson.decode(ActionJson.encode(updated))
+            ?: return blockPending(pending, "selected contact failed validation")
+        if (pendingActions.updatePendingAction(pendingId, ActionJson.encode(validated)) != 1) {
+            return Step.Failed("Action ta already handle hoye geche.")
+        }
+        val risk = CommandValidator.recomputeRisk(
+            validated,
+            pending.commandText,
+            NuvaRisk.fromWire(pending.risk),
+        )
         val decision = CommandDecision(
-            intent = updated.intent,
-            action = updated,
+            intent = validated.intent,
+            action = validated,
             unsupported = false,
-            risk = NuvaRisk.valueOf(pending.risk.uppercase()),
+            risk = risk,
             requiresConfirmation = true,
             speech = "",
             reasons = emptyList(),
             commandId = pending.serverCommandId,
             source = "contact-choice",
         )
-        // Re-enter the confirmation gate with the resolved number.
-        val mustConfirm = com.nuva.assistant.core.security.SecurityPolicy.mustConfirm(
-            decision.risk,
-            preferences.confirmationAlwaysBlocking(),
-        ) || decision.requiresConfirmation
-        return if (mustConfirm) {
-            Step.AwaitingConfirmation(pendingId, decision)
-        } else {
-            confirm(pendingId)
-        }
+        return Step.AwaitingConfirmation(pendingId, decision)
     }
 
     /** Called by the confirmation UI when the user approves a pending action. */
-    suspend fun confirm(pendingId: Long): Step {
+    suspend fun confirm(pendingId: Long): Step = commandMutex.withLock {
+        confirmLocked(pendingId)
+    }
+
+    private suspend fun confirmLocked(pendingId: Long): Step {
         val pending = pendingActions.get(pendingId) ?: return Step.Failed("Action ar pending nei.")
+        if (pending.status != "pending") return Step.Failed("Action ta already handle hoye geche; abar command din.")
+        if (!PendingActionPolicy.isFresh(pending.createdAt)) return expirePending(pending)
         val action = ActionJson.decode(pending.actionJson)
-            ?: return Step.Failed("Action ta ar valid nei.")
-        pendingActions.updateStatus(pendingId, "confirmed")
+            ?: return blockPending(pending, "pending action failed validation")
+        SensitiveAppPolicy.refusalForAction(action)?.let { refusal ->
+            return blockPending(pending, refusal.reason, refusal.speech)
+        }
+        // SQL compare-and-set makes confirmation one-shot even under rapid
+        // double taps or two visible NUVA surfaces racing the same row.
+        if (pendingActions.claimPending(pendingId) != 1) {
+            return Step.Failed("Action ta already handle hoye geche; abar command din.")
+        }
+
+        val continuesPlan = planPendingId == pendingId
+        if (continuesPlan) planPendingId = null
         if (pending.localCommandId != null) {
             history.updateStatus(pending.localCommandId, "confirmed")
         }
+        val risk = CommandValidator.recomputeRisk(
+            action,
+            pending.commandText,
+            NuvaRisk.fromWire(pending.risk),
+        )
         val decision = CommandDecision(
             intent = action.intent,
             action = action,
             unsupported = false,
-            risk = NuvaRisk.valueOf(pending.risk.uppercase()),
+            risk = risk,
             requiresConfirmation = true,
             speech = "",
             reasons = emptyList(),
             commandId = pending.serverCommandId,
             source = "pending",
         )
-        return drainPlan(executeDecision(decision, action, pending.localCommandId ?: 0L))
+        val executed = executeDecision(decision, action, pending.localCommandId ?: 0L)
+        return if (continuesPlan) drainPlan(executed) else executed
     }
 
     /** Called when the user rejects the confirmation dialog. */
-    suspend fun reject(pendingId: Long): Step {
-        val pending = pendingActions.get(pendingId) ?: return Step.Done("Thik ache, koreni.", "rejected")
-        pendingActions.updateStatus(pendingId, "rejected")
+    suspend fun reject(pendingId: Long): Step = commandMutex.withLock {
+        val pending = pendingActions.get(pendingId)
+            ?: return@withLock Step.Done("Thik ache, koreni.", "rejected")
+        if (pendingActions.transitionPending(pendingId, "rejected") != 1) {
+            return@withLock Step.Done("Action ta agei handle hoye geche.", "rejected")
+        }
         if (pending.localCommandId != null) history.updateStatus(pending.localCommandId, "rejected")
         reportRemoteById(pending.serverCommandId, "rejected", null)
-        // Cancelling one step cancels the whole remaining plan — never run
-        // half-approved sequences.
-        if (planQueue.isNotEmpty()) {
-            planQueue.clear()
-            planTotalSteps = 0
-            return Step.Done("Thik ache, koreni — baki plan-er kajgulo o cancel kore dilam.", "rejected")
+        // Only cancel the plan owned by THIS dialog. An old dialog must never
+        // erase or resume a newer command's plan.
+        if (planPendingId == pendingId) {
+            val hadMoreSteps = planQueue.isNotEmpty()
+            clearActivePlan()
+            if (hadMoreSteps) {
+                return@withLock Step.Done(
+                    "Thik ache, koreni — baki plan-er kajgulo o cancel kore dilam.",
+                    "rejected",
+                )
+            }
         }
-        return Step.Done("Thik ache, koreni.", "rejected")
+        Step.Done("Thik ache, koreni.", "rejected")
+    }
+
+    private suspend fun expirePending(
+        pending: com.nuva.assistant.database.entities.PendingActionEntity,
+    ): Step {
+        if (pendingActions.transitionPending(pending.id, "expired") != 1) {
+            return Step.Failed("Action ta already handle hoye geche; abar command din.")
+        }
+        pending.localCommandId?.let {
+            history.updateStatusAndError(it, "expired", "confirmation expired")
+        }
+        reportRemoteById(pending.serverCommandId, "rejected", "confirmation expired")
+        if (planPendingId == pending.id) clearActivePlan()
+        return Step.Failed("Confirmation-er shomoy sesh hoye geche; abar command din.")
+    }
+
+    private suspend fun blockPending(
+        pending: com.nuva.assistant.database.entities.PendingActionEntity,
+        reason: String,
+        speech: String = "Action ta security check pass koreni; abar command din.",
+    ): Step {
+        if (pendingActions.transitionPending(pending.id, "blocked") != 1) {
+            return Step.Failed("Action ta already handle hoye geche; abar command din.")
+        }
+        pending.localCommandId?.let { history.updateStatusAndError(it, "blocked", reason) }
+        reportRemoteById(pending.serverCommandId, "blocked", reason)
+        if (planPendingId == pending.id) clearActivePlan()
+        return Step.Failed(speech)
     }
 
     // --- Execution -------------------------------------------------------------
@@ -872,7 +990,7 @@ class CommandExecutor(
             is NuvaAction.DeviceStatusQuery ->
                 ExecutionOutcome(
                     "completed",
-                    deviceStatus.answer(action.query, preferences.languageBlocking()),
+                    deviceStatus.answer(action.query, preferences.language.first()),
                 )
 
             is NuvaAction.LocalAnswer ->
@@ -1052,7 +1170,7 @@ class CommandExecutor(
                 if (number.isNullOrBlank()) {
                     ExecutionOutcome("failed", "${action.contact} er number painai.", "no phone number")
                 } else {
-                    val direct = preferences.directCallBlocking()
+                    val direct = preferences.directCall.first()
                     val ok = AppLauncher.dial(context, number, direct)
                     if (ok) {
                         ExecutionOutcome("completed", "${action.contact}-কে কল করছি।")
@@ -1160,7 +1278,9 @@ class CommandExecutor(
     private suspend fun readSavedItems(kind: SavedItemKind): ExecutionOutcome {
         val dao = notes ?: return ExecutionOutcome("failed", "Saved list porte parini.", "notes storage unavailable")
         val roomKind = if (kind == SavedItemKind.TODO || kind == SavedItemKind.SHOPPING) "todo" else "note"
-        val rows = dao.byKindOnce(roomKind, 50).filter { row ->
+        val rows = dao.byKindOnce(roomKind, 50)
+            .filterNot { row -> SensitiveAppPolicy.mentionsCredentials(row.content) }
+            .filter { row ->
             when (kind) {
                 SavedItemKind.SHOPPING -> row.content.startsWith("Shopping:", ignoreCase = true)
                 SavedItemKind.EXPENSE -> row.content.startsWith("Expense:", ignoreCase = true)
@@ -1312,7 +1432,9 @@ class CommandExecutor(
         if (commandId == null) return // offline/local-only command — history row suffices
         try {
             supabaseRepository.reportExecution(commandId, status, error)
-        } catch (err: Exception) {
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
             // Best effort: the local Room history is the source of truth offline.
         }
     }

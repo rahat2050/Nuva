@@ -32,6 +32,13 @@ auto-submitted. Credential-like and financial-transaction text is refused before
 Activity Intent payload is cleared after consumption. Details:
 [`quick-access-text-handoff.md`](quick-access-text-handoff.md).
 
+## Runtime/consent hardening — SUPPORTED / DEVICE QA PENDING
+v4.4.2 removes main-thread DataStore blocking, streams SSE stages without EOF buffering, serializes
+command plans and scheduled-draft mutations, and makes confirmation a five-minute one-shot database
+claim. Credential-bearing and financial-transaction transcripts stop before history/network/sync;
+model actions/speech and memory values are revalidated. Supabase in-flight sign-in is bound to its configuration snapshot.
+These source/runtime contracts pass deterministic checks; full Gradle and real-device QA remain pending.
+
 ## Natural command grammar — SUPPORTED
 A data-audited grammar accepts **12,250 concrete static command forms** (50 families × 5 aliases ×
 7 prefixes × 7 suffixes), plus dynamic apps/contacts/messages/queries/times and 600 sourced skills.

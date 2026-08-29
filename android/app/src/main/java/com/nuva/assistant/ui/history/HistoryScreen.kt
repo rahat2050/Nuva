@@ -32,11 +32,13 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nuva.assistant.R
 import com.nuva.assistant.core.NuvaContainer
+import com.nuva.assistant.core.security.SensitiveAppPolicy
 import com.nuva.assistant.ui.theme.NuvaGlassPanel
 import com.nuva.assistant.ui.theme.NuvaScreenHeader
 import com.nuva.assistant.ui.theme.NuvaStatusChip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -53,6 +55,13 @@ class HistoryViewModel : ViewModel() {
     val history = NuvaContainer.database
         .commandHistoryDao()
         .recent(200)
+        .map { rows ->
+            rows.filterNot { row ->
+                SensitiveAppPolicy.mentionsCredentials(row.text) ||
+                    SensitiveAppPolicy.mentionsCredentials(row.error.orEmpty()) ||
+                    SensitiveAppPolicy.refusalForText(row.text) != null
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun clear() {

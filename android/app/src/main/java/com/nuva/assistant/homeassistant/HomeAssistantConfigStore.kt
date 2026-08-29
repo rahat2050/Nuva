@@ -4,7 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
-import java.net.URI
+import com.nuva.assistant.core.security.SecureEndpointPolicy
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -17,6 +17,7 @@ class HomeAssistantConfigStore(private val context: Context) {
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    @Synchronized
     fun save(baseUrl: String, newToken: String?): Result<Unit> = runCatching {
         val normalized = normalizeAndValidateUrl(baseUrl)
             ?: error("Home Assistant URL must be a valid HTTPS origin")
@@ -36,6 +37,7 @@ class HomeAssistantConfigStore(private val context: Context) {
             .apply()
     }
 
+    @Synchronized
     fun config(): Config? {
         val url = prefs.getString(KEY_URL, null)?.let(::normalizeAndValidateUrl) ?: return null
         val token = readToken()?.takeIf { it.isNotBlank() } ?: return null
@@ -44,8 +46,10 @@ class HomeAssistantConfigStore(private val context: Context) {
 
     fun isConfigured(): Boolean = config() != null
 
+    @Synchronized
     fun savedBaseUrl(): String = prefs.getString(KEY_URL, "").orEmpty()
 
+    @Synchronized
     fun clear() {
         prefs.edit().remove(KEY_URL).remove(KEY_TOKEN).apply()
     }
@@ -86,14 +90,14 @@ class HomeAssistantConfigStore(private val context: Context) {
     }
 
     companion object {
-        fun normalizeAndValidateUrl(raw: String): String? = runCatching {
-            val value = raw.trim().trimEnd('/')
-            val uri = URI(value)
-            if (uri.scheme?.lowercase() != "https" || uri.host.isNullOrBlank()) return null
-            if (uri.userInfo != null || uri.query != null || uri.fragment != null) return null
-            val port = if (uri.port == -1) "" else ":${uri.port}"
-            "https://${uri.host.lowercase()}$port${uri.path.orEmpty().trimEnd('/')}"
-        }.getOrNull()
+        fun normalizeAndValidateUrl(raw: String): String? {
+            val value = raw.trim()
+            // Home Assistant setup intentionally requires the scheme to be
+            // visible to the user; the shared policy handles every other URI
+            // edge case (credentials/query/fragment/port/path traversal).
+            if (!value.startsWith("https://", ignoreCase = true)) return null
+            return SecureEndpointPolicy.normalizeRequired(value)?.trimEnd('/')
+        }
 
         private const val PREFS = "nuva_home_assistant_secure"
         private const val KEY_URL = "base_url"
